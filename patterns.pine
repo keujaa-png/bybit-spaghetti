@@ -29,7 +29,7 @@ swWickPct   = input.float(40, "Mèche basse ≥ % de la bougie", minval=0, maxva
 hideDown    = input.bool(false, "Masquer les sweeps en tendance baissière", group="3. Sweep")
 tpR         = input.float(1.5, "Réussite = objectif à x fois le risque", minval=0.5, step=0.25, group="3. Sweep : statistiques", tooltip="Entrée à la clôture du sweep, stop sous la mèche. Réussi si l'objectif est touché avant le stop.")
 maxHold     = input.int(30, "…dans les N barres (sinon échec)", minval=3, group="3. Sweep : statistiques")
-showStats   = input.bool(true, "Tableau des statistiques", group="3. Sweep : statistiques")
+showStats   = input.bool(false, "Tableau des statistiques", group="3. Sweep : statistiques")
 consLen     = input.int(40, "Consolidation : durée (barres)", minval=10, maxval=300, group="3. Sweep : contexte")
 consAtr     = input.float(6.0, "Consolidation : range ≤ x ATR", minval=1, step=0.5, group="3. Sweep : contexte")
 trendLen    = input.int(50, "Tendance : EMA", minval=10, group="3. Sweep : contexte")
@@ -44,7 +44,8 @@ atr = ta.atr(14)
 var int lastFlagBar = na
 flagBreak = false
 float fGain = na
-preFilter = close > open and close > ta.highest(close, flagMin)[1]
+recentHi  = ta.highest(close, flagMin)[1]
+preFilter = close > open and close > recentHi
 if useFlag and preFilter and bar_index > flagMax + poleLen + 2 and (na(lastFlagBar) or bar_index - lastFlagBar > flagMin)
     for L = flagMin to flagMax
         top = high[L]
@@ -221,7 +222,7 @@ if sweep and barstate.isconfirmed
     if not (hideDown and ctx == 1)
         probTxt = t < 5 ? "historique insuffisant (" + str.tostring(t) + ")" : str.tostring(swProb, "#") + "% réussite (" + str.tostring(t) + " cas)"
         line.new(swBar, swLvl, bar_index, swLvl, color = color.new(ctxCol(ctx), 30), style = line.style_dotted)
-        label.new(bar_index, low, "Sweep · " + ctxName(ctx) + "\n" + probTxt, style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.small, tooltip = "Réussite = objectif " + str.tostring(tpR) + "R touché avant le stop (sous la mèche), dans les " + str.tostring(maxHold) + " barres. Calculé sur l'historique de ce graphique, avant ce sweep.")
+        label.new(bar_index, low, "Sweep", style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.tiny, tooltip = "Sweep " + ctxName(ctx) + " : " + probTxt + ". Réussite = objectif " + str.tostring(tpR) + "R avant le stop (sous la mèche), en " + str.tostring(maxHold) + " barres max, sur l'historique de ce graphique.")
     swLvl := na
 
 var table st = table.new(position.bottom_right, 3, 5, bgcolor = color.new(color.black, 15), border_width = 1)
@@ -248,4 +249,4 @@ if barstate.isconfirmed
     if tbBreak
         alert("Triple creux : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
     if sweep and not (hideDown and ctx == 1)
-        alert("Sweep " + ctxName(ctx) + " : " + syminfo.ticker + " " + timeframe.period + (na(swProb) ? "" : " · " + str.tostring(swProb, "#") + "% historique"), alert.freq_once_per_bar_close)
+        alert("Sweep " + ctxName(ctx) + " : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
