@@ -171,7 +171,7 @@
     </ul></details>
     <details><summary>Les outils</summary><ul>
       <li>☆ épingle un coin (toujours visible, en haut).</li>
-      <li>↗ ouvre le graphique (TradingView, ou Hyperliquid pour les coins <b>HL</b>).</li>
+      <li>↗ ouvre le coin sur son exchange : Bybit, ou Hyperliquid pour les coins <b>HL</b>.</li>
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
       <li><b>⚡ RS</b> : un coin qui monte d'un coup plus vite que le marché (X % au-dessus de la médiane sur N min, avec du volume). Badge ⚡ dans la liste + alerte si « Alertes » est coché, même s'il n'est pas dans le top affiché.</li>
       <li><b>Alertes</b> : son + notification si un coin gagne N places ou atteint le score choisi (onglet ouvert).</li>
@@ -613,7 +613,7 @@ const SORTS = {
 function linkOf(c){
   return c.ex === 'hl'
     ? {href: `https://app.hyperliquid.xyz/trade/${encodeURIComponent(c.name)}`, title: 'Ouvrir sur Hyperliquid'}
-    : {href: `https://www.tradingview.com/chart/?symbol=BYBIT:${c.name}.P`, title: 'Ouvrir sur TradingView'};
+    : {href: `https://www.bybit.com/trade/usdt/${c.name}`, title: 'Trader sur Bybit'};
 }
 function renderList({vis, accWin, nextIn}){
   $('accHead').textContent = `Accél ${accWin >= 3600000 ? Math.round(accWin / 3600000) + 'h' : Math.round(accWin / 60000) + 'm'}`;
