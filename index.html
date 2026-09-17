@@ -127,8 +127,13 @@
   <label title="Épaisseur des courbes proportionnelle au volume 24h"><input id="thick" type="checkbox" checked> Épaisseur ∝ volume</label>
   <span class="sep"></span>
   <label title="Notification + son quand un coin remplit une condition (1 alerte max par coin toutes les 15 min)"><input id="alerts" type="checkbox"> Alertes</label>
-  <label title="Alerte si le coin gagne au moins N places">rang ▲≥ <input id="alRank" type="number" value="5" min="1" step="1"></label>
-  <label title="Alerte si le score atteint ce seuil">score ≥ <input id="alScore" type="number" value="80" min="0" max="100" step="5"></label>
+  <label title="Stricte : très peu d'alertes, seulement les setups les plus nets. Large : plus d'alertes.">Sensibilité
+    <select id="alSens">
+      <option value="strict">stricte</option>
+      <option value="normal" selected>normale</option>
+      <option value="wide">large</option>
+    </select>
+  </label>
   <label title="Relative strength soudaine : le coin monte d'au moins X % de plus que la médiane du marché sur la période choisie, avec du volume (Vol× ≥ 1,2 quand il est connu). 0 = désactivé.">⚡ RS ≥ <input id="alRs" type="number" value="2" min="0" step="0.5">% en
     <select id="alRsWin">
       <option value="5">5 min</option>
@@ -173,8 +178,8 @@
       <li>☆ épingle un coin (toujours visible, en haut).</li>
       <li>↗ ouvre le coin sur son exchange : Bybit, ou Hyperliquid pour les coins <b>HL</b>.</li>
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
-      <li><b>⚡ RS</b> : un coin qui monte d'un coup plus vite que le marché (X % au-dessus de la médiane sur N min, avec du volume). Badge ⚡ dans la liste + alerte si « Alertes » est coché, même s'il n'est pas dans le top affiché.</li>
-      <li><b>Alertes</b> : son + notification si un coin gagne N places ou atteint le score choisi (onglet ouvert).</li>
+      <li><b>🎯 Setup long</b> : une seule alerte, seulement si tout est réuni : le coin monte d'un coup plus vite que le marché (⚡ RS), avec du volume (Vol×), en accélération, en hausse sur la fenêtre, bon score, et pas déjà trop étendu (un funding élevé est signalé ⚠ mais n'empêche pas l'alerte). Badge 🎯 dans la liste.</li>
+      <li><b>Alertes</b> : son + notification pour le meilleur setup du moment (onglet ouvert). <b>Sensibilité</b> stricte = très peu d'alertes, large = plus. Un même coin n'est pas re-signalé avant 20 à 45 min.</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
       <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous). Par défaut le tri est <b>Perf</b> : la liste suit l'ordre des courbes du graphique.</li>
       <li><b>Reclasser</b> : l'ordre ne bouge qu'à cet intervalle (↻ = compte à rebours) ; les chiffres restent en direct.</li>
@@ -202,7 +207,15 @@ const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
 const ALIASES = {PUMPFUN: 'PUMP'};
-const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
+const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens'];
+// Alerte « setup long » : toutes les conditions doivent être réunies. rs = multiplicateur du seuil RS,
+// rv = Vol× minimum, score = score minimum, cool = minutes entre 2 alertes d'un même coin, gap = minutes entre 2 alertes tout court
+const PRESETS = {
+  strict: {rs: 1.5,  rv: 2.0, score: 75, cool: 45, gap: 5},
+  normal: {rs: 1.0,  rv: 1.5, score: 65, cool: 30, gap: 2},
+  wide:   {rs: 0.75, rv: 1.2, score: 50, cool: 20, gap: 1}
+};
+let lastAlertAt = 0;
 const STORE_KEY = 'bybit-spaghetti-v2';
 
 // clé de dédoublonnage : 1000PEPEUSDT, SHIB1000USDT, kPEPE -> PEPE / SHIB
@@ -223,7 +236,7 @@ const opt = () => ({
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
-  alerts: $('alerts').checked, alRs: +$('alRs').value || 0, alRsWin: (+$('alRsWin').value || 10) * 60000, alRank: +$('alRank').value || 5, alScore: +$('alScore').value || 80
+  alerts: $('alerts').checked, alRs: +$('alRs').value || 0, alRsWin: (+$('alRsWin').value || 10) * 60000, alSens: PRESETS[$('alSens').value] || PRESETS.normal
 });
 const colorOf = c => `hsl(${c.hue} 72% 62%)`;
 const fmtPct = (v, d = 2) => isNaN(v) ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(d)}%`;
@@ -481,6 +494,7 @@ function compute(){
     let s = 100 * (0.40 * P.acc.get(r) + 0.30 * P.dr.get(r) + 0.30 * P.rv.get(r));
     if(r.fr >= 0.08) s -= 20; else if(r.fr >= 0.03) s -= 8;
     r.score = Math.max(0, Math.round(s));
+    r.scoreRaw = Math.round(100 * (0.40 * P.acc.get(r) + 0.30 * P.dr.get(r) + 0.30 * P.rv.get(r)));   // sans pénalité funding
   });
   const vis = all.filter(r => r.pinned || !o.bull || r.perf > o.minPerf);
   // ordre figé pendant o.reorderMs ; reclassement immédiat si un coin encore inconnu apparaît (chargement)
@@ -500,7 +514,11 @@ function compute(){
   const med = shorts.length ? shorts[Math.floor(shorts.length / 2)] : NaN;
   all.forEach(r => {
     r.rs = isNaN(r.pS) || isNaN(med) ? NaN : r.pS - med;
-    r.rsHit = o.alRs > 0 && r.rs >= o.alRs && r.pS > 0 && (isNaN(r.rv) || r.rv >= 1.2);
+    const P = o.alSens;
+    // setup long : RS soudaine + volume + accélération + tendance + score, mouvement pas déjà trop étendu (le funding n'exclut pas)
+    r.rsHit = o.alRs > 0 && r.rs >= o.alRs * P.rs && r.pS > 0 && r.pS <= 4 * o.alRs
+      && !isNaN(r.rv) && r.rv >= P.rv && r.acc > 0 && r.perf > 0 && r.perf <= 25
+      && r.dr >= 0 && r.scoreRaw >= P.score;
   });
   return {vis: shown, all, t0, now, accWin, o, total: all.length, eligible: vis.length, nextIn};
 }
@@ -515,24 +533,21 @@ function beep(){
     osc.connect(g).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.35);
   }catch(e){}
 }
-function checkAlerts({vis, all, o}){
+function checkAlerts({all, o}){
   if(!o.alerts || Date.now() - startedAt < ALERT_WARMUP) return;
-  const now = Date.now(), shownSet = new Set(vis);
-  all.forEach(r => {
-    if(now - r.c.lastAlert < ALERT_COOLDOWN) return;
-    const why = [];
-    if(r.rsHit) why.push(`⚡ RS +${r.rs.toFixed(1)}% vs marché en ${Math.round(o.alRsWin / 60000)} min${isNaN(r.rv) ? '' : ` · vol ${r.rv.toFixed(1)}×`}`);
-    if(shownSet.has(r) && r.perf > 0){
-      if(r.dr >= o.alRank) why.push(`▲${r.dr} places`);
-      if(r.score >= o.alScore) why.push(`score ${r.score}`);
-    }
-    if(!why.length) return;
-    r.c.lastAlert = now;
-    const text = `${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(r.perf)} · ${why.join(' · ')}`;
-    alertLog.unshift({t: now, sym: r.c.sym, text}); alertLog.length = Math.min(alertLog.length, 30);
-    try{ if('Notification' in window && Notification.permission === 'granted') new Notification('Spaghetti', {body: text, tag: r.c.sym}); }catch(e){}
+  const now = Date.now(), P = o.alSens;
+  if(now - lastAlertAt < P.gap * 60000) return;
+  // une seule alerte à la fois : le meilleur setup du moment
+  const best = all.filter(r => r.rsHit && now - r.c.lastAlert >= P.cool * 60000)
+                  .sort((a, b) => b.scoreRaw - a.scoreRaw || b.rs - a.rs)[0];
+  if(best){
+    const r = best;
+    r.c.lastAlert = now; lastAlertAt = now;
+    const text = `🎯 LONG ${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(r.perf)} · RS +${r.rs.toFixed(1)}% en ${Math.round(o.alRsWin / 60000)} min · vol ${r.rv.toFixed(1)}× · score ${r.scoreRaw}${r.fr >= 0.03 ? ` · ⚠ funding ${r.fr.toFixed(3)}%` : ''}`;
+    alertLog.unshift({t: now, sym: r.c.sym, text}); alertLog.length = Math.min(alertLog.length, 20);
+    try{ if('Notification' in window && Notification.permission === 'granted') new Notification('Setup long', {body: text, tag: r.c.sym}); }catch(e){}
     beep();
-  });
+  }
   $('alertBox').innerHTML = alertLog.map(a =>
     `<div data-s="${a.sym}"><time>${new Date(a.t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}</time><span>${a.text}</span></div>`).join('');
 }
@@ -629,7 +644,7 @@ function renderList({vis, accWin, nextIn}){
     const fr = isNaN(r.fr) ? '<span class="mut">–</span>' : `<span class="${r.fr >= 0.08 ? 'down' : r.fr >= 0.03 ? 'warn' : r.fr < 0 ? 'up' : 'mut'}">${r.fr.toFixed(3)}%</span>`;
     const sc = `<span class="score ${r.score >= 75 ? 'up' : r.score < 40 ? 'mut' : ''}">${r.score}</span>`;
     const isNew = (r.c.addedAt && now - r.c.addedAt < NEW_BADGE_MS ? '<span class="new">NEW</span>' : '')
-      + (r.rsHit ? `<span class="rs" title="RS soudaine : +${r.rs.toFixed(1)}% vs marché">⚡</span>` : '');
+      + (r.rsHit ? `<span class="rs" title="Setup long : RS +${r.rs.toFixed(1)}% vs marché, vol ${r.rv.toFixed(1)}×, score ${r.score}">🎯</span>` : '');
     const ex = r.c.ex === 'hl' ? '<span class="ex" title="Hyperliquid">HL</span>' : '';
     return `<div class="grid row ${hi === s ? 'hi' : ''} ${r.pinned ? 'pin' : ''}" data-s="${s}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
       <span class="star ${r.pinned ? 'on' : ''}" data-pin="${s}">${r.pinned ? '★' : '☆'}</span>
@@ -684,7 +699,7 @@ $('alerts').addEventListener('change', async () => {
   if($('alerts').checked) beep();
   saveSettings();
 });
-['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alSens'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
 ['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
