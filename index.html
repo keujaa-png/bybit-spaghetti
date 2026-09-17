@@ -53,11 +53,23 @@
   .up{color:var(--up)} .down{color:var(--down)} .warn{color:var(--warn)} .mut{color:var(--muted)}
   #empty{padding:40px 18px;color:var(--muted);text-align:center}
   @media (max-width:1250px){main{grid-template-columns:1fr;grid-template-rows:minmax(320px,1fr) 45%}aside{border-left:0;border-top:1px solid var(--line)}}
+  #helpBtn{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--text);font:600 13px/1 inherit;cursor:pointer}
+  #helpBtn:hover{border-color:var(--accent);color:var(--accent)}
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:0;width:min(560px,calc(100vw - 32px));max-height:min(80vh,720px)}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  .help{padding:16px 20px;overflow-y:auto;max-height:inherit;font-size:13px}
+  .help h2{font-size:15px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+  .help h3{font-size:13px;margin:14px 0 4px;color:var(--accent)}
+  .help ul,.help ol{margin:4px 0;padding-left:18px} .help li{margin:2px 0}
+  .help button{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer}
+  .help details{border-top:1px solid var(--line);padding:6px 0} .help summary{cursor:pointer;font-weight:600}
+  .help .note{color:var(--muted);font-size:12px;margin-top:12px}
 </style>
 </head>
 <body>
 <header>
   <h1>Spaghetti Bybit + HL</h1>
+  <button id="helpBtn" title="Guide d'utilisation" aria-label="Guide d'utilisation">?</button>
   <label title="Coins Hyperliquid ajoutés seulement s'ils ne sont pas déjà dans la liste Bybit"><input id="hl" type="checkbox" checked> + Hyperliquid</label>
   <label>Vol 24h min (M$) <input id="minVol" type="number" value="5" step="1" min="0"></label>
   <label>Fenêtre
@@ -98,6 +110,36 @@
   </aside>
 </main>
 
+<dialog id="help">
+  <div class="help">
+    <h2>Guide rapide <button id="helpClose" aria-label="Fermer">×</button></h2>
+    <p>Chaque courbe = un coin, parti de 0 % au début de la fenêtre. Survol = détail, clic = surligner.</p>
+    <details open><summary>Les colonnes</summary><ul>
+      <li><b>Score</b> 0–100 : accélération + places gagnées + volume relatif, pénalisé si funding élevé.</li>
+      <li><b>Accél</b> : le coin monte-t-il plus vite qu'avant ? ▲ = oui.</li>
+      <li><b>Rang</b> : places gagnées (▲) ou perdues (▼) récemment.</li>
+      <li><b>Vol×</b> : volume des 15 dernières min vs la normale. ≥ 1,5× = la hausse a du volume.</li>
+      <li><b>Funding</b> : orange/rouge = beaucoup de longs déjà en place, risque de purge.</li>
+    </ul></details>
+    <details><summary>Les outils</summary><ul>
+      <li>☆ épingle un coin (toujours visible, en haut).</li>
+      <li>↗ ouvre le graphique (TradingView, ou Hyperliquid pour les coins <b>HL</b>).</li>
+      <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
+      <li><b>Alertes</b> : son + notification si un coin gagne N places ou atteint le score choisi (onglet ouvert).</li>
+      <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
+      <li>Ex. filtre « +5 % sur 4 h » : Fenêtre 4 h + Perf min 5.</li>
+    </ul></details>
+    <details><summary>Méthode d'entrée (exemple)</summary><ol>
+      <li><b>Repérer</b> : Score ≥ 70, ▲ en Accél et Rang, Vol× ≥ 1,5, funding pas orange/rouge.</li>
+      <li><b>Confirmer</b> (↗) : structure haussière en 15 min / 1 h, pas en pleine bougie étirée.</li>
+      <li><b>Entrer</b> : cassure du dernier plus haut avec volume, ou rebond sur support / EMA 20.</li>
+      <li><b>Stop</b> sous le dernier plus bas, fixé avant d'entrer. Trop loin = pas de trade.</li>
+      <li><b>Taille</b> : risquer 0,5–1 % du capital, calculé depuis la distance au stop.</li>
+      <li><b>Sortir</b> : partiel à 1,5–2× le risque, stop au prix d'entrée ; alléger si Accél/Rang passent ▼.</li>
+    </ol></details>
+    <p class="note">Outil d'analyse, pas un conseil financier. Les hausses rapides et les petits volumes donnent beaucoup de faux signaux.</p>
+  </div>
+</dialog>
 <script>
 const API    = 'https://api.bybit.com/v5/market';
 const WS     = 'wss://stream.bybit.com/v5/public/linear';
@@ -571,6 +613,13 @@ $('win').addEventListener('change', () => {
   backfill([...coins.values()].filter(c => !c.ready)); render();
 });
 window.addEventListener('resize', render);
+
+
+const helpDlg = $('help');
+$('helpBtn').addEventListener('click', () => helpDlg.showModal());
+$('helpClose').addEventListener('click', () => helpDlg.close());
+helpDlg.addEventListener('click', e => { if(e.target === helpDlg) helpDlg.close(); });
+try{ if(!localStorage.getItem('bybit-spaghetti-help-seen')){ helpDlg.showModal(); localStorage.setItem('bybit-spaghetti-help-seen', '1'); } }catch(e){}
 
 // ─── Démarrage ────────────────────────────────────────────────────────────
 loadSettings();
