@@ -35,6 +35,17 @@ consAtr     = input.float(6.0, "Consolidation : range ≤ x ATR", minval=1, step
 trendLen    = input.int(50, "Tendance : EMA", minval=10, group="3. Sweep : contexte")
 downSlope   = input.float(0.5, "Baissière : EMA en baisse d'au moins x % sur 10 barres", minval=0, step=0.1, group="3. Sweep : contexte")
 
+// ── 4. Supports Daily / Weekly
+useHtf      = input.bool(true, "Afficher", group="4. Supports D / W")
+htfLen      = input.int(3, "Creux : bougies de chaque côté", minval=1, maxval=10, group="4. Supports D / W")
+showD       = input.bool(true, "Supports Daily", group="4. Supports D / W")
+showW       = input.bool(true, "Supports Weekly", group="4. Supports D / W")
+htfCount    = input.int(3, "Nombre de supports affichés par unité", minval=1, maxval=4, group="4. Supports D / W")
+htfMerge    = input.float(0.5, "Fusionner les niveaux à moins de x %", minval=0, step=0.1, group="4. Supports D / W")
+htfNearPct  = input.float(0.8, "Sweep « sur support » si à moins de x %", minval=0, step=0.1, group="4. Supports D / W")
+colD        = input.color(color.new(#7fb8a6, 0), "Couleur Daily", group="4. Supports D / W")
+colW        = input.color(color.new(#2bb3f0, 0), "Couleur Weekly", group="4. Supports D / W")
+
 atr = ta.atr(14)
 
 // ═══ 1. BULL FLAG ═══════════════════════════════════════════════════════
@@ -160,6 +171,65 @@ if useTB and not na(tbNeck)
         label.new(bar_index, low, "Triple creux", style = label.style_label_up, color = color.new(color.lime, 20), textcolor = color.black, size = size.small)
         tbNeck := na
 
+// ═══ 4. SUPPORTS DAILY / WEEKLY ═════════════════════════════════════════
+htfPiv() =>
+    pv = ta.pivotlow(low, htfLen, htfLen)
+    found = not na(pv)
+    [ta.valuewhen(found, pv, 0), ta.valuewhen(found, pv, 1), ta.valuewhen(found, pv, 2), ta.valuewhen(found, pv, 3)]
+
+[d0, d1, d2, d3] = request.security(syminfo.tickerid, "D", htfPiv(), lookahead = barmerge.lookahead_off)
+[w0, w1, w2, w3] = request.security(syminfo.tickerid, "W", htfPiv(), lookahead = barmerge.lookahead_off)
+
+// supports = niveaux sous le prix, du plus proche au plus lointain
+supportsBelow(float a0, float a1, float a2, float a3, float px) =>
+    out = array.new<float>()
+    for v in array.from(a0, a1, a2, a3)
+        if not na(v) and v < px
+            array.push(out, v)
+    array.sort(out, order.descending)
+    out
+
+near(array<float> arr, float v, float pct) =>
+    bool r = false
+    for x in arr
+        if math.abs(v / x - 1) * 100 <= pct
+            r := true
+    r
+
+wLv = supportsBelow(w0, w1, w2, w3, close)
+dLv = supportsBelow(d0, d1, d2, d3, close)
+if not showW
+    array.clear(wLv)
+if not showD
+    array.clear(dLv)
+
+var array<line>  htfLines  = array.new<line>()
+var array<label> htfLabels = array.new<label>()
+if useHtf and barstate.islast
+    for l in htfLines
+        line.delete(l)
+    for l in htfLabels
+        label.delete(l)
+    array.clear(htfLines)
+    array.clear(htfLabels)
+    drawn = array.new<float>()
+    // Weekly d'abord (prioritaire), puis Daily sans doublon
+    for tf = 0 to 1
+        lv = array.copy(dLv)
+        if tf == 0
+            lv := array.copy(wLv)
+        col = tf == 0 ? colW : colD
+        n = 0
+        for v in lv
+            if n >= htfCount
+                break
+            if near(drawn, v, htfMerge)
+                continue
+            array.push(drawn, v)
+            n += 1
+            array.push(htfLines, line.new(bar_index - 120, v, bar_index, v, extend = extend.right, color = col, width = tf == 0 ? 2 : 1, style = tf == 0 ? line.style_solid : line.style_dashed))
+            array.push(htfLabels, label.new(bar_index + 3, v, (tf == 0 ? "W " : "D ") + str.tostring(v, format.mintick) + "  " + str.tostring((v / close - 1) * 100, "#.#") + "%", style = label.style_label_left, color = color.new(color.black, 100), textcolor = col, size = size.small))
+
 // ═══ 3. SWEEP + CONTEXTE + TAUX DE RÉUSSITE ═════════════════════════════
 // contextes : 0 = après consolidation, 1 = tendance baissière, 2 = neutre
 ema      = ta.ema(close, trendLen)
@@ -221,8 +291,9 @@ if sweep and barstate.isconfirmed
         array.push(tBar, bar_index)
     if not (hideDown and ctx == 1)
         probTxt = t < 5 ? "historique insuffisant (" + str.tostring(t) + ")" : str.tostring(swProb, "#") + "% réussite (" + str.tostring(t) + " cas)"
+        onSup = useHtf ? (near(wLv, low, htfNearPct) ? " sur support W" : near(dLv, low, htfNearPct) ? " sur support D" : "") : ""
         line.new(swBar, swLvl, bar_index, swLvl, color = color.new(ctxCol(ctx), 30), style = line.style_dotted)
-        label.new(bar_index, low, "Sweep", style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.tiny, tooltip = "Sweep " + ctxName(ctx) + " : " + probTxt + ". Réussite = objectif " + str.tostring(tpR) + "R avant le stop (sous la mèche), en " + str.tostring(maxHold) + " barres max, sur l'historique de ce graphique.")
+        label.new(bar_index, low, onSup == "" ? "Sweep" : "Sweep" + (str.contains(onSup, "W") ? " W" : " D"), style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.tiny, tooltip = "Sweep " + ctxName(ctx) + onSup + " : " + probTxt + ". Réussite = objectif " + str.tostring(tpR) + "R avant le stop (sous la mèche), en " + str.tostring(maxHold) + " barres max, sur l'historique de ce graphique.")
     swLvl := na
 
 var table st = table.new(position.bottom_right, 3, 5, bgcolor = color.new(color.black, 15), border_width = 1)
@@ -242,6 +313,8 @@ if showStats and useSweep and barstate.islast
 alertcondition(flagBreak, "Bull flag", "Bull flag cassé sur {{ticker}} ({{interval}})")
 alertcondition(tbBreak, "Triple creux", "Triple creux cassé sur {{ticker}} ({{interval}})")
 alertcondition(sweep and ctx == 0, "Sweep après consolidation", "Sweep après consolidation sur {{ticker}} ({{interval}})")
+sweepOnSup = sweep and useHtf and (near(wLv, low, htfNearPct) or near(dLv, low, htfNearPct))
+alertcondition(sweepOnSup, "Sweep sur support D/W", "Sweep sur un support Daily/Weekly : {{ticker}} ({{interval}})")
 alertcondition(sweep, "Sweep (tous)", "Sweep d'un plus bas sur {{ticker}} ({{interval}})")
 if barstate.isconfirmed
     if flagBreak
@@ -249,4 +322,5 @@ if barstate.isconfirmed
     if tbBreak
         alert("Triple creux : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
     if sweep and not (hideDown and ctx == 1)
-        alert("Sweep " + ctxName(ctx) + " : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+        sup = useHtf ? (near(wLv, low, htfNearPct) ? " sur support W" : near(dLv, low, htfNearPct) ? " sur support D" : "") : ""
+        alert("Sweep " + ctxName(ctx) + sup + " : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
