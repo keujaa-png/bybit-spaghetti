@@ -108,7 +108,6 @@
   <button id="helpBtn" title="Guide d'utilisation" aria-label="Guide d'utilisation">?</button>
   <button id="setBtn" aria-expanded="false" aria-controls="controls">⚙ Réglages</button>
   <div class="controls" id="controls">
-  <label title="Coins Hyperliquid ajoutés seulement s'ils ne sont pas déjà dans la liste Bybit"><input id="hl" type="checkbox" checked> + Hyperliquid</label>
   <label>Vol 24h min (M$) <input id="minVol" type="number" value="5" step="1" min="0"></label>
   <label>Fenêtre
     <select id="win">
@@ -219,7 +218,7 @@ const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
 const ALIASES = {PUMPFUN: 'PUMP'};
-const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens', 'night'];
+const SETTINGS = ['maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens', 'night'];
 // Alerte « setup long » : toutes les conditions doivent être réunies. rs = multiplicateur du seuil RS,
 // rv = Vol× minimum, score = score minimum, cool = minutes entre 2 alertes d'un même coin, gap = minutes entre 2 alertes tout court
 // Réglages issus du backtest (5 jours, 84 perps Bybit, bougies 1 min, fenêtre 1 h, RS sur 10 min,
@@ -248,7 +247,7 @@ const startedAt = Date.now();
 const alertLog = [];
 const $ = id => document.getElementById(id);
 const opt = () => ({
-  hl: $('hl').checked, reorderMs: (+$('reorder').value || 0) * 1000, maxN: Math.max(0, Math.floor(+$('maxN').value || 0)),
+  hl: true, reorderMs: (+$('reorder').value || 0) * 1000, maxN: Math.max(0, Math.floor(+$('maxN').value || 0)),
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
@@ -414,7 +413,10 @@ function connect(){
     if(!m.topic || !m.topic.startsWith('tickers.')) return;
     const c = coins.get(m.data.symbol); if(!c) return;
     const d = m.data;
-    if(d.lastPrice) c.last = +d.lastPrice;
+    if(d.bid1Price) c.bid = +d.bid1Price;
+    if(d.ask1Price) c.ask = +d.ask1Price;
+    if(c.bid > 0 && c.ask > c.bid && (c.ask - c.bid) / c.bid < 0.01) c.last = (c.bid + c.ask) / 2;
+    else if(d.lastPrice) c.last = +d.lastPrice;
     if(d.prevPrice24h) c.prev24 = +d.prevPrice24h;
     if(d.turnover24h) c.turnover = +d.turnover24h;
     if(d.fundingRate) c.funding = +d.fundingRate;
@@ -454,8 +456,26 @@ function thin(h, now){
   }
   return out;
 }
+let lastSampleAt = 0, repairing = false;
+async function repairGaps(from){
+  if(repairing) return; repairing = true;
+  const now = Date.now(), n = Math.min(1000, Math.ceil((now - from) / 60000) + 3);
+  const step = async c => {
+    const rows = (await fetchCandles(c, 1, n)).map(k => [k.t, k.close]).filter(p => p[0] > from && p[0] < now - 30000);
+    if(!rows.length) return;
+    const lo = rows[0][0], hi = rows[rows.length - 1][0];
+    c.hist = c.hist.filter(p => p[0] < lo).concat(rows, c.hist.filter(p => p[0] > hi)).sort((a, b) => a[0] - b[0]);
+  };
+  try{
+    const list = [...coins.values()].filter(c => c.ready);
+    await Promise.all([pool(list.filter(c => c.ex !== 'hl'), 6, step), pool(list.filter(c => c.ex === 'hl'), 2, step)]);
+  }finally{ repairing = false; render(); }
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) sample(); });
 function sample(){
   const now = Date.now();
+  if(lastSampleAt && now - lastSampleAt > 90000) repairGaps(lastSampleAt - 60000);
+  lastSampleAt = now;
   coins.forEach(c => { if(c.last && c.ready) c.hist.push([now, c.last]); });
   if(now - lastCompact > 60000){ coins.forEach(c => { c.hist = thin(c.hist, now); }); lastCompact = now; }
   render();
@@ -654,14 +674,17 @@ function draw({vis, t0, now, o}){
     ctx.lineWidth = isHi ? Math.max(2.8, lineWidth(r.c, o) + 1) : lineWidth(r.c, o);
     ctx.setLineDash(r.perf <= 0 ? [4, 3] : []);
     ctx.beginPath();
-    let started = false;
+    let started = false, col = null, cy = 0;
+    const flush = () => { if(col === null) return; if(started) ctx.lineTo(col, cy); else { ctx.moveTo(col, cy); started = true; } };
     for(let i = 0; i < r.pts.length; i++){
       const p = r.pts[i], nx = r.pts[i + 1];
       if(nx && nx[0] < tS) continue;                         // avant la fenêtre visible
       if(started && r.pts[i - 1] && r.pts[i - 1][0] > tE) break; // après
-      const X = x(p[0]), Y = y(p[1]);
-      if(started) ctx.lineTo(X, Y); else { ctx.moveTo(X, Y); started = true; }
+      const X = Math.round(x(p[0]) * 2) / 2, Y = y(p[1]);
+      if(X !== col){ flush(); col = X; }
+      cy = Y;                                                // dernière valeur de la colonne de pixels
     }
+    flush();
     ctx.stroke();
   });
   ctx.restore();
@@ -863,7 +886,7 @@ $('alerts').addEventListener('change', async () => {
   saveSettings();
 });
 ['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alSens', 'night'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
-['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
+['minVol'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
   view.span = 0; view.shift = 0; view.y = null;
