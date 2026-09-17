@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bybit Spaghetti — temps réel</title>
+<title>Bybit + Hyperliquid Spaghetti — temps réel</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -24,7 +24,7 @@
   .status b{color:var(--text);font-weight:500}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
   .dot.on{background:var(--up)} .dot.err{background:var(--down)}
-  main{flex:1;display:grid;grid-template-columns:1fr 640px;min-height:0}
+  main{flex:1;display:grid;grid-template-columns:1fr 540px;min-height:0}
   #wrap{position:relative;min-width:0}
   canvas{display:block;width:100%;height:100%}
   #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:13px;display:none;white-space:nowrap}
@@ -34,7 +34,7 @@
   #alertBox div{padding:3px 12px;cursor:pointer;display:flex;gap:8px}
   #alertBox div:hover{background:rgba(143,179,255,.12)}
   #alertBox time{color:var(--muted)}
-  .grid{display:grid;grid-template-columns:16px 10px minmax(92px,1fr) 42px 64px 62px 38px 42px 58px 58px 62px;gap:6px;align-items:center;padding:4px 10px;font-size:13px;min-width:600px}
+  .grid{display:grid;grid-template-columns:16px 10px minmax(110px,1fr) 42px 64px 62px 38px 42px 64px;gap:6px;align-items:center;padding:4px 10px;font-size:13px;min-width:500px}
   .head{position:sticky;top:0;z-index:1;background:var(--panel);color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)}
   .head span{cursor:pointer;user-select:none} .head span.sel{color:var(--text)}
   .row{cursor:pointer}
@@ -46,6 +46,7 @@
   .name{display:flex;align-items:center;gap:5px;min-width:0}
   .name a{color:var(--muted);text-decoration:none;font-size:12px}
   .name a:hover{color:var(--accent)}
+  .ex{font-size:9px;font-weight:600;color:#9be3d0;border:1px solid #2f6f62;border-radius:3px;padding:0 3px}
   .new{font-size:10px;font-weight:600;color:var(--bg);background:var(--accent);border-radius:3px;padding:0 3px}
   .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   .score{font-weight:600}
@@ -56,7 +57,8 @@
 </head>
 <body>
 <header>
-  <h1>Bybit Spaghetti</h1>
+  <h1>Spaghetti Bybit + HL</h1>
+  <label title="Coins Hyperliquid ajoutés seulement s'ils ne sont pas déjà dans la liste Bybit"><input id="hl" type="checkbox" checked> + Hyperliquid</label>
   <label>Vol 24h min (M$) <input id="minVol" type="number" value="5" step="1" min="0"></label>
   <label>Fenêtre
     <select id="win">
@@ -85,42 +87,50 @@
     <div class="grid head">
       <span title="Épingler">★</span><i></i>
       <span data-k="name">Coin</span>
-      <span data-k="score" class="num" title="Score 0–100 : accélération, places gagnées, volume relatif, force vs BTC et open interest (pénalité si funding élevé)">Score</span>
+      <span data-k="score" class="num" title="Score 0–100 : accélération 40 %, places gagnées 30 %, volume relatif 30 % (pénalité si funding élevé)">Score</span>
       <span data-k="perf" class="num" title="Performance depuis le début de la fenêtre">Perf</span>
       <span data-k="acc" class="num" id="accHead" title="Gain récent (dernier 1/6 de la fenêtre) moins le rythme moyen d'avant, en points de %">Accél</span>
       <span data-k="dr" class="num" title="Places gagnées ou perdues sur la même durée">Rang</span>
       <span data-k="rv" class="num" title="Volume des 15 dernières minutes ÷ moyenne des 4 h précédentes">Vol×</span>
-      <span data-k="vb" class="num" title="Perf du coin moins perf du BTC sur la fenêtre">vs BTC</span>
-      <span data-k="oi" class="num" title="Variation de l'open interest sur la fenêtre">OI</span>
-      <span data-k="fr" class="num" title="Funding rate actuel (8 h). Orange ≥ 0,03 %, rouge ≥ 0,08 %">Funding</span>
+      <span data-k="fr" class="num" title="Funding actuel ramené sur 8 h (Hyperliquid : taux horaire × 8). Orange ≥ 0,03 %, rouge ≥ 0,08 %">Funding</span>
     </div>
     <div id="list"><div id="empty">Chargement de l'historique Bybit…</div></div>
   </aside>
 </main>
 
 <script>
-const API  = 'https://api.bybit.com/v5/market';
-const WS   = 'wss://stream.bybit.com/v5/public/linear';
-const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, VOL_REFRESH_MS = 3 * 60 * 1000;
+const API    = 'https://api.bybit.com/v5/market';
+const WS     = 'wss://stream.bybit.com/v5/public/linear';
+const HL_API = 'https://api.hyperliquid.xyz/info';
+const HL_WS  = 'wss://api.hyperliquid.xyz/ws';
+const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, VOL_REFRESH_MS = 3 * 60 * 1000, HL_CTX_MS = 60 * 1000;
 const KEEP_MS = 25 * 3600 * 1000, FINE_MS = 3600 * 1000;          // points 2 s gardés 1 h, puis 1 / min
 const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 3600 * 1000;
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
-const SETTINGS = ['minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
+// Même token, noms différents selon l'exchange
+const ALIASES = {PUMPFUN: 'PUMP'};
+const SETTINGS = ['hl', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
 const STORE_KEY = 'bybit-spaghetti-v2';
 
-const coins = new Map();  // sym -> {sym,last,turnover,prev24,funding,oi,hist,oiHist,relVol,hue,ready,oiReady,addedAt,lastAlert}
-let ws, pingTimer, hi = null, sortKey = 'score', lastPlot = null, listLoaded = false, audioCtx = null;
+// clé de dédoublonnage : 1000PEPEUSDT, SHIB1000USDT, kPEPE -> PEPE / SHIB
+function baseOf(name){
+  let b = name.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000|k)(?=[A-Z0-9])/, '').replace(/1000$/, '');
+  return ALIASES[b] || b;
+}
+
+const coins = new Map();  // id -> {sym,ex,name,label,base,last,turnover,prev24,funding,hist,relVol,hue,ready,addedAt,lastAlert}
+let ws, hlWs, pingTimer, hlPingTimer, hi = null, sortKey = 'score', lastPlot = null, listLoaded = false, audioCtx = null;
 let pins = new Set();
 const startedAt = Date.now();
 const alertLog = [];
 const $ = id => document.getElementById(id);
 const opt = () => ({
+  hl: $('hl').checked,
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
   alerts: $('alerts').checked, alRank: +$('alRank').value || 5, alScore: +$('alScore').value || 80
 });
-const tick = s => s.replace(/USDT$/, '');
 const colorOf = c => `hsl(${c.hue} 72% 62%)`;
 const fmtPct = (v, d = 2) => isNaN(v) ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(d)}%`;
 let hueIdx = 0;
@@ -131,7 +141,7 @@ function loadSettings(){
   try{
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
     SETTINGS.forEach(id => { if(s[id] === undefined) return; const el = $(id); if(el.type === 'checkbox') el.checked = s[id]; else el.value = s[id]; });
-    if(s.sortKey) sortKey = s.sortKey;
+    if(s.sortKey && s.sortKey !== 'oi' && s.sortKey !== 'vb') sortKey = s.sortKey;
     if(Array.isArray(s.pins)) pins = new Set(s.pins);
   }catch(e){}
   document.querySelectorAll('.head [data-k]').forEach(s => s.classList.toggle('sel', s.dataset.k === sortKey));
@@ -144,37 +154,88 @@ function saveSettings(){
   }catch(e){}
 }
 
-// ─── Liste des coins + historiques ────────────────────────────────────────
+// ─── Accès aux API ────────────────────────────────────────────────────────
 async function getJSON(url){ const r = await fetch(url); const d = await r.json(); if(d.retCode !== 0) throw new Error(d.retMsg); return d.result; }
-
-async function refreshList(){
-  let list;
-  try{ list = (await getJSON(`${API}/tickers?category=linear`)).list; }
-  catch(e){ setStatus('API Bybit injoignable : ' + e.message, 'err'); return; }
-  const o = opt(), keep = new Set(), now = Date.now();
-  for(const t of list){
-    if(!t.symbol.endsWith('USDT')) continue;
-    const turnover = +t.turnover24h;
-    if(turnover < o.minVol && !pins.has(t.symbol)) continue;
-    keep.add(t.symbol);
-    const c = coins.get(t.symbol);
-    const f = {turnover, prev24: +t.prevPrice24h, last: +t.lastPrice, funding: +t.fundingRate, oi: +t.openInterest};
-    if(c) Object.assign(c, f);
-    else coins.set(t.symbol, {sym: t.symbol, ...f, hist: [], oiHist: [], relVol: NaN, hue: (hueIdx++ * 137.508) % 360,
-                               ready: false, oiReady: false, addedAt: listLoaded ? now : 0, lastAlert: 0});
-  }
-  const removed = [...coins.keys()].filter(s => !keep.has(s));
-  removed.forEach(s => coins.delete(s));
-  listLoaded = true;
-  resubscribe([...keep], removed);
-  const fresh = [...coins.values()].filter(c => !c.ready);
-  await backfill(fresh);
-  await refreshExtras(fresh);
+async function hlPost(body){
+  const r = await fetch(HL_API, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if(!r.ok) throw new Error('Hyperliquid ' + r.status);
+  return r.json();
 }
-
 async function pool(items, n, fn){
   const q = [...items];
   await Promise.all(Array.from({length: n}, async () => { while(q.length){ const it = q.shift(); try{ await fn(it); }catch(e){} } }));
+}
+function addCoin(id, f){
+  const c = coins.get(id);
+  if(c){ Object.assign(c, f); return; }
+  coins.set(id, {sym: id, ...f, hist: [], relVol: NaN, hue: (hueIdx++ * 137.508) % 360,
+                 ready: false, addedAt: listLoaded ? Date.now() : 0, lastAlert: 0});
+}
+
+// ─── Liste des coins (Bybit d'abord, puis Hyperliquid sans doublon) ───────
+async function refreshList(){
+  const o = opt();
+  const [by, hl] = await Promise.allSettled([
+    getJSON(`${API}/tickers?category=linear`),
+    o.hl ? hlPost({type: 'metaAndAssetCtxs'}) : Promise.resolve(null)
+  ]);
+  if(by.status !== 'fulfilled'){ setStatus('API Bybit injoignable : ' + by.reason.message, 'err'); return; }
+  const keep = new Set(), bases = new Set();
+  for(const t of by.value.list){
+    if(!t.symbol.endsWith('USDT')) continue;
+    const turnover = +t.turnover24h;
+    if(turnover < o.minVol && !pins.has(t.symbol)) continue;
+    const base = baseOf(t.symbol);
+    if(bases.has(base)) continue;                       // ex. 1000PEPE et PEPE sur Bybit
+    keep.add(t.symbol); bases.add(base);
+    addCoin(t.symbol, {ex: 'bybit', name: t.symbol, label: t.symbol.replace(/USDT$/, ''), base, turnover,
+      prev24: +t.prevPrice24h, last: +t.lastPrice, funding: +t.fundingRate});
+  }
+  if(hl.status === 'fulfilled' && hl.value){
+    const [meta, ctxs] = hl.value;
+    meta.universe.forEach((u, i) => {
+      const x = ctxs[i], id = 'HL:' + u.name;
+      if(!x || u.isDelisted) return;
+      const turnover = +x.dayNtlVlm;
+      if(turnover < o.minVol && !pins.has(id)) return;
+      const base = baseOf(u.name);
+      if(bases.has(base)) return;                       // déjà présent via Bybit : pas de doublon
+      keep.add(id); bases.add(base);
+      addCoin(id, {ex: 'hl', name: u.name, label: u.name, base, turnover,
+        prev24: +x.prevDayPx, last: +(x.midPx || x.markPx), funding: +x.funding * 8});
+    });
+  }else if(o.hl && hl.status !== 'fulfilled') console.warn('Hyperliquid indisponible', hl.reason);
+  const removed = [...coins.keys()].filter(s => !keep.has(s));
+  removed.forEach(s => coins.delete(s));
+  listLoaded = true;
+  resubscribe([...keep].filter(s => !s.startsWith('HL:')), removed.filter(s => !s.startsWith('HL:')));
+  const fresh = [...coins.values()].filter(c => !c.ready);
+  await backfill(fresh);
+  await refreshVol(fresh);
+}
+
+// volume et funding Hyperliquid (un seul appel)
+async function pollHL(){
+  if(!opt().hl || ![...coins.values()].some(c => c.ex === 'hl')) return;
+  try{
+    const [meta, ctxs] = await hlPost({type: 'metaAndAssetCtxs'});
+    meta.universe.forEach((u, i) => {
+      const c = coins.get('HL:' + u.name), x = ctxs[i];
+      if(!c || !x) return;
+      c.turnover = +x.dayNtlVlm; c.funding = +x.funding * 8; c.prev24 = +x.prevDayPx;
+    });
+  }catch(e){}
+}
+
+// ─── Historique des prix ──────────────────────────────────────────────────
+async function fetchCandles(c, ivMin, count){
+  if(c.ex === 'hl'){
+    const end = Date.now();
+    const rows = await hlPost({type: 'candleSnapshot', req: {coin: c.name, interval: ivMin + 'm', startTime: end - count * ivMin * 60000, endTime: end}});
+    return rows.map(k => ({t: k.T + 1, close: +k.c, turnover: +k.v * +k.c}));   // plus ancienne d'abord
+  }
+  const list = (await getJSON(`${API}/kline?category=linear&symbol=${c.name}&interval=${ivMin}&limit=${count}`)).list;
+  return list.map(k => ({t: +k[0] + ivMin * 60000, close: +k[4], turnover: +k[6]})).reverse();
 }
 
 async function backfill(list){
@@ -182,46 +243,45 @@ async function backfill(list){
   const iv = opt().win > 12 * 3600 * 1000 ? 5 : 1;
   const need = Math.min(1000, Math.ceil(opt().win / (iv * 60000)) + 5);
   let done = 0;
-  await pool(list, 6, async c => {
+  const step = async c => {
     try{
-      const rows = (await getJSON(`${API}/kline?category=linear&symbol=${c.sym}&interval=${iv}&limit=${need}`)).list
-        .map(k => [+k[0] + iv * 60000, +k[4]]).reverse();
+      const rows = (await fetchCandles(c, iv, need)).map(k => [k.t, k.close]);
       const firstLive = c.hist.length ? c.hist[0][0] : Infinity;
       c.hist = rows.filter(p => p[0] < firstLive).concat(c.hist);
     }finally{
       c.ready = true;
       if(++done % 10 === 0){ setStatus(`historique ${done}/${list.length}…`, 'on'); render(); }
     }
-  });
+  };
+  await Promise.all([
+    pool(list.filter(c => c.ex !== 'hl'), 6, step),
+    pool(list.filter(c => c.ex === 'hl'), 2, step)     // Hyperliquid limite plus fort
+  ]);
   setStatus(ws && ws.readyState === 1 ? 'en direct' : 'connexion…', ws && ws.readyState === 1 ? 'on' : '');
   render();
 }
 
-// Volume relatif (bougies 1 min) + historique d'open interest
-async function refreshExtras(list){
-  await pool(list, 6, async c => {
-    const k = (await getJSON(`${API}/kline?category=linear&symbol=${c.sym}&interval=1&limit=240`)).list; // plus récente d'abord
-    const closed = k.slice(1).map(r => +r[6]);
-    if(closed.length >= 60){
-      const recent = closed.slice(0, 15).reduce((a, b) => a + b, 0);
-      const avg15 = closed.reduce((a, b) => a + b, 0) / closed.length * 15;
-      c.relVol = avg15 > 0 ? recent / avg15 : NaN;
-    }
-    if(!c.oiReady){
-      const oi = (await getJSON(`${API}/open-interest?category=linear&symbol=${c.sym}&intervalTime=15min&limit=110`)).list
-        .map(r => [+r.timestamp, +r.openInterest]).reverse();
-      const firstLive = c.oiHist.length ? c.oiHist[0][0] : Infinity;
-      c.oiHist = oi.filter(p => p[0] < firstLive).concat(c.oiHist);
-      c.oiReady = true;
-    }
-  });
+// Volume relatif : 15 dernières minutes ÷ moyenne 15 min sur 4 h
+async function refreshVol(list){
+  const step = async c => {
+    const k = await fetchCandles(c, 1, 241);
+    const closed = k.slice(0, -1).map(r => r.turnover).reverse();   // plus récente d'abord, bougie en cours exclue
+    if(closed.length < 60) return;
+    const recent = closed.slice(0, 15).reduce((a, b) => a + b, 0);
+    const avg15 = closed.reduce((a, b) => a + b, 0) / closed.length * 15;
+    c.relVol = avg15 > 0 ? recent / avg15 : NaN;
+  };
+  await Promise.all([
+    pool(list.filter(c => c.ex !== 'hl'), 6, step),
+    pool(list.filter(c => c.ex === 'hl'), 2, step)
+  ]);
   render();
 }
 
-// ─── WebSocket ────────────────────────────────────────────────────────────
+// ─── WebSockets ───────────────────────────────────────────────────────────
 function connect(){
   ws = new WebSocket(WS);
-  ws.onopen = () => { setStatus('en direct', 'on'); resubscribe([...coins.keys()], []);
+  ws.onopen = () => { setStatus('en direct', 'on'); resubscribe([...coins.values()].filter(c => c.ex === 'bybit').map(c => c.sym), []);
     clearInterval(pingTimer); pingTimer = setInterval(() => ws.readyState === 1 && ws.send('{"op":"ping"}'), 20000); };
   ws.onclose = () => { setStatus('déconnecté, reconnexion…', 'err'); setTimeout(connect, 3000); };
   ws.onmessage = ev => {
@@ -233,7 +293,6 @@ function connect(){
     if(d.prevPrice24h) c.prev24 = +d.prevPrice24h;
     if(d.turnover24h) c.turnover = +d.turnover24h;
     if(d.fundingRate) c.funding = +d.fundingRate;
-    if(d.openInterest) c.oi = +d.openInterest;
   };
 }
 function resubscribe(add, remove){
@@ -241,11 +300,26 @@ function resubscribe(add, remove){
   const send = (arr, op) => { for(let i = 0; i < arr.length; i += 10) ws.send(JSON.stringify({op, args: arr.slice(i, i + 10).map(s => 'tickers.' + s)})); };
   send(remove, 'unsubscribe'); send(add, 'subscribe');
 }
+function connectHL(){
+  hlWs = new WebSocket(HL_WS);
+  hlWs.onopen = () => {
+    hlWs.send(JSON.stringify({method: 'subscribe', subscription: {type: 'allMids'}}));
+    clearInterval(hlPingTimer); hlPingTimer = setInterval(() => hlWs.readyState === 1 && hlWs.send('{"method":"ping"}'), 50000);
+  };
+  hlWs.onclose = () => setTimeout(connectHL, 5000);
+  hlWs.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if(m.channel !== 'allMids' || !m.data || !m.data.mids) return;
+    for(const [name, px] of Object.entries(m.data.mids)){
+      const c = coins.get('HL:' + name);
+      if(c) c.last = +px;
+    }
+  };
+}
 
 // ─── Échantillonnage ──────────────────────────────────────────────────────
-let lastCompact = 0, lastOiSample = 0;
+let lastCompact = 0;
 function thin(h, now){
-  // garde tout sur la dernière heure, 1 point / minute avant, rien au-delà de 25 h
   const out = []; let lastMin = -1;
   for(const p of h){
     if(p[0] < now - KEEP_MS) continue;
@@ -256,13 +330,9 @@ function thin(h, now){
   return out;
 }
 function sample(){
-  const now = Date.now(), oiTick = now - lastOiSample >= 30000;
-  coins.forEach(c => {
-    if(c.last) c.hist.push([now, c.last]);
-    if(oiTick && c.oi && c.oiReady) c.oiHist.push([now, c.oi]);
-  });
-  if(oiTick) lastOiSample = now;
-  if(now - lastCompact > 60000){ coins.forEach(c => { c.hist = thin(c.hist, now); c.oiHist = thin(c.oiHist, now); }); lastCompact = now; }
+  const now = Date.now();
+  coins.forEach(c => { if(c.last && c.ready) c.hist.push([now, c.last]); });
+  if(now - lastCompact > 60000){ coins.forEach(c => { c.hist = thin(c.hist, now); }); lastCompact = now; }
   render();
 }
 
@@ -277,7 +347,7 @@ function pctRanks(rows, key){
   rows.forEach(r => {
     const v = r[key];
     if(isNaN(v) || vals.length < 2){ out.set(r, 0.5); return; }
-    let lo = 0, hi_ = vals.length;                       // nombre de valeurs < v
+    let lo = 0, hi_ = vals.length;
     while(lo < hi_){ const m = (lo + hi_) >> 1; if(vals[m] < v) lo = m + 1; else hi_ = m; }
     out.set(r, lo / (vals.length - 1));
   });
@@ -290,9 +360,10 @@ function compute(){
   const all = [];
   coins.forEach(c => {
     if(!c.ready || c.hist.length < 2) return;
+    if(c.ex === 'hl' && !o.hl) return;
     const pinned = pins.has(c.sym);
     if(!pinned && c.turnover < o.minVol) return;
-    if(!pinned && o.noStock && NON_CRYPTO.has(tick(c.sym))) return;
+    if(!pinned && o.noStock && NON_CRYPTO.has(c.base)) return;
     let i0 = c.hist.findIndex(p => p[0] >= t0);
     if(i0 < 0) return;
     if(i0 > 0) i0--;
@@ -302,20 +373,16 @@ function compute(){
     const perf = (c.last / base - 1) * 100;
     const pA = (valueAt(c.hist, tA) / base - 1) * 100;
     const acc = isNaN(pA) ? NaN : (perf - pA) - pA / (o.win - accWin) * accWin;
-    const oi0 = valueAt(c.oiHist, t0);
-    const oi = c.oi && oi0 ? (c.oi / oi0 - 1) * 100 : NaN;
-    all.push({c, pts, perf, pA, acc, oi, rv: c.relVol, fr: c.funding * 100, pinned});
+    all.push({c, pts, perf, pA, acc, rv: c.relVol, fr: c.funding * 100, pinned});
   });
-  const btc = all.find(r => r.c.sym === 'BTCUSDT');
-  all.forEach(r => r.vb = btc ? r.perf - btc.perf : NaN);
   const vis = all.filter(r => r.pinned || !o.bull || r.perf > o.minPerf);
   const byNow = [...vis].sort((a, b) => b.perf - a.perf);
   const byPrev = [...vis].sort((a, b) => (isNaN(b.pA) ? -1e9 : b.pA) - (isNaN(a.pA) ? -1e9 : a.pA));
   byNow.forEach((r, i) => r.rank = i + 1);
   byPrev.forEach((r, i) => r.dr = (i + 1) - r.rank);
-  const P = Object.fromEntries(['acc', 'dr', 'rv', 'vb', 'oi'].map(k => [k, pctRanks(vis, k)]));
+  const P = Object.fromEntries(['acc', 'dr', 'rv'].map(k => [k, pctRanks(vis, k)]));
   vis.forEach(r => {
-    let s = 100 * (0.30 * P.acc.get(r) + 0.20 * P.dr.get(r) + 0.20 * P.rv.get(r) + 0.15 * P.vb.get(r) + 0.15 * P.oi.get(r));
+    let s = 100 * (0.40 * P.acc.get(r) + 0.30 * P.dr.get(r) + 0.30 * P.rv.get(r));
     if(r.fr >= 0.08) s -= 20; else if(r.fr >= 0.03) s -= 8;
     r.score = Math.max(0, Math.round(s));
   });
@@ -342,9 +409,9 @@ function checkAlerts({vis, o}){
     if(r.score >= o.alScore) why.push(`score ${r.score}`);
     if(!why.length) return;
     r.c.lastAlert = now;
-    const text = `${tick(r.c.sym)} ${fmtPct(r.perf)} · ${why.join(' · ')}`;
+    const text = `${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(r.perf)} · ${why.join(' · ')}`;
     alertLog.unshift({t: now, sym: r.c.sym, text}); alertLog.length = Math.min(alertLog.length, 30);
-    try{ if('Notification' in window && Notification.permission === 'granted') new Notification('Bybit Spaghetti', {body: text, tag: r.c.sym}); }catch(e){}
+    try{ if('Notification' in window && Notification.permission === 'granted') new Notification('Spaghetti', {body: text, tag: r.c.sym}); }catch(e){}
     beep();
   });
   $('alertBox').innerHTML = alertLog.map(a =>
@@ -353,7 +420,11 @@ function checkAlerts({vis, o}){
 
 // ─── Rendu ────────────────────────────────────────────────────────────────
 const cv = $('c'), ctx = cv.getContext('2d');
-function render(){ const d = compute(); draw(d); renderList(d); checkAlerts(d); $('count').textContent = `${d.vis.length}/${d.total}`; }
+function render(){
+  const d = compute(); draw(d); renderList(d); checkAlerts(d);
+  const nHL = d.vis.filter(r => r.c.ex === 'hl').length;
+  $('count').textContent = `${d.vis.length}/${d.total}${nHL ? ` (dont ${nHL} HL)` : ''}`;
+}
 
 function lineWidth(c, o){
   if(!o.thick) return 1.4;
@@ -389,12 +460,11 @@ function draw({vis, t0, now, o}){
     ctx.strokeStyle = Math.abs(v) < step / 2 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.06)';
     ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
   }
-  // les plus épaisses dessous, la surlignée par-dessus
   [...vis].sort((a, b) => (a.c.sym === hi) - (b.c.sym === hi) || lineWidth(b.c, o) - lineWidth(a.c, o)).forEach(r => {
     const isHi = hi === r.c.sym;
     ctx.strokeStyle = colorOf(r.c); ctx.globalAlpha = hi && !isHi ? 0.15 : (r.pinned ? 1 : 0.88);
     ctx.lineWidth = isHi ? Math.max(2.8, lineWidth(r.c, o) + 1) : lineWidth(r.c, o);
-    ctx.setLineDash(r.pinned && !o.bull ? [] : r.perf <= 0 ? [4, 3] : []);
+    ctx.setLineDash(r.perf <= 0 ? [4, 3] : []);
     ctx.beginPath(); r.pts.forEach((p, i) => i ? ctx.lineTo(x(p[0]), y(p[1])) : ctx.moveTo(x(p[0]), y(p[1]))); ctx.stroke();
   });
   ctx.setLineDash([]); ctx.globalAlpha = 1;
@@ -408,7 +478,7 @@ function draw({vis, t0, now, o}){
     const yy = Math.max(e.yy, lastY + 12); if(yy > H - padB) return;
     lastY = yy; shown++;
     ctx.fillStyle = colorOf(e.r.c);
-    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${tick(e.r.c.sym)} ${fmtPct(e.r.perf)}${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
+    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' ? ' ·HL' : ''} ${fmtPct(e.r.perf)}${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
   });
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
   for(let k = 0; k <= 4; k++){ const t = t0 + (now - t0) * k / 4; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}), x(t), H - 8); }
@@ -416,10 +486,14 @@ function draw({vis, t0, now, o}){
 function niceStep(r){ const p = Math.pow(10, Math.floor(Math.log10(r || 1))); const m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
 
 const SORTS = {
-  name: r => tick(r.c.sym), score: r => -r.score, perf: r => -r.perf, acc: r => isNaN(r.acc) ? 1e9 : -r.acc,
-  dr: r => -r.dr, rv: r => isNaN(r.rv) ? 1e9 : -r.rv, vb: r => isNaN(r.vb) ? 1e9 : -r.vb,
-  oi: r => isNaN(r.oi) ? 1e9 : -r.oi, fr: r => isNaN(r.fr) ? 1e9 : r.fr
+  name: r => r.c.label, score: r => -r.score, perf: r => -r.perf, acc: r => isNaN(r.acc) ? 1e9 : -r.acc,
+  dr: r => -r.dr, rv: r => isNaN(r.rv) ? 1e9 : -r.rv, fr: r => isNaN(r.fr) ? 1e9 : r.fr
 };
+function linkOf(c){
+  return c.ex === 'hl'
+    ? {href: `https://app.hyperliquid.xyz/trade/${encodeURIComponent(c.name)}`, title: 'Ouvrir sur Hyperliquid'}
+    : {href: `https://www.tradingview.com/chart/?symbol=BYBIT:${c.name}.P`, title: 'Ouvrir sur TradingView'};
+}
 function renderList({vis, accWin}){
   $('accHead').textContent = `Accél ${accWin >= 3600000 ? Math.round(accWin / 3600000) + 'h' : Math.round(accWin / 60000) + 'm'}`;
   const key = SORTS[sortKey] || SORTS.score;
@@ -427,23 +501,22 @@ function renderList({vis, accWin}){
   if(!rows.length){ $('list').innerHTML = `<div id="empty">${coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…'}</div>`; return; }
   const now = Date.now();
   $('list').innerHTML = rows.map(r => {
-    const s = r.c.sym;
+    const s = r.c.sym, L = linkOf(r.c);
     const acc = isNaN(r.acc) ? '<span class="mut">–</span>' : `<span class="${r.acc >= 0 ? 'up' : 'warn'}">${r.acc >= 0 ? '▲' : '▼'}${Math.abs(r.acc).toFixed(2)}</span>`;
     const dr = r.dr > 0 ? `<span class="up">▲${r.dr}</span>` : r.dr < 0 ? `<span class="down">▼${-r.dr}</span>` : '<span class="mut">=</span>';
     const rv = isNaN(r.rv) ? '<span class="mut">–</span>' : `<span class="${r.rv >= 2 ? 'up' : r.rv < 0.7 ? 'mut' : ''}">${r.rv.toFixed(1)}×</span>`;
-    const vb = isNaN(r.vb) ? '<span class="mut">–</span>' : `<span class="${r.vb >= 0 ? 'up' : 'down'}">${fmtPct(r.vb, 1)}</span>`;
-    const oi = isNaN(r.oi) ? '<span class="mut">–</span>' : `<span class="${r.oi >= 0 ? 'up' : 'down'}">${fmtPct(r.oi, 1)}</span>`;
-    const fr = isNaN(r.fr) ? '<span class="mut">–</span>' : `<span class="${r.fr >= 0.08 ? 'down' : r.fr >= 0.03 ? 'warn' : r.fr < 0 ? 'up' : 'mut'}">${r.fr.toFixed(4)}%</span>`;
+    const fr = isNaN(r.fr) ? '<span class="mut">–</span>' : `<span class="${r.fr >= 0.08 ? 'down' : r.fr >= 0.03 ? 'warn' : r.fr < 0 ? 'up' : 'mut'}">${r.fr.toFixed(3)}%</span>`;
     const sc = `<span class="score ${r.score >= 75 ? 'up' : r.score < 40 ? 'mut' : ''}">${r.score}</span>`;
     const isNew = r.c.addedAt && now - r.c.addedAt < NEW_BADGE_MS ? '<span class="new">NEW</span>' : '';
+    const ex = r.c.ex === 'hl' ? '<span class="ex" title="Hyperliquid">HL</span>' : '';
     return `<div class="grid row ${hi === s ? 'hi' : ''} ${r.pinned ? 'pin' : ''}" data-s="${s}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
       <span class="star ${r.pinned ? 'on' : ''}" data-pin="${s}">${r.pinned ? '★' : '☆'}</span>
       <i style="background:${colorOf(r.c)}"></i>
-      <span class="name">${tick(s)}${isNew}<a href="https://www.tradingview.com/chart/?symbol=BYBIT:${s}.P" target="_blank" rel="noopener" title="Ouvrir sur TradingView">↗</a></span>
+      <span class="name">${r.c.label}${ex}${isNew}<a href="${L.href}" target="_blank" rel="noopener" title="${L.title}">↗</a></span>
       <span class="num">${sc}</span>
       <span class="num ${r.perf >= 0 ? 'up' : 'down'}">${fmtPct(r.perf)}</span>
       <span class="num">${acc}</span><span class="num">${dr}</span><span class="num">${rv}</span>
-      <span class="num">${vb}</span><span class="num">${oi}</span><span class="num">${fr}</span></div>`;
+      <span class="num">${fr}</span></div>`;
   }).join('');
 }
 
@@ -474,12 +547,11 @@ cv.addEventListener('mousemove', e => {
   if(!best){ tip.style.display = 'none'; tip.dataset.s = ''; return; }
   tip.style.display = 'block'; tip.style.left = (e.offsetX + 12) + 'px'; tip.style.top = (e.offsetY - 12) + 'px';
   tip.dataset.s = best.r.c.sym;
-  tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${tick(best.r.c.sym)}</b> ${fmtPct(best.p[1])} · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})} · score ${best.r.score}`;
+  tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${best.r.c.label}</b>${best.r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(best.p[1])} · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})} · score ${best.r.score}`;
 });
 cv.addEventListener('mouseleave', () => $('tip').style.display = 'none');
 cv.addEventListener('click', () => { const t = $('tip'); if(t.style.display === 'block' && t.dataset.s){ hi = hi === t.dataset.s ? null : t.dataset.s; render(); } });
 
-['bull', 'minPerf', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
 function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if(audioCtx.state === 'suspended') audioCtx.resume(); }catch(e){} }
 document.addEventListener('pointerdown', ensureAudio, {once: true});
 $('alerts').addEventListener('change', async () => {
@@ -490,7 +562,8 @@ $('alerts').addEventListener('change', async () => {
   if($('alerts').checked) beep();
   saveSettings();
 });
-$('minVol').addEventListener('change', () => { saveSettings(); refreshList(); });
+['bull', 'minPerf', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
   const w = opt().win;
@@ -502,9 +575,11 @@ window.addEventListener('resize', render);
 // ─── Démarrage ────────────────────────────────────────────────────────────
 loadSettings();
 connect();
+connectHL();
 refreshList();
 setInterval(refreshList, LIST_REFRESH_MS);
-setInterval(() => refreshExtras([...coins.values()].filter(c => c.ready)), VOL_REFRESH_MS);
+setInterval(() => refreshVol([...coins.values()].filter(c => c.ready)), VOL_REFRESH_MS);
+setInterval(pollHL, HL_CTX_MS);
 setInterval(sample, SAMPLE_MS);
 </script>
 </body>
