@@ -130,7 +130,8 @@
   <span class="sep"></span>
   <label title="Notification Chrome + son pour le meilleur setup long du moment"><input id="alerts" type="checkbox"> Alertes</label>
   <button id="notifBtn" class="nbtn" title="État des notifications Chrome (clic = tester)">🔔 …</button>
-  <label title="Stricte : très peu d'alertes, seulement les setups les plus nets. Large : plus d'alertes.">Sensibilité
+  <label title="Backtest : ~50 % des alertes atteignent 1R avant le stop (entre 8 h et minuit). Pas de réussite garantie."><input id="night" type="checkbox" checked> Pas d'alerte 0 h–8 h</label>
+  <label title="Stricte ≈ 15 alertes/jour (RS forte + volume). Normale ≈ 25/j. Large ≈ 50/j.">Sensibilité
     <select id="alSens">
       <option value="strict">stricte</option>
       <option value="normal" selected>normale</option>
@@ -181,7 +182,8 @@
       <li>☆ épingle un coin (toujours visible, en haut).</li>
       <li>↗ ouvre le coin sur son exchange : Bybit, ou Hyperliquid pour les coins <b>HL</b>.</li>
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
-      <li><b>🎯 Setup long</b> : une seule alerte, seulement si tout est réuni : le coin monte d'un coup plus vite que le marché (⚡ RS), avec du volume (Vol×), en accélération, en hausse sur la fenêtre, bon score, et pas déjà trop étendu (un funding élevé est signalé ⚠ mais n'empêche pas l'alerte). Badge 🎯 dans la liste.</li>
+      <li><b>🎯 Setup long</b> : une seule alerte à la fois, quand un coin monte d'un coup plus vite que le marché (⚡ RS), en hausse de +2 à +10 % sur la fenêtre, sans être parabolique, hors nuit (0 h–8 h). L'alerte donne un <b>stop ≈</b> (sous le plus bas des 10 dernières minutes) et les objectifs <b>TP1</b> (1R) et <b>TP1.5</b>. Réglages testés avec la fenêtre 1 h.</li>
+      <li><b>Backtest</b> (5 jours, 84 perps) : ~50 % des alertes touchent TP1 avant le stop, ~40 % TP1.5 ; gain moyen faible (+0,1 à +0,2R avant frais). Ce n'est pas une garantie.</li>
       <li><b>Alertes</b> : notification Chrome + son pour le meilleur setup du moment (l'onglet doit rester ouvert, même en arrière-plan). Le bouton 🔔 montre l'état et envoie un test ; clic sur la notification = ouvre le coin sur l'exchange. <b>Sensibilité</b> stricte = très peu d'alertes, large = plus. Un même coin n'est pas re-signalé avant 20 à 45 min.</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
       <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous). Par défaut le tri est <b>Perf</b> : la liste suit l'ordre des courbes du graphique.</li>
@@ -210,13 +212,16 @@ const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
 const ALIASES = {PUMPFUN: 'PUMP'};
-const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens'];
+const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens', 'night'];
 // Alerte « setup long » : toutes les conditions doivent être réunies. rs = multiplicateur du seuil RS,
 // rv = Vol× minimum, score = score minimum, cool = minutes entre 2 alertes d'un même coin, gap = minutes entre 2 alertes tout court
+// Réglages issus du backtest (5 jours, 84 perps Bybit, bougies 1 min, fenêtre 1 h, RS sur 10 min,
+// stop sous le plus bas des 10 dernières minutes, validation sur une période séparée) :
+//   stricte ≈ 15 alertes/jour, normale ≈ 25/j, large ≈ 50/j ; ~50 % de réussite à 1R, ~40 % à 1,5R.
 const PRESETS = {
-  strict: {rs: 1.5,  rv: 2.0, score: 75, cool: 45, gap: 5},
-  normal: {rs: 1.0,  rv: 1.5, score: 65, cool: 30, gap: 2},
-  wide:   {rs: 0.75, rv: 1.2, score: 50, cool: 20, gap: 1}
+  strict: {rs: 1.5, rv: 1.5, cool: 120, gap: 20},
+  normal: {rs: 1.5, rv: 0,   cool: 120, gap: 20},
+  wide:   {rs: 1.0, rv: 0,   cool: 60,  gap: 10}
 };
 let lastAlertAt = 0;
 const STORE_KEY = 'bybit-spaghetti-v2';
@@ -239,7 +244,7 @@ const opt = () => ({
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
-  alerts: $('alerts').checked, alRs: +$('alRs').value || 0, alRsWin: (+$('alRsWin').value || 10) * 60000, alSens: PRESETS[$('alSens').value] || PRESETS.normal
+  alerts: $('alerts').checked, alRs: +$('alRs').value || 0, alRsWin: (+$('alRsWin').value || 10) * 60000, alSens: PRESETS[$('alSens').value] || PRESETS.normal, night: $('night').checked
 });
 const colorOf = c => `hsl(${c.hue} 72% 62%)`;
 const fmtPct = (v, d = 2) => isNaN(v) ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(d)}%`;
@@ -513,15 +518,23 @@ function compute(){
   const shown = ordered.filter(r => r.pinned || (o.maxN > 0 ? kept++ < o.maxN : true));
   const nextIn = o.reorderMs ? Math.max(0, Math.ceil((frozen.at + o.reorderMs - now) / 1000)) : 0;
   // relative strength soudaine : perf courte - médiane du marché
+  const hourNow = new Date().getHours();
   const shorts = all.map(r => r.pS).filter(v => !isNaN(v)).sort((a, b) => a - b);
   const med = shorts.length ? shorts[Math.floor(shorts.length / 2)] : NaN;
   all.forEach(r => {
     r.rs = isNaN(r.pS) || isNaN(med) ? NaN : r.pS - med;
     const P = o.alSens;
     // setup long : RS soudaine + volume + accélération + tendance + score, mouvement pas déjà trop étendu (le funding n'exclut pas)
-    r.rsHit = o.alRs > 0 && r.rs >= o.alRs * P.rs && r.pS > 0 && r.pS <= 4 * o.alRs
-      && !isNaN(r.rv) && r.rv >= P.rv && r.acc > 0 && r.perf > 0 && r.perf <= 25
-      && r.dr >= 0 && r.scoreRaw >= P.score;
+    // filtres qui ont tenu dans le backtest : RS forte, hausse de +2 à +10 % sur la fenêtre (ni plate ni trop étendue),
+    // accélération pas parabolique, mouvement court pas déjà explosé, pas la nuit (0 h - 8 h)
+    const rsMin = o.alRs * P.rs;
+    r.rsHit = o.alRs > 0 && r.rs >= rsMin && r.pS > 0 && r.pS < 3 * Math.max(2, rsMin)
+      && (P.rv === 0 || (!isNaN(r.rv) && r.rv >= P.rv))
+      && r.perf >= 2 && r.perf <= 10 && r.acc <= 4 && !(o.night && hourNow < 8);
+    if(r.rsHit){
+      const lows = r.c.hist.filter(p => p[0] >= now - 10 * 60000).map(p => p[1]);
+      r.stop = lows.length ? Math.min(...lows) * 0.9995 : NaN;
+    }
   });
   return {vis: shown, all, t0, now, accWin, o, total: all.length, eligible: vis.length, nextIn};
 }
@@ -546,7 +559,10 @@ function checkAlerts({all, o}){
   if(best){
     const r = best;
     r.c.lastAlert = now; lastAlertAt = now;
-    const text = `🎯 LONG ${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(r.perf)} · RS +${r.rs.toFixed(1)}% en ${Math.round(o.alRsWin / 60000)} min · vol ${r.rv.toFixed(1)}× · score ${r.scoreRaw}${r.fr >= 0.03 ? ` · ⚠ funding ${r.fr.toFixed(3)}%` : ''}`;
+    const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(4) : v.toPrecision(4);
+    const risk = r.c.last - r.stop;
+    const plan = risk > 0 ? ` · stop ≈ ${px(r.stop)} (-${(risk / r.c.last * 100).toFixed(1)}%) · TP1 ${px(r.c.last + risk)} · TP1.5 ${px(r.c.last + 1.5 * risk)}` : '';
+    const text = `🎯 LONG ${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${px(r.c.last)} · ${fmtPct(r.perf)} · RS +${r.rs.toFixed(1)}%${isNaN(r.rv) ? '' : ` · vol ${r.rv.toFixed(1)}×`}${plan}${r.fr >= 0.03 ? ` · ⚠ funding ${r.fr.toFixed(3)}%` : ''}`;
     alertLog.unshift({t: now, sym: r.c.sym, text}); alertLog.length = Math.min(alertLog.length, 20);
     notify('🎯 Setup long ' + r.c.label, text, r.c.sym, linkOf(r.c).href);
     beep();
@@ -700,7 +716,7 @@ $('alerts').addEventListener('change', async () => {
   if($('alerts').checked) beep();
   saveSettings();
 });
-['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alSens'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alSens', 'night'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
 ['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
