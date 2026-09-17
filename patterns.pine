@@ -1,48 +1,117 @@
 //@version=6
-indicator("Patterns : bull flag, triple creux, sweep", shorttitle="Patterns", overlay=true, max_boxes_count=100, max_lines_count=300, max_labels_count=300)
+indicator("Patterns : bull flag, triple creux, sweep", shorttitle="Patterns", overlay=true, max_boxes_count=100, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
 // ── 1. Bull flag
 useFlag     = input.bool(true, "Afficher", group="1. Bull flag")
-poleLen     = input.int(10, "Mât : sur N barres max", minval=3, group="1. Bull flag")
-poleMinPct  = input.float(4.0, "Mât : hausse minimum (%)", minval=0.5, step=0.5, group="1. Bull flag")
-flagLen     = input.int(8, "Drapeau : durée (barres)", minval=3, group="1. Bull flag")
+poleLen     = input.int(12, "Mât : durée max (barres)", minval=2, maxval=50, group="1. Bull flag")
+poleMinPct  = input.float(5.0, "Mât : hausse minimum (%)", minval=0.5, step=0.5, group="1. Bull flag")
+poleAtr     = input.float(3.0, "Mât : hausse minimum (en ATR)", minval=0.5, step=0.5, group="1. Bull flag")
+flagMin     = input.int(4, "Drapeau : durée min (barres)", minval=3, maxval=30, group="1. Bull flag")
+flagMax     = input.int(20, "Drapeau : durée max (barres)", minval=4, maxval=40, group="1. Bull flag")
 flagMaxRetr = input.float(50, "Drapeau : repli max (% du mât)", minval=10, maxval=100, group="1. Bull flag")
-flagVolMult = input.float(1.2, "Cassure : volume ≥ x moyenne", minval=0, step=0.1, group="1. Bull flag")
+flagMaxUp   = input.float(0.05, "Drapeau : pente max (% par barre, 0 = doit baisser)", step=0.05, group="1. Bull flag")
+flagVolDry  = input.bool(true, "Drapeau : volume plus faible que le mât", group="1. Bull flag")
+brkVolMult  = input.float(1.2, "Cassure : volume ≥ x moyenne du drapeau", minval=0, step=0.1, group="1. Bull flag")
 
 // ── 2. Triple creux
 useTB       = input.bool(true, "Afficher", group="2. Triple creux")
 pivLen      = input.int(5, "Creux : barres de chaque côté", minval=2, group="2. Triple creux")
 tbTolPct    = input.float(1.5, "Écart max entre les 3 creux (%)", minval=0.1, step=0.1, group="2. Triple creux")
 tbMinGap    = input.int(5, "Écart min entre creux (barres)", minval=1, group="2. Triple creux")
-tbMaxSpan   = input.int(150, "Durée max du motif (barres)", minval=20, group="2. Triple creux")
+tbMaxSpan   = input.int(150, "Durée max du motif (barres)", minval=20, maxval=400, group="2. Triple creux")
 tbMaxWait   = input.int(30, "Cassure attendue dans les N barres", minval=1, group="2. Triple creux")
 
-// ── 3. Balayage de liquidité (sweep)
+// ── 3. Sweep + taux de réussite
 useSweep    = input.bool(true, "Afficher", group="3. Sweep")
 swPivLen    = input.int(5, "Plus bas de référence : barres de chaque côté", minval=2, group="3. Sweep")
 swMaxAge    = input.int(100, "Plus bas de référence : âge max (barres)", minval=10, group="3. Sweep")
 swWickPct   = input.float(40, "Mèche basse ≥ % de la bougie", minval=0, maxval=100, group="3. Sweep")
+hideDown    = input.bool(false, "Masquer les sweeps en tendance baissière", group="3. Sweep")
+tpR         = input.float(1.5, "Réussite = objectif à x fois le risque", minval=0.5, step=0.25, group="3. Sweep : statistiques", tooltip="Entrée à la clôture du sweep, stop sous la mèche. Réussi si l'objectif est touché avant le stop.")
+maxHold     = input.int(30, "…dans les N barres (sinon échec)", minval=3, group="3. Sweep : statistiques")
+showStats   = input.bool(true, "Tableau des statistiques", group="3. Sweep : statistiques")
+consLen     = input.int(40, "Consolidation : durée (barres)", minval=10, maxval=300, group="3. Sweep : contexte")
+consAtr     = input.float(6.0, "Consolidation : range ≤ x ATR", minval=1, step=0.5, group="3. Sweep : contexte")
+trendLen    = input.int(50, "Tendance : EMA", minval=10, group="3. Sweep : contexte")
+downSlope   = input.float(0.5, "Baissière : EMA en baisse d'au moins x % sur 10 barres", minval=0, step=0.1, group="3. Sweep : contexte")
 
-volAvg = ta.sma(volume, 20)
+atr = ta.atr(14)
 
 // ═══ 1. BULL FLAG ═══════════════════════════════════════════════════════
-flagHigh  = ta.highest(high, flagLen)[1]
-flagLow   = ta.lowest(low, flagLen)[1]
-poleLow   = ta.lowest(low, poleLen)[flagLen]
-poleGain  = poleLow > 0 ? (flagHigh / poleLow - 1) * 100 : 0.0
-retrPct   = flagHigh > poleLow ? (flagHigh - flagLow) / (flagHigh - poleLow) * 100 : 100.0
-// le sommet du mât doit être au début du drapeau, et le drapeau doit baisser ou stagner
-topEarly  = ta.highestbars(high, flagLen)[1] <= -(flagLen / 2)
-drift     = ta.linreg(close, flagLen, 0)[1] <= ta.linreg(close, flagLen, flagLen - 1)[1] * 1.002
-isFlag    = poleGain >= poleMinPct and retrPct <= flagMaxRetr and topEarly and drift
-flagBreak = useFlag and isFlag and close > flagHigh and close[1] <= flagHigh and volume >= flagVolMult * volAvg
-
+// Pour chaque durée de drapeau L : le sommet du mât est à la barre [L] et domine tout le drapeau ;
+// le mât monte vite (en % et en ATR) ; le drapeau est un canal plat ou descendant, repli limité,
+// volume en baisse ; la barre actuelle clôture au-dessus de la ligne haute du canal, avec du volume.
 var int lastFlagBar = na
-if flagBreak and barstate.isconfirmed and (na(lastFlagBar) or bar_index - lastFlagBar > flagLen)
-    lastFlagBar := bar_index
-    box.new(bar_index - flagLen, flagHigh, bar_index - 1, flagLow, border_color = color.new(color.aqua, 20), bgcolor = color.new(color.aqua, 88))
-    line.new(bar_index - flagLen - poleLen, poleLow, bar_index - flagLen, flagHigh, color = color.aqua, width = 2)
-    label.new(bar_index, low, "Bull flag\n+" + str.tostring(poleGain, "#.#") + "%", style = label.style_label_up, color = color.new(color.aqua, 20), textcolor = color.black, size = size.small)
+flagBreak = false
+float fGain = na
+preFilter = close > open and close > ta.highest(close, flagMin)[1]
+if useFlag and preFilter and bar_index > flagMax + poleLen + 2 and (na(lastFlagBar) or bar_index - lastFlagBar > flagMin)
+    for L = flagMin to flagMax
+        top = high[L]
+        isTop = true
+        for k = 1 to L - 1
+            if high[k] > top
+                isTop := false
+                break
+        if not isTop
+            continue
+        pLow = low[L]
+        pBar = L
+        for k = L to L + poleLen - 1
+            if low[k] < pLow
+                pLow := low[k]
+                pBar := k
+        gain = (top / pLow - 1) * 100
+        if gain < poleMinPct or top - pLow < poleAtr * atr[L] or pBar == L
+            continue
+        n = L - 1
+        sx = 0.0
+        sy = 0.0
+        sxx = 0.0
+        sxy = 0.0
+        fLow = low[1]
+        vFlag = 0.0
+        for k = 1 to n
+            x = float(n - k)
+            sx += x
+            sy += close[k]
+            sxx += x * x
+            sxy += x * close[k]
+            fLow := math.min(fLow, low[k])
+            vFlag += volume[k]
+        den = n * sxx - sx * sx
+        slope = den != 0 ? (n * sxy - sx * sy) / den : 0.0
+        icpt = (sy - slope * sx) / n
+        if slope / top * 100 > flagMaxUp
+            continue
+        retr = (top - fLow) / (top - pLow) * 100
+        if retr > flagMaxRetr
+            continue
+        upDev = 0.0
+        dnDev = 0.0
+        for k = 1 to n
+            reg = icpt + slope * (n - k)
+            upDev := math.max(upDev, high[k] - reg)
+            dnDev := math.max(dnDev, reg - low[k])
+        vFlagAvg = vFlag / n
+        vPole = 0.0
+        for k = L to pBar
+            vPole += volume[k]
+        vPoleAvg = vPole / (pBar - L + 1)
+        if flagVolDry and vFlagAvg >= vPoleAvg
+            continue
+        upperNow = icpt + slope * n + upDev
+        if close > upperNow and volume >= brkVolMult * vFlagAvg
+            flagBreak := true
+            fGain := gain
+            if barstate.isconfirmed
+                lastFlagBar := bar_index
+                x0 = bar_index - n
+                line.new(bar_index - pBar, pLow, bar_index - L, top, color = color.aqua, width = 3)
+                line.new(x0, icpt + upDev, bar_index, upperNow, color = color.new(color.aqua, 10))
+                line.new(x0, icpt - dnDev, bar_index, icpt + slope * n - dnDev, color = color.new(color.aqua, 10))
+                label.new(bar_index, low, "Bull flag\nmât +" + str.tostring(gain, "#.#") + "%", style = label.style_label_up, color = color.new(color.aqua, 20), textcolor = color.black, size = size.small)
+            break
 
 // ═══ 2. TRIPLE CREUX ════════════════════════════════════════════════════
 pl = ta.pivotlow(low, pivLen, pivLen)
@@ -90,7 +159,45 @@ if useTB and not na(tbNeck)
         label.new(bar_index, low, "Triple creux", style = label.style_label_up, color = color.new(color.lime, 20), textcolor = color.black, size = size.small)
         tbNeck := na
 
-// ═══ 3. SWEEP ═══════════════════════════════════════════════════════════
+// ═══ 3. SWEEP + CONTEXTE + TAUX DE RÉUSSITE ═════════════════════════════
+// contextes : 0 = après consolidation, 1 = tendance baissière, 2 = neutre
+ema      = ta.ema(close, trendLen)
+emaSlope = ema[10] != 0 ? (ema / ema[10] - 1) * 100 : 0.0
+consRng  = ta.highest(high, consLen)[1] - ta.lowest(low, consLen)[1]
+isCons   = consRng <= consAtr * atr[1] and math.abs(emaSlope) < downSlope
+isDown   = not isCons and emaSlope <= -downSlope and close < ema
+ctx      = isCons ? 0 : isDown ? 1 : 2
+
+ctxName(int c) =>
+    c == 0 ? "après consolidation" : c == 1 ? "tendance baissière" : "neutre"
+ctxCol(int c) =>
+    c == 0 ? color.lime : c == 1 ? color.red : color.orange
+
+var array<int>   wins  = array.from(0, 0, 0)
+var array<int>   total = array.from(0, 0, 0)
+var array<float> tStop = array.new<float>()
+var array<float> tTgt  = array.new<float>()
+var array<int>   tCtx  = array.new<int>()
+var array<int>   tBar  = array.new<int>()
+
+// résolution des trades ouverts (barres clôturées, après la barre d'entrée)
+if barstate.isconfirmed and array.size(tStop) > 0
+    for i = array.size(tStop) - 1 to 0
+        if bar_index <= array.get(tBar, i)
+            continue
+        hitStop = low <= array.get(tStop, i)
+        hitTgt  = high >= array.get(tTgt, i)
+        expired = bar_index - array.get(tBar, i) >= maxHold
+        if hitStop or hitTgt or expired
+            c = array.get(tCtx, i)
+            array.set(total, c, array.get(total, c) + 1)
+            if hitTgt and not hitStop          // les deux sur la même barre = compté en échec
+                array.set(wins, c, array.get(wins, c) + 1)
+            array.remove(tStop, i)
+            array.remove(tTgt, i)
+            array.remove(tCtx, i)
+            array.remove(tBar, i)
+
 spl = ta.pivotlow(low, swPivLen, swPivLen)
 var float swLvl = na
 var int   swBar = na
@@ -100,19 +207,45 @@ if not na(spl)
 range_  = high - low
 lowWick = math.min(open, close) - low
 sweep = useSweep and not na(swLvl) and bar_index - swBar <= swMaxAge and low < swLvl and close > swLvl and range_ > 0 and lowWick / range_ * 100 >= swWickPct
+float swProb = na
 if sweep and barstate.isconfirmed
-    line.new(swBar, swLvl, bar_index, swLvl, color = color.new(color.orange, 20), style = line.style_dotted)
-    label.new(bar_index, low, "Sweep", style = label.style_label_up, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny)
-    swLvl := na      // un plus bas n'est balayé qu'une fois
+    w = array.get(wins, ctx)
+    t = array.get(total, ctx)
+    swProb := t > 0 ? float(w) / t * 100 : na
+    risk = close - low
+    if risk > 0
+        array.push(tStop, low)
+        array.push(tTgt, close + tpR * risk)
+        array.push(tCtx, ctx)
+        array.push(tBar, bar_index)
+    if not (hideDown and ctx == 1)
+        probTxt = t < 5 ? "historique insuffisant (" + str.tostring(t) + ")" : str.tostring(swProb, "#") + "% réussite (" + str.tostring(t) + " cas)"
+        line.new(swBar, swLvl, bar_index, swLvl, color = color.new(ctxCol(ctx), 30), style = line.style_dotted)
+        label.new(bar_index, low, "Sweep · " + ctxName(ctx) + "\n" + probTxt, style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.small, tooltip = "Réussite = objectif " + str.tostring(tpR) + "R touché avant le stop (sous la mèche), dans les " + str.tostring(maxHold) + " barres. Calculé sur l'historique de ce graphique, avant ce sweep.")
+    swLvl := na
+
+var table st = table.new(position.bottom_right, 3, 5, bgcolor = color.new(color.black, 15), border_width = 1)
+if showStats and useSweep and barstate.islast
+    table.cell(st, 0, 0, "Sweep (" + str.tostring(tpR) + "R en " + str.tostring(maxHold) + " b.)", text_color = color.white, text_size = size.small)
+    table.cell(st, 1, 0, "Cas", text_color = color.white, text_size = size.small)
+    table.cell(st, 2, 0, "Réussite", text_color = color.white, text_size = size.small)
+    for c = 0 to 2
+        t = array.get(total, c)
+        w = array.get(wins, c)
+        table.cell(st, 0, c + 1, ctxName(c), text_color = ctxCol(c), text_size = size.small)
+        table.cell(st, 1, c + 1, str.tostring(t), text_color = color.silver, text_size = size.small)
+        table.cell(st, 2, c + 1, t > 0 ? str.tostring(float(w) / t * 100, "#") + "%" : "–", text_color = color.white, text_size = size.small)
+    table.cell(st, 0, 4, "Maintenant : " + ctxName(ctx), text_color = ctxCol(ctx), text_size = size.tiny)
 
 // ═══ ALERTES ════════════════════════════════════════════════════════════
 alertcondition(flagBreak, "Bull flag", "Bull flag cassé sur {{ticker}} ({{interval}})")
 alertcondition(tbBreak, "Triple creux", "Triple creux cassé sur {{ticker}} ({{interval}})")
-alertcondition(sweep, "Sweep", "Sweep d'un plus bas sur {{ticker}} ({{interval}})")
+alertcondition(sweep and ctx == 0, "Sweep après consolidation", "Sweep après consolidation sur {{ticker}} ({{interval}})")
+alertcondition(sweep, "Sweep (tous)", "Sweep d'un plus bas sur {{ticker}} ({{interval}})")
 if barstate.isconfirmed
     if flagBreak
-        alert("Bull flag : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+        alert("Bull flag : " + syminfo.ticker + " " + timeframe.period + " (mât +" + str.tostring(fGain, "#.#") + "%)", alert.freq_once_per_bar_close)
     if tbBreak
         alert("Triple creux : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
-    if sweep
-        alert("Sweep : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+    if sweep and not (hideDown and ctx == 1)
+        alert("Sweep " + ctxName(ctx) + " : " + syminfo.ticker + " " + timeframe.period + (na(swProb) ? "" : " · " + str.tostring(swProb, "#") + "% historique"), alert.freq_once_per_bar_close)

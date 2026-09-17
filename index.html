@@ -47,6 +47,7 @@
   .name a{color:var(--muted);text-decoration:none;font-size:12px}
   .name a:hover{color:var(--accent)}
   .ex{font-size:9px;font-weight:600;color:#9be3d0;border:1px solid #2f6f62;border-radius:3px;padding:0 3px}
+  .rs{color:var(--gold);font-size:12px}
   .new{font-size:10px;font-weight:600;color:var(--bg);background:var(--accent);border-radius:3px;padding:0 3px}
   .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   .score{font-weight:600}
@@ -128,6 +129,14 @@
   <label title="Notification + son quand un coin remplit une condition (1 alerte max par coin toutes les 15 min)"><input id="alerts" type="checkbox"> Alertes</label>
   <label title="Alerte si le coin gagne au moins N places">rang ▲≥ <input id="alRank" type="number" value="5" min="1" step="1"></label>
   <label title="Alerte si le score atteint ce seuil">score ≥ <input id="alScore" type="number" value="80" min="0" max="100" step="5"></label>
+  <label title="Relative strength soudaine : le coin monte d'au moins X % de plus que la médiane du marché sur la période choisie, avec du volume (Vol× ≥ 1,2 quand il est connu). 0 = désactivé.">⚡ RS ≥ <input id="alRs" type="number" value="2" min="0" step="0.5">% en
+    <select id="alRsWin">
+      <option value="5">5 min</option>
+      <option value="10" selected>10 min</option>
+      <option value="15">15 min</option>
+      <option value="30">30 min</option>
+    </select>
+  </label>
   </div>
   <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins<span id="countX"></span> · <span id="msg">connexion…</span></div>
 </header>
@@ -164,6 +173,7 @@
       <li>☆ épingle un coin (toujours visible, en haut).</li>
       <li>↗ ouvre le graphique (TradingView, ou Hyperliquid pour les coins <b>HL</b>).</li>
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
+      <li><b>⚡ RS</b> : un coin qui monte d'un coup plus vite que le marché (X % au-dessus de la médiane sur N min, avec du volume). Badge ⚡ dans la liste + alerte si « Alertes » est coché, même s'il n'est pas dans le top affiché.</li>
       <li><b>Alertes</b> : son + notification si un coin gagne N places ou atteint le score choisi (onglet ouvert).</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
       <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous). Par défaut le tri est <b>Perf</b> : la liste suit l'ordre des courbes du graphique.</li>
@@ -192,7 +202,7 @@ const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
 const ALIASES = {PUMPFUN: 'PUMP'};
-const SETTINGS = ['hl', 'maxN', 'reorder', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
+const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
 const STORE_KEY = 'bybit-spaghetti-v2';
 
 // clé de dédoublonnage : 1000PEPEUSDT, SHIB1000USDT, kPEPE -> PEPE / SHIB
@@ -213,7 +223,7 @@ const opt = () => ({
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
-  alerts: $('alerts').checked, alRank: +$('alRank').value || 5, alScore: +$('alScore').value || 80
+  alerts: $('alerts').checked, alRs: +$('alRs').value || 0, alRsWin: (+$('alRsWin').value || 10) * 60000, alRank: +$('alRank').value || 5, alScore: +$('alScore').value || 80
 });
 const colorOf = c => `hsl(${c.hue} 72% 62%)`;
 const fmtPct = (v, d = 2) => isNaN(v) ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(d)}%`;
@@ -458,7 +468,8 @@ function compute(){
     const perf = (c.last / base - 1) * 100;
     const pA = (valueAt(c.hist, tA) / base - 1) * 100;
     const acc = isNaN(pA) ? NaN : (perf - pA) - pA / (o.win - accWin) * accWin;
-    all.push({c, pts, perf, pA, acc, rv: c.relVol, fr: c.funding * 100, pinned});
+    const pS = (c.last / valueAt(c.hist, now - o.alRsWin) - 1) * 100;       // perf sur la période RS
+    all.push({c, pts, perf, pA, acc, pS, rv: c.relVol, fr: c.funding * 100, pinned});
   });
   // rangs et score calculés sur tous les coins suivis (plus stable que sur la seule sélection)
   const byNow = [...all].sort((a, b) => b.perf - a.perf);
@@ -484,7 +495,14 @@ function compute(){
   let kept = 0;
   const shown = ordered.filter(r => r.pinned || (o.maxN > 0 ? kept++ < o.maxN : true));
   const nextIn = o.reorderMs ? Math.max(0, Math.ceil((frozen.at + o.reorderMs - now) / 1000)) : 0;
-  return {vis: shown, t0, now, accWin, o, total: all.length, eligible: vis.length, nextIn};
+  // relative strength soudaine : perf courte - médiane du marché
+  const shorts = all.map(r => r.pS).filter(v => !isNaN(v)).sort((a, b) => a - b);
+  const med = shorts.length ? shorts[Math.floor(shorts.length / 2)] : NaN;
+  all.forEach(r => {
+    r.rs = isNaN(r.pS) || isNaN(med) ? NaN : r.pS - med;
+    r.rsHit = o.alRs > 0 && r.rs >= o.alRs && r.pS > 0 && (isNaN(r.rv) || r.rv >= 1.2);
+  });
+  return {vis: shown, all, t0, now, accWin, o, total: all.length, eligible: vis.length, nextIn};
 }
 
 // ─── Alertes ──────────────────────────────────────────────────────────────
@@ -497,14 +515,17 @@ function beep(){
     osc.connect(g).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.35);
   }catch(e){}
 }
-function checkAlerts({vis, o}){
+function checkAlerts({vis, all, o}){
   if(!o.alerts || Date.now() - startedAt < ALERT_WARMUP) return;
-  const now = Date.now();
-  vis.forEach(r => {
-    if(r.perf <= 0 || now - r.c.lastAlert < ALERT_COOLDOWN) return;
+  const now = Date.now(), shownSet = new Set(vis);
+  all.forEach(r => {
+    if(now - r.c.lastAlert < ALERT_COOLDOWN) return;
     const why = [];
-    if(r.dr >= o.alRank) why.push(`▲${r.dr} places`);
-    if(r.score >= o.alScore) why.push(`score ${r.score}`);
+    if(r.rsHit) why.push(`⚡ RS +${r.rs.toFixed(1)}% vs marché en ${Math.round(o.alRsWin / 60000)} min${isNaN(r.rv) ? '' : ` · vol ${r.rv.toFixed(1)}×`}`);
+    if(shownSet.has(r) && r.perf > 0){
+      if(r.dr >= o.alRank) why.push(`▲${r.dr} places`);
+      if(r.score >= o.alScore) why.push(`score ${r.score}`);
+    }
     if(!why.length) return;
     r.c.lastAlert = now;
     const text = `${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(r.perf)} · ${why.join(' · ')}`;
@@ -607,7 +628,8 @@ function renderList({vis, accWin, nextIn}){
     const rv = isNaN(r.rv) ? '<span class="mut">–</span>' : `<span class="${r.rv >= 2 ? 'up' : r.rv < 0.7 ? 'mut' : ''}">${r.rv.toFixed(1)}×</span>`;
     const fr = isNaN(r.fr) ? '<span class="mut">–</span>' : `<span class="${r.fr >= 0.08 ? 'down' : r.fr >= 0.03 ? 'warn' : r.fr < 0 ? 'up' : 'mut'}">${r.fr.toFixed(3)}%</span>`;
     const sc = `<span class="score ${r.score >= 75 ? 'up' : r.score < 40 ? 'mut' : ''}">${r.score}</span>`;
-    const isNew = r.c.addedAt && now - r.c.addedAt < NEW_BADGE_MS ? '<span class="new">NEW</span>' : '';
+    const isNew = (r.c.addedAt && now - r.c.addedAt < NEW_BADGE_MS ? '<span class="new">NEW</span>' : '')
+      + (r.rsHit ? `<span class="rs" title="RS soudaine : +${r.rs.toFixed(1)}% vs marché">⚡</span>` : '');
     const ex = r.c.ex === 'hl' ? '<span class="ex" title="Hyperliquid">HL</span>' : '';
     return `<div class="grid row ${hi === s ? 'hi' : ''} ${r.pinned ? 'pin' : ''}" data-s="${s}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
       <span class="star ${r.pinned ? 'on' : ''}" data-pin="${s}">${r.pinned ? '★' : '☆'}</span>
@@ -662,7 +684,7 @@ $('alerts').addEventListener('change', async () => {
   if($('alerts').checked) beep();
   saveSettings();
 });
-['maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
 ['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
