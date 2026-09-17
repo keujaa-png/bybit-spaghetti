@@ -48,6 +48,8 @@
   .name a:hover{color:var(--accent)}
   .ex{font-size:9px;font-weight:600;color:#9be3d0;border:1px solid #2f6f62;border-radius:3px;padding:0 3px}
   .rs{color:var(--gold);font-size:12px}
+  .nbtn{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:4px;padding:2px 8px;font:inherit;font-size:12px;cursor:pointer}
+  .nbtn.ok{color:var(--up);border-color:#2f6f62} .nbtn.bad{color:var(--warn)}
   .new{font-size:10px;font-weight:600;color:var(--bg);background:var(--accent);border-radius:3px;padding:0 3px}
   .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   .score{font-weight:600}
@@ -126,7 +128,8 @@
   <label><input id="noStock" type="checkbox" checked> Masquer actions/métaux</label>
   <label title="Épaisseur des courbes proportionnelle au volume 24h"><input id="thick" type="checkbox" checked> Épaisseur ∝ volume</label>
   <span class="sep"></span>
-  <label title="Notification + son quand un coin remplit une condition (1 alerte max par coin toutes les 15 min)"><input id="alerts" type="checkbox"> Alertes</label>
+  <label title="Notification Chrome + son pour le meilleur setup long du moment"><input id="alerts" type="checkbox"> Alertes</label>
+  <button id="notifBtn" class="nbtn" title="État des notifications Chrome (clic = tester)">🔔 …</button>
   <label title="Stricte : très peu d'alertes, seulement les setups les plus nets. Large : plus d'alertes.">Sensibilité
     <select id="alSens">
       <option value="strict">stricte</option>
@@ -179,7 +182,7 @@
       <li>↗ ouvre le coin sur son exchange : Bybit, ou Hyperliquid pour les coins <b>HL</b>.</li>
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
       <li><b>🎯 Setup long</b> : une seule alerte, seulement si tout est réuni : le coin monte d'un coup plus vite que le marché (⚡ RS), avec du volume (Vol×), en accélération, en hausse sur la fenêtre, bon score, et pas déjà trop étendu (un funding élevé est signalé ⚠ mais n'empêche pas l'alerte). Badge 🎯 dans la liste.</li>
-      <li><b>Alertes</b> : son + notification pour le meilleur setup du moment (onglet ouvert). <b>Sensibilité</b> stricte = très peu d'alertes, large = plus. Un même coin n'est pas re-signalé avant 20 à 45 min.</li>
+      <li><b>Alertes</b> : notification Chrome + son pour le meilleur setup du moment (l'onglet doit rester ouvert, même en arrière-plan). Le bouton 🔔 montre l'état et envoie un test ; clic sur la notification = ouvre le coin sur l'exchange. <b>Sensibilité</b> stricte = très peu d'alertes, large = plus. Un même coin n'est pas re-signalé avant 20 à 45 min.</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
       <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous). Par défaut le tri est <b>Perf</b> : la liste suit l'ordre des courbes du graphique.</li>
       <li><b>Reclasser</b> : l'ordre ne bouge qu'à cet intervalle (↻ = compte à rebours) ; les chiffres restent en direct.</li>
@@ -545,7 +548,7 @@ function checkAlerts({all, o}){
     r.c.lastAlert = now; lastAlertAt = now;
     const text = `🎯 LONG ${r.c.label}${r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(r.perf)} · RS +${r.rs.toFixed(1)}% en ${Math.round(o.alRsWin / 60000)} min · vol ${r.rv.toFixed(1)}× · score ${r.scoreRaw}${r.fr >= 0.03 ? ` · ⚠ funding ${r.fr.toFixed(3)}%` : ''}`;
     alertLog.unshift({t: now, sym: r.c.sym, text}); alertLog.length = Math.min(alertLog.length, 20);
-    try{ if('Notification' in window && Notification.permission === 'granted') new Notification('Setup long', {body: text, tag: r.c.sym}); }catch(e){}
+    notify('🎯 Setup long ' + r.c.label, text, r.c.sym, linkOf(r.c).href);
     beep();
   }
   $('alertBox').innerHTML = alertLog.map(a =>
@@ -693,9 +696,7 @@ function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext |
 document.addEventListener('pointerdown', ensureAudio, {once: true});
 $('alerts').addEventListener('change', async () => {
   ensureAudio();
-  if($('alerts').checked && 'Notification' in window && Notification.permission === 'default'){
-    try{ await Notification.requestPermission(); }catch(e){}
-  }
+  if($('alerts').checked) await askNotif();
   if($('alerts').checked) beep();
   saveSettings();
 });
@@ -737,6 +738,48 @@ async function checkUpdate(){
   }catch(e){}
 }
 if(location.protocol.startsWith('http')){ checkUpdate(); setInterval(checkUpdate, 5 * 60 * 1000); }
+
+// ─── Notifications Chrome ─────────────────────────────────────────────────
+// Page ouverte directement : Notification API. Page intégrée (marketscanner.co) : Chrome bloque les
+// notifications dans un iframe, on les confie à la page parente via postMessage.
+const inFrame = window.top !== window.self;
+let parentNotif = 'unknown';          // état remonté par la page parente
+function notifState(){
+  if(inFrame) return parentNotif;
+  return 'Notification' in window ? Notification.permission : 'unsupported';
+}
+function paintNotif(){
+  const st = notifState(), b = $('notifBtn');
+  b.className = 'nbtn ' + (st === 'granted' ? 'ok' : st === 'unknown' ? '' : 'bad');
+  b.textContent = st === 'granted' ? '🔔 activées' : st === 'denied' ? '🔕 bloquées' : st === 'unsupported' ? '🔕 indisponibles' : st === 'unknown' ? '🔔 …' : '🔔 activer';
+  b.title = st === 'denied' ? 'Notifications bloquées : autorise-les pour ce site dans Chrome (icône à gauche de l\'adresse)' : 'Clic : ' + (st === 'granted' ? 'envoyer une notification de test' : 'activer les notifications');
+}
+async function askNotif(){
+  if(inFrame){ window.parent.postMessage({type: 'spaghetti-perm-request'}, '*'); return; }
+  if('Notification' in window && Notification.permission === 'default'){ try{ await Notification.requestPermission(); }catch(e){} }
+  paintNotif();
+}
+function notify(title, body, tag, url){
+  if(inFrame){ window.parent.postMessage({type: 'spaghetti-alert', title, body, tag, url}, '*'); return; }
+  try{
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+    const n = new Notification(title, {body, tag, renotify: true, requireInteraction: true});
+    n.onclick = () => { window.focus(); if(url) window.open(url, '_blank', 'noopener'); n.close(); };
+  }catch(e){}
+}
+window.addEventListener('message', e => {
+  if(!e.data || e.data.type !== 'spaghetti-perm') return;
+  parentNotif = e.data.state; paintNotif();
+});
+if(inFrame) window.parent.postMessage({type: 'spaghetti-perm-query'}, '*');
+setTimeout(() => { if(inFrame && parentNotif === 'unknown'){ parentNotif = 'unsupported'; paintNotif(); } }, 4000);
+$('notifBtn').addEventListener('click', async () => {
+  ensureAudio();
+  if(notifState() !== 'granted'){ await askNotif(); return; }
+  notify('🔔 Test Spaghetti', 'Les notifications fonctionnent. Les setups long arriveront ici.', 'test', null);
+  beep();
+});
+paintNotif();
 
 // ─── Démarrage ────────────────────────────────────────────────────────────
 loadSettings();

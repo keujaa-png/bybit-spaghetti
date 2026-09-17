@@ -227,7 +227,7 @@ if useHtf and barstate.islast
                 continue
             array.push(drawn, v)
             n += 1
-            array.push(htfLines, line.new(bar_index - 120, v, bar_index, v, extend = extend.right, color = col, width = tf == 0 ? 2 : 1, style = tf == 0 ? line.style_solid : line.style_dashed))
+            array.push(htfLines, line.new(math.max(0, bar_index - 120), v, bar_index, v, extend = extend.right, color = col, width = tf == 0 ? 2 : 1, style = tf == 0 ? line.style_solid : line.style_dashed))
             array.push(htfLabels, label.new(bar_index + 3, v, (tf == 0 ? "W " : "D ") + str.tostring(v, format.mintick) + "  " + str.tostring((v / close - 1) * 100, "#.#") + "%", style = label.style_label_left, color = color.new(color.black, 100), textcolor = col, size = size.small))
 
 // ═══ 3. SWEEP + CONTEXTE + TAUX DE RÉUSSITE ═════════════════════════════
