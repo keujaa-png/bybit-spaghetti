@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bybit Spaghetti — temps réel</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#101720; --panel:#161f2b; --line:#243141; --text:#dfe6ee; --muted:#7f8fa3;
+    --up:#4fd1a0; --down:#f2705a; --warn:#f2b35a; --accent:#8fb3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.4 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;font-weight:600;margin:0 6px 0 0}
+  header label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+  input[type=number]{width:80px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:inherit}
+  select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:inherit}
+  input[type=checkbox]{accent-color:var(--up)}
+  .status{margin-left:auto;color:var(--muted);font-size:13px}
+  .status b{color:var(--text);font-weight:500}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--up)} .dot.err{background:var(--down)}
+  main{flex:1;display:grid;grid-template-columns:1fr 300px;min-height:0}
+  #wrap{position:relative;min-width:0}
+  canvas{display:block;width:100%;height:100%}
+  #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:13px;display:none;white-space:nowrap}
+  aside{border-left:1px solid var(--line);overflow-y:auto;background:var(--panel)}
+  .head,.row{display:grid;grid-template-columns:10px 1fr 70px 72px 36px;gap:6px;align-items:center;padding:4px 12px;font-size:13px}
+  .head{position:sticky;top:0;background:var(--panel);color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)}
+  .head span{cursor:pointer} .head span.sel{color:var(--text)}
+  .row{cursor:pointer}
+  .row:hover,.row.hi{background:rgba(143,179,255,.12)}
+  .row i{width:10px;height:3px;border-radius:2px}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .up{color:var(--up)} .down{color:var(--down)} .warn{color:var(--warn)} .mut{color:var(--muted)}
+  #empty{padding:40px 18px;color:var(--muted);text-align:center}
+  @media (max-width:820px){main{grid-template-columns:1fr;grid-template-rows:1fr 40%}aside{border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Bybit Spaghetti</h1>
+  <label>Vol 24h min (M$) <input id="minVol" type="number" value="5" step="1" min="0"></label>
+  <label>Fenêtre
+    <select id="win">
+      <option value="900">15 min</option>
+      <option value="1800">30 min</option>
+      <option value="3600" selected>1 h</option>
+      <option value="14400">4 h</option>
+      <option value="86400">24 h</option>
+    </select>
+  </label>
+  <label><input id="bull" type="checkbox" checked> Bullish uniquement</label>
+  <label>Perf min % <input id="minPerf" type="number" value="0" step="0.5"></label>
+  <label><input id="cap" type="checkbox" checked> Plafonner le leader</label>
+  <label><input id="noStock" type="checkbox" checked> Masquer actions/métaux</label>
+  <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins · <span id="msg">connexion…</span></div>
+</header>
+<main>
+  <div id="wrap"><canvas id="c"></canvas><div id="tip"></div></div>
+  <aside>
+    <div class="head"><i></i><span data-k="name">Coin</span><span data-k="perf" class="num sel">Perf</span><span data-k="acc" class="num">Accél</span><span data-k="dr" class="num">Rang</span></div>
+    <div id="list"><div id="empty">Chargement de l'historique Bybit…</div></div>
+  </aside>
+</main>
+
+<script>
+const API  = 'https://api.bybit.com/v5/market';
+const WS   = 'wss://stream.bybit.com/v5/public/linear';
+const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, KEEP_MS = 25 * 3600 * 1000;
+// Perps Bybit qui ne sont pas des cryptos (actions, ETF, métaux, pétrole)
+const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
+
+const coins = new Map();   // sym -> {sym, last, turnover, prev24, hist:[[t,price]], hue, ready}
+let ws, pingTimer, hi = null, sortKey = 'perf', lastRows = [], lastPlot = null;
+const $ = id => document.getElementById(id);
+const opt = () => ({
+  minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
+  bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
+  cap: $('cap').checked, noStock: $('noStock').checked
+});
+const tick = s => s.replace(/USDT$/, '');
+const colorOf = c => `hsl(${c.hue} 72% 62%)`;
+let hueIdx = 0;
+function setStatus(txt, state){ $('msg').textContent = txt; $('dot').className = 'dot' + (state ? ' ' + state : ''); }
+
+// ─── Liste des coins ≥ volume min + historique 1 min ─────────────────────
+async function refreshList(){
+  let list;
+  try{
+    const r = await fetch(`${API}/tickers?category=linear`); const d = await r.json();
+    if(d.retCode !== 0) throw new Error(d.retMsg);
+    list = d.result.list;
+  }catch(e){ setStatus('API Bybit injoignable : ' + e.message, 'err'); return; }
+  const o = opt(), keep = new Set();
+  for(const t of list){
+    if(!t.symbol.endsWith('USDT')) continue;
+    const turnover = +t.turnover24h;
+    if(turnover < o.minVol) continue;
+    keep.add(t.symbol);
+    const c = coins.get(t.symbol);
+    if(c){ c.turnover = turnover; c.prev24 = +t.prevPrice24h; c.last = +t.lastPrice; }
+    else coins.set(t.symbol, {sym:t.symbol, last:+t.lastPrice, turnover, prev24:+t.prevPrice24h, hist:[], hue:(hueIdx++ * 137.508) % 360, ready:false});
+  }
+  const removed = [...coins.keys()].filter(s => !keep.has(s));
+  removed.forEach(s => coins.delete(s));
+  resubscribe([...keep], removed);
+  await backfill([...coins.values()].filter(c => !c.ready));
+}
+
+async function backfill(list){
+  const iv = opt().win > 12 * 3600 * 1000 ? 5 : 1;                 // bougies 1 min, ou 5 min pour 24 h
+  const need = Math.min(1000, Math.ceil(opt().win / (iv * 60000)) + 5);
+  let done = 0;
+  const worker = async () => {
+    while(list.length){
+      const c = list.shift();
+      try{
+        const r = await fetch(`${API}/kline?category=linear&symbol=${c.sym}&interval=${iv}&limit=${need}`);
+        const d = await r.json();
+        const rows = (d.result && d.result.list || []).map(k => [+k[0] + iv * 60000, +k[4]]).reverse();
+        const firstLive = c.hist.length ? c.hist[0][0] : Infinity;
+        c.hist = rows.filter(p => p[0] < firstLive).concat(c.hist);
+        c.ready = true;
+      }catch(e){ c.ready = true; }
+      if(++done % 10 === 0){ setStatus(`historique ${done} coins…`, 'on'); render(); }
+    }
+  };
+  await Promise.all(Array.from({length:6}, worker));
+  setStatus(ws && ws.readyState === 1 ? 'en direct' : 'connexion…', ws && ws.readyState === 1 ? 'on' : '');
+  render();
+}
+
+// ─── WebSocket ────────────────────────────────────────────────────────────
+function connect(){
+  ws = new WebSocket(WS);
+  ws.onopen = () => { setStatus('en direct', 'on'); resubscribe([...coins.keys()], []);
+    clearInterval(pingTimer); pingTimer = setInterval(() => ws.readyState === 1 && ws.send('{"op":"ping"}'), 20000); };
+  ws.onclose = () => { setStatus('déconnecté, reconnexion…', 'err'); setTimeout(connect, 3000); };
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if(!m.topic || !m.topic.startsWith('tickers.')) return;
+    const c = coins.get(m.data.symbol); if(!c) return;
+    if(m.data.lastPrice) c.last = +m.data.lastPrice;
+    if(m.data.prevPrice24h) c.prev24 = +m.data.prevPrice24h;
+    if(m.data.turnover24h) c.turnover = +m.data.turnover24h;
+  };
+}
+function resubscribe(add, remove){
+  if(!ws || ws.readyState !== 1) return;
+  const send = (arr, op) => { for(let i = 0; i < arr.length; i += 10) ws.send(JSON.stringify({op, args: arr.slice(i, i + 10).map(s => 'tickers.' + s)})); };
+  send(remove, 'unsubscribe'); send(add, 'subscribe');
+}
+
+// ─── Échantillonnage ──────────────────────────────────────────────────────
+function sample(){
+  const now = Date.now();
+  coins.forEach(c => {
+    if(!c.last) return;
+    c.hist.push([now, c.last]);
+    while(c.hist.length && c.hist[0][0] < now - KEEP_MS) c.hist.shift();
+  });
+  render();
+}
+
+// prix à l'instant t (dernier point ≤ t)
+function priceAt(h, t){
+  let lo = 0, hi_ = h.length - 1, r = -1;
+  while(lo <= hi_){ const m = (lo + hi_) >> 1; if(h[m][0] <= t){ r = m; lo = m + 1; } else hi_ = m - 1; }
+  return r < 0 ? NaN : h[r][1];
+}
+
+// ─── Calcul ───────────────────────────────────────────────────────────────
+function compute(){
+  const o = opt(), now = Date.now(), t0 = now - o.win, accWin = o.win / 6, tA = now - accWin;
+  const all = [];
+  coins.forEach(c => {
+    if(!c.ready || c.hist.length < 2 || c.turnover < o.minVol) return;
+    if(o.noStock && NON_CRYPTO.has(tick(c.sym))) return;
+    let i0 = c.hist.findIndex(p => p[0] >= t0);
+    if(i0 < 0) return;
+    if(i0 > 0) i0--;                          // point juste avant le début : base propre
+    const base = c.hist[i0][1]; if(!base) return;
+    const pts = [];
+    for(let i = i0; i < c.hist.length; i++) pts.push([Math.max(c.hist[i][0], t0), (c.hist[i][1] / base - 1) * 100]);
+    const perf = (c.last / base - 1) * 100;
+    const pA = (priceAt(c.hist, tA) / base - 1) * 100;
+    const acc = isNaN(pA) ? NaN : (perf - pA) - pA / (o.win - accWin) * accWin;
+    all.push({c, pts, perf, pA, acc});
+  });
+  const vis = all.filter(r => !o.bull || r.perf > o.minPerf);
+  // rangs : maintenant vs il y a accWin
+  const byNow = [...vis].sort((a, b) => b.perf - a.perf);
+  const byPrev = [...vis].sort((a, b) => (isNaN(b.pA) ? -1e9 : b.pA) - (isNaN(a.pA) ? -1e9 : a.pA));
+  byNow.forEach((r, i) => r.rank = i + 1);
+  byPrev.forEach((r, i) => r.dr = (i + 1) - r.rank);
+  return {vis, t0, now, accWin, o, total: all.length};
+}
+
+// ─── Rendu ────────────────────────────────────────────────────────────────
+const cv = $('c'), ctx = cv.getContext('2d');
+function render(){ const d = compute(); draw(d); renderList(d); $('count').textContent = `${d.vis.length}/${d.total}`; }
+
+function draw({vis, t0, now, o}){
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if(cv.width !== W * dpr || cv.height !== H * dpr){ cv.width = W * dpr; cv.height = H * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  lastPlot = null;
+  if(!vis.length){ ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center'; ctx.font = '14px IBM Plex Sans, sans-serif';
+    ctx.fillText(coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…', W / 2, H / 2); return; }
+  const padL = 12, padR = 120, padT = 16, padB = 26;
+  let lo = 0, top = 0;
+  vis.forEach(r => r.pts.forEach(p => { lo = Math.min(lo, p[1]); top = Math.max(top, p[1]); }));
+  let capV = Infinity;
+  if(o.cap && vis.length >= 2){
+    const s = vis.map(r => Math.max(...r.pts.map(p => p[1]))).sort((a, b) => b - a);
+    const c2 = Math.max(s[1] * 1.5, 1);
+    if(s[0] > c2){ capV = c2; top = c2; }
+  }
+  if(top - lo < 0.5){ top += 0.25; lo -= 0.25; }
+  const pad = (top - lo) * 0.06; const yMin = lo - pad, yMax = top + pad;
+  const x = t => padL + (t - t0) / (now - t0) * (W - padL - padR);
+  const y = v => padT + (yMax - Math.min(v, capV)) / (yMax - yMin) * (H - padT - padB);
+  lastPlot = {x, y, vis, capV};
+
+  ctx.font = '11px IBM Plex Sans, sans-serif'; ctx.textAlign = 'left';
+  const step = niceStep((yMax - yMin) / 6);
+  for(let v = Math.ceil(yMin / step) * step; v <= yMax; v += step){
+    ctx.strokeStyle = Math.abs(v) < step / 2 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.06)';
+    ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
+  }
+  // lignes
+  vis.forEach(r => {
+    const isHi = hi === r.c.sym;
+    ctx.strokeStyle = colorOf(r.c); ctx.globalAlpha = hi && !isHi ? 0.15 : 0.9; ctx.lineWidth = isHi ? 2.6 : 1.4;
+    ctx.beginPath(); r.pts.forEach((p, i) => i ? ctx.lineTo(x(p[0]), y(p[1])) : ctx.moveTo(x(p[0]), y(p[1]))); ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+  // axe % à droite des lignes
+  ctx.fillStyle = '#7f8fa3';
+  for(let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) ctx.fillText((v > 0 ? '+' : '') + v.toFixed(step < 1 ? 1 : 0) + '%', padL + 2, y(v) - 3);
+  // labels bout de ligne (sans chevauchement), du haut vers le bas
+  const ends = vis.map(r => ({r, yy: y(r.perf)})).sort((a, b) => a.yy - b.yy);
+  let lastY = -99, shown = 0;
+  ends.forEach(e => {
+    if(shown >= 18 && hi !== e.r.c.sym) return;
+    let yy = Math.max(e.yy, lastY + 12); if(yy > H - padB) return;
+    lastY = yy; shown++;
+    ctx.fillStyle = colorOf(e.r.c);
+    ctx.fillText(`${tick(e.r.c.sym)} ${e.r.perf >= 0 ? '+' : ''}${e.r.perf.toFixed(2)}%${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
+  });
+  // axe temps
+  ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
+  for(let k = 0; k <= 4; k++){ const t = t0 + (now - t0) * k / 4; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}), x(t), H - 8); }
+}
+function niceStep(r){ const p = Math.pow(10, Math.floor(Math.log10(r || 1))); const m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
+
+function renderList({vis, accWin}){
+  document.querySelector('.head [data-k=acc]').textContent = `Accél ${accWin >= 3600000 ? Math.round(accWin / 3600000) + 'h' : Math.round(accWin / 60000) + 'm'}`;
+  const key = {name: r => tick(r.c.sym), perf: r => -r.perf, acc: r => isNaN(r.acc) ? 1e9 : -r.acc, dr: r => -r.dr}[sortKey];
+  const rows = [...vis].sort((a, b) => { const A = key(a), B = key(b); return A < B ? -1 : A > B ? 1 : 0; });
+  lastRows = rows;
+  if(!rows.length){ $('list').innerHTML = `<div id="empty">${coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…'}</div>`; return; }
+  $('list').innerHTML = rows.map(r => {
+    const acc = isNaN(r.acc) ? '<span class="mut">–</span>' : `<span class="${r.acc >= 0 ? 'up' : 'warn'}">${r.acc >= 0 ? '▲ +' : '▼ '}${r.acc.toFixed(2)}</span>`;
+    const dr = r.dr > 0 ? `<span class="up">▲${r.dr}</span>` : r.dr < 0 ? `<span class="down">▼${-r.dr}</span>` : '<span class="mut">=</span>';
+    return `<div class="row ${hi === r.c.sym ? 'hi' : ''}" data-s="${r.c.sym}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
+      <i style="background:${colorOf(r.c)}"></i><span>${tick(r.c.sym)}</span>
+      <span class="num ${r.perf >= 0 ? 'up' : 'down'}">${r.perf >= 0 ? '+' : ''}${r.perf.toFixed(2)}%</span>
+      <span class="num">${acc}</span><span class="num">${dr}</span></div>`;
+  }).join('');
+}
+
+// ─── Interactions ─────────────────────────────────────────────────────────
+$('list').addEventListener('click', e => { const r = e.target.closest('.row'); if(!r) return; hi = hi === r.dataset.s ? null : r.dataset.s; render(); });
+document.querySelector('.head').addEventListener('click', e => {
+  const k = e.target.dataset && e.target.dataset.k; if(!k) return;
+  sortKey = k; document.querySelectorAll('.head span').forEach(s => s.classList.toggle('sel', s.dataset.k === k)); render();
+});
+cv.addEventListener('mousemove', e => {
+  const tip = $('tip'); if(!lastPlot){ tip.style.display = 'none'; return; }
+  const {x, y, vis} = lastPlot; let best = null, bd = 14;
+  vis.forEach(r => {
+    let near = null, dx = Infinity;
+    for(const p of r.pts){ const d = Math.abs(x(p[0]) - e.offsetX); if(d < dx){ dx = d; near = p; } }
+    if(!near) return;
+    const d = Math.abs(y(near[1]) - e.offsetY);
+    if(d < bd){ bd = d; best = {r, p: near}; }
+  });
+  if(!best){ tip.style.display = 'none'; return; }
+  tip.style.display = 'block'; tip.style.left = (e.offsetX + 12) + 'px'; tip.style.top = (e.offsetY - 12) + 'px';
+  tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${tick(best.r.c.sym)}</b> ${best.p[1] >= 0 ? '+' : ''}${best.p[1].toFixed(2)}% · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
+});
+cv.addEventListener('mouseleave', () => $('tip').style.display = 'none');
+cv.addEventListener('click', () => { const t = $('tip'); if(t.style.display === 'block'){ const s = t.querySelector('b').textContent + 'USDT'; hi = hi === s ? null : s; render(); } });
+
+['bull', 'minPerf', 'cap', 'noStock'].forEach(id => $(id).addEventListener('change', render));
+$('minVol').addEventListener('change', refreshList);
+$('win').addEventListener('change', () => { coins.forEach(c => { if(c.hist.length && c.hist[0][0] > Date.now() - opt().win) c.ready = false; }); backfill([...coins.values()].filter(c => !c.ready)); render(); });
+window.addEventListener('resize', render);
+
+// ─── Démarrage ────────────────────────────────────────────────────────────
+connect();
+refreshList();
+setInterval(refreshList, LIST_REFRESH_MS);
+setInterval(sample, SAMPLE_MS);
+</script>
+</body>
+</html>

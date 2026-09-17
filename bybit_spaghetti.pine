@@ -1,0 +1,319 @@
+//@version=6
+indicator("Bybit Spaghetti (vol 24h ≥ 5M)", shorttitle="Bybit Spaghetti", overlay=true, scale=scale.left, max_labels_count=100, max_polylines_count=100, max_bars_back=2000)
+
+// ── Réglages
+lookback   = input.int(96, "Performance depuis N barres", minval=2, maxval=1500, group="Calcul")
+minTurnM   = input.float(5.0, "Volume 24h minimum (M USDT)", minval=0, step=0.5, group="Filtre")
+minPerf    = input.float(0.0, "Perf minimum (%) — seuls les coins au-dessus sont tracés", group="Filtre")
+lineW      = input.int(2, "Épaisseur des courbes", minval=1, maxval=4, group="Affichage")
+showLabels = input.bool(true, "Labels en bout de ligne", group="Affichage")
+showTable  = input.bool(true, "Tableau classement", group="Affichage")
+tableRows  = input.int(20, "Lignes du tableau", minval=1, maxval=40, group="Affichage")
+accLen     = input.int(12, "Fenêtre récente (barres)", minval=1, group="Accélération")
+sortAcc    = input.bool(false, "Trier par accélération", group="Accélération")
+capOn      = input.bool(true, "Plafonner le coin trop en avance", group="Échelle")
+capMult    = input.float(1.5, "Plafond = 2e meilleur ×", minval=1.0, step=0.1, group="Échelle")
+minTurn    = minTurnM * 1e6
+
+barsDay = math.max(1, int(86400 / timeframe.in_seconds()))
+
+f(string sym) =>
+    request.security(sym, timeframe.period, [close, math.sum(volume * close, barsDay)], ignore_invalid_symbol = true)
+
+tick(string sym) =>
+    str.replace(str.replace(str.replace(sym, "BYBIT:", ""), ".P", ""), "USDT", "")
+
+var array<polyline> pls  = array.new<polyline>()
+var array<label>    labs = array.new<label>()
+var array<float>    ext  = array.from(0.0, 0.0)
+var array<float>    capA = array.from(1e12)
+
+if barstate.islast
+    for pl in pls
+        polyline.delete(pl)
+    array.clear(pls)
+    for l in labs
+        label.delete(l)
+    array.clear(labs)
+    array.set(ext, 0, 0.0)
+    array.set(ext, 1, 0.0)
+
+// Trace la courbe (ancrée à 0 il y a N barres) seulement si le coin est haussier
+draw(float c, float t, color col) =>
+    float perf = na
+    float prev = na
+    base = c[lookback]
+    if barstate.islast and t >= minTurn and not na(base) and base != 0
+        perf := (c / base - 1) * 100
+        prev := na(c[accLen]) ? na : (c[accLen] / base - 1) * 100
+        if perf > minPerf
+            pts = array.new<chart.point>()
+            for k = lookback to 0
+                ck = c[k]
+                if not na(ck)
+                    y = math.min((ck / base - 1) * 100, array.get(capA, 0))
+                    array.push(pts, chart.point.from_index(bar_index - k, y))
+                    array.set(ext, 0, math.max(array.get(ext, 0), y))
+                    array.set(ext, 1, math.min(array.get(ext, 1), y))
+            array.push(pls, polyline.new(pts, line_color = col, line_width = lineW))
+        else
+            perf := na
+            prev := na
+    [perf, prev]
+
+perfOf(float c, float t) =>
+    base = c[lookback]
+    float r = na
+    if barstate.islast and t >= minTurn and not na(base) and base != 0
+        r := (c / base - 1) * 100
+    r
+
+// ── Symboles (modifiables dans les réglages)
+s01 = input.symbol("BYBIT:BTCUSDT.P", "#1", group="Symboles")
+s02 = input.symbol("BYBIT:ETHUSDT.P", "#2", group="Symboles")
+s03 = input.symbol("BYBIT:ZECUSDT.P", "#3", group="Symboles")
+s04 = input.symbol("BYBIT:SOLUSDT.P", "#4", group="Symboles")
+s05 = input.symbol("BYBIT:XRPUSDT.P", "#5", group="Symboles")
+s06 = input.symbol("BYBIT:HYPEUSDT.P", "#6", group="Symboles")
+s07 = input.symbol("BYBIT:LSKUSDT.P", "#7", group="Symboles")
+s08 = input.symbol("BYBIT:NEARUSDT.P", "#8", group="Symboles")
+s09 = input.symbol("BYBIT:ARBUSDT.P", "#9", group="Symboles")
+s10 = input.symbol("BYBIT:AKEUSDT.P", "#10", group="Symboles")
+s11 = input.symbol("BYBIT:DOGEUSDT.P", "#11", group="Symboles")
+s12 = input.symbol("BYBIT:ENAUSDT.P", "#12", group="Symboles")
+s13 = input.symbol("BYBIT:BRUSDT.P", "#13", group="Symboles")
+s14 = input.symbol("BYBIT:ADAUSDT.P", "#14", group="Symboles")
+s15 = input.symbol("BYBIT:SUIUSDT.P", "#15", group="Symboles")
+s16 = input.symbol("BYBIT:1000PEPEUSDT.P", "#16", group="Symboles")
+s17 = input.symbol("BYBIT:PUMPFUNUSDT.P", "#17", group="Symboles")
+s18 = input.symbol("BYBIT:UNIUSDT.P", "#18", group="Symboles")
+s19 = input.symbol("BYBIT:LINKUSDT.P", "#19", group="Symboles")
+s20 = input.symbol("BYBIT:LITUSDT.P", "#20", group="Symboles")
+s21 = input.symbol("BYBIT:ONDOUSDT.P", "#21", group="Symboles")
+s22 = input.symbol("BYBIT:AAVEUSDT.P", "#22", group="Symboles")
+s23 = input.symbol("BYBIT:USELESSUSDT.P", "#23", group="Symboles")
+s24 = input.symbol("BYBIT:TAOUSDT.P", "#24", group="Symboles")
+s25 = input.symbol("BYBIT:BNBUSDT.P", "#25", group="Symboles")
+s26 = input.symbol("BYBIT:WLDUSDT.P", "#26", group="Symboles")
+s27 = input.symbol("BYBIT:PONSUSDT.P", "#27", group="Symboles")
+s28 = input.symbol("BYBIT:DASHUSDT.P", "#28", group="Symboles")
+s29 = input.symbol("BYBIT:TRUMPUSDT.P", "#29", group="Symboles")
+s30 = input.symbol("BYBIT:XLMUSDT.P", "#30", group="Symboles")
+s31 = input.symbol("BYBIT:VVVUSDT.P", "#31", group="Symboles")
+s32 = input.symbol("BYBIT:AVAXUSDT.P", "#32", group="Symboles")
+s33 = input.symbol("BYBIT:MARSCOINUSDT.P", "#33", group="Symboles")
+s34 = input.symbol("BYBIT:LTCUSDT.P", "#34", group="Symboles")
+s35 = input.symbol("BYBIT:DOTUSDT.P", "#35", group="Symboles")
+s36 = input.symbol("BYBIT:XMRUSDT.P", "#36", group="Symboles")
+s37 = input.symbol("BYBIT:INJUSDT.P", "#37", group="Symboles")
+s38 = input.symbol("BYBIT:FARTCOINUSDT.P", "#38", group="Symboles")
+s39 = input.symbol("BYBIT:POWERUSDT.P", "#39", group="Symboles")
+s40 = input.symbol("BYBIT:APTUSDT.P", "#40", group="Symboles")
+
+// ── Données + tracé
+[c01, t01] = f(s01)
+q01 = perfOf(c01, t01)
+[c02, t02] = f(s02)
+q02 = perfOf(c02, t02)
+[c03, t03] = f(s03)
+q03 = perfOf(c03, t03)
+[c04, t04] = f(s04)
+q04 = perfOf(c04, t04)
+[c05, t05] = f(s05)
+q05 = perfOf(c05, t05)
+[c06, t06] = f(s06)
+q06 = perfOf(c06, t06)
+[c07, t07] = f(s07)
+q07 = perfOf(c07, t07)
+[c08, t08] = f(s08)
+q08 = perfOf(c08, t08)
+[c09, t09] = f(s09)
+q09 = perfOf(c09, t09)
+[c10, t10] = f(s10)
+q10 = perfOf(c10, t10)
+[c11, t11] = f(s11)
+q11 = perfOf(c11, t11)
+[c12, t12] = f(s12)
+q12 = perfOf(c12, t12)
+[c13, t13] = f(s13)
+q13 = perfOf(c13, t13)
+[c14, t14] = f(s14)
+q14 = perfOf(c14, t14)
+[c15, t15] = f(s15)
+q15 = perfOf(c15, t15)
+[c16, t16] = f(s16)
+q16 = perfOf(c16, t16)
+[c17, t17] = f(s17)
+q17 = perfOf(c17, t17)
+[c18, t18] = f(s18)
+q18 = perfOf(c18, t18)
+[c19, t19] = f(s19)
+q19 = perfOf(c19, t19)
+[c20, t20] = f(s20)
+q20 = perfOf(c20, t20)
+[c21, t21] = f(s21)
+q21 = perfOf(c21, t21)
+[c22, t22] = f(s22)
+q22 = perfOf(c22, t22)
+[c23, t23] = f(s23)
+q23 = perfOf(c23, t23)
+[c24, t24] = f(s24)
+q24 = perfOf(c24, t24)
+[c25, t25] = f(s25)
+q25 = perfOf(c25, t25)
+[c26, t26] = f(s26)
+q26 = perfOf(c26, t26)
+[c27, t27] = f(s27)
+q27 = perfOf(c27, t27)
+[c28, t28] = f(s28)
+q28 = perfOf(c28, t28)
+[c29, t29] = f(s29)
+q29 = perfOf(c29, t29)
+[c30, t30] = f(s30)
+q30 = perfOf(c30, t30)
+[c31, t31] = f(s31)
+q31 = perfOf(c31, t31)
+[c32, t32] = f(s32)
+q32 = perfOf(c32, t32)
+[c33, t33] = f(s33)
+q33 = perfOf(c33, t33)
+[c34, t34] = f(s34)
+q34 = perfOf(c34, t34)
+[c35, t35] = f(s35)
+q35 = perfOf(c35, t35)
+[c36, t36] = f(s36)
+q36 = perfOf(c36, t36)
+[c37, t37] = f(s37)
+q37 = perfOf(c37, t37)
+[c38, t38] = f(s38)
+q38 = perfOf(c38, t38)
+[c39, t39] = f(s39)
+q39 = perfOf(c39, t39)
+[c40, t40] = f(s40)
+q40 = perfOf(c40, t40)
+
+// Plafond d'échelle : 2e meilleur coin × capMult
+if barstate.islast
+    qs = array.from(q01, q02, q03, q04, q05, q06, q07, q08, q09, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27, q28, q29, q30, q31, q32, q33, q34, q35, q36, q37, q38, q39, q40)
+    good = array.new<float>()
+    for q in qs
+        if not na(q) and q > minPerf
+            array.push(good, q)
+    array.set(capA, 0, 1e12)
+    if capOn and array.size(good) >= 2
+        array.sort(good, order.descending)
+        array.set(capA, 0, math.max(array.get(good, 1) * capMult, 1.0))
+
+[v01, w01] = draw(c01, t01, #ED2A2A)
+[v02, w02] = draw(c02, t02, #6890F2)
+[v03, w03] = draw(c03, t03, #9CED2A)
+[v04, w04] = draw(c04, t04, #F268E1)
+[v05, w05] = draw(c05, t05, #2AEDCD)
+[v06, w06] = draw(c06, t06, #F2B368)
+[v07, w07] = draw(c07, t07, #5B2AED)
+[v08, w08] = draw(c08, t08, #6DF268)
+[v09, w09] = draw(c09, t09, #ED2A6B)
+[v10, w10] = draw(c10, t10, #68BEF2)
+[v11, w11] = draw(c11, t11, #DDED2A)
+[v12, w12] = draw(c12, t12, #D568F2)
+[v13, w13] = draw(c13, t13, #2AED8B)
+[v14, w14] = draw(c14, t14, #F28468)
+[v15, w15] = draw(c15, t15, #2A3BED)
+[v16, w16] = draw(c16, t16, #9CF268)
+[v17, w17] = draw(c17, t17, #ED2AAD)
+[v18, w18] = draw(c18, t18, #68EDF2)
+[v19, w19] = draw(c19, t19, #EDBC2A)
+[v20, w20] = draw(c20, t20, #A768F2)
+[v21, w21] = draw(c21, t21, #2AED4A)
+[v22, w22] = draw(c22, t22, #F26879)
+[v23, w23] = draw(c23, t23, #2A7CED)
+[v24, w24] = draw(c24, t24, #CAF268)
+[v25, w25] = draw(c25, t25, #ED2AED)
+[v26, w26] = draw(c26, t26, #68F2C9)
+[v27, w27] = draw(c27, t27, #ED7B2A)
+[v28, w28] = draw(c28, t28, #7868F2)
+[v29, w29] = draw(c29, t29, #4BED2A)
+[v30, w30] = draw(c30, t30, #F268A8)
+[v31, w31] = draw(c31, t31, #2ABDED)
+[v32, w32] = draw(c32, t32, #F2EC68)
+[v33, w33] = draw(c33, t33, #AB2AED)
+[v34, w34] = draw(c34, t34, #68F29B)
+[v35, w35] = draw(c35, t35, #ED3A2A)
+[v36, w36] = draw(c36, t36, #6885F2)
+[v37, w37] = draw(c37, t37, #8DED2A)
+[v38, w38] = draw(c38, t38, #F268D6)
+[v39, w39] = draw(c39, t39, #2AEDDC)
+[v40, w40] = draw(c40, t40, #F2BE68)
+
+hline(0, "Zéro", color=color.gray, linestyle=hline.style_dashed)
+// ancres invisibles pour l'échelle automatique
+plot(0.0, "base", color=color.new(color.white, 100), editable=false)
+plot(barstate.islast ? array.get(ext, 0) : na, "max", color=color.new(color.white, 100), editable=false)
+plot(barstate.islast ? array.get(ext, 1) : na, "min", color=color.new(color.white, 100), editable=false)
+
+// ── Labels + classement
+var table tb = table.new(position.top_right, 5, 41, bgcolor=color.new(color.black, 20), border_width=1)
+
+if barstate.islast
+    vals = array.from(v01, v02, v03, v04, v05, v06, v07, v08, v09, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36, v37, v38, v39, v40)
+    prevs = array.from(w01, w02, w03, w04, w05, w06, w07, w08, w09, w10, w11, w12, w13, w14, w15, w16, w17, w18, w19, w20, w21, w22, w23, w24, w25, w26, w27, w28, w29, w30, w31, w32, w33, w34, w35, w36, w37, w38, w39, w40)
+    syms = array.from(s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27, s28, s29, s30, s31, s32, s33, s34, s35, s36, s37, s38, s39, s40)
+    cols = array.from(#ED2A2A, #6890F2, #9CED2A, #F268E1, #2AEDCD, #F2B368, #5B2AED, #6DF268, #ED2A6B, #68BEF2, #DDED2A, #D568F2, #2AED8B, #F28468, #2A3BED, #9CF268, #ED2AAD, #68EDF2, #EDBC2A, #A768F2, #2AED4A, #F26879, #2A7CED, #CAF268, #ED2AED, #68F2C9, #ED7B2A, #7868F2, #4BED2A, #F268A8, #2ABDED, #F2EC68, #AB2AED, #68F29B, #ED3A2A, #6885F2, #8DED2A, #F268D6, #2AEDDC, #F2BE68)
+    idx  = array.new<int>()
+    for i = 0 to 39
+        v = array.get(vals, i)
+        if not na(v)
+            array.push(idx, i)
+            if showLabels
+                array.push(labs, label.new(bar_index, math.min(v, array.get(capA, 0)), tick(array.get(syms, i)) + " +" + str.tostring(v, "#.##") + "%" + (v > array.get(capA, 0) ? " ⤒" : ""), style=label.style_label_left, color=color.new(color.black, 100), textcolor=array.get(cols, i), size=size.small))
+    n = array.size(idx)
+    // Accélération = gain des accLen dernières barres - rythme moyen d'avant (en points de %)
+    accs   = array.new<float>(40, na)
+    rkNow  = array.new<int>(40, 0)
+    rkPrev = array.new<int>(40, 0)
+    for a in idx
+        pv = array.get(prevs, a)
+        if not na(pv)
+            recent = array.get(vals, a) - pv
+            pace = pv / math.max(1, lookback - accLen) * accLen
+            array.set(accs, a, recent - pace)
+        rn = 1
+        rp = 1
+        for o in idx
+            if o != a
+                if array.get(vals, o) > array.get(vals, a)
+                    rn += 1
+                po = array.get(prevs, o)
+                if not na(po) and not na(pv) and po > pv
+                    rp += 1
+        array.set(rkNow, a, rn)
+        array.set(rkPrev, a, rp)
+    sortKey = array.copy(vals)
+    if sortAcc
+        sortKey := array.copy(accs)
+    if n > 1
+        for a = 1 to n - 1
+            k = array.get(idx, a)
+            b = a - 1
+            while b >= 0 and nz(array.get(sortKey, array.get(idx, b)), -1e9) < nz(array.get(sortKey, k), -1e9)
+                array.set(idx, b + 1, array.get(idx, b))
+                b -= 1
+            array.set(idx, b + 1, k)
+    table.clear(tb, 0, 0, 4, 40)
+    if showTable
+        table.cell(tb, 0, 0, "#", text_color=color.gray, text_size=size.small)
+        table.cell(tb, 1, 0, "Bullish (" + str.tostring(n) + ")", text_color=color.white, text_size=size.small)
+        table.cell(tb, 2, 0, "Perf", text_color=color.white, text_size=size.small)
+        table.cell(tb, 3, 0, "Accél " + str.tostring(accLen) + "b", text_color=color.white, text_size=size.small)
+        table.cell(tb, 4, 0, "Rang", text_color=color.white, text_size=size.small)
+        rows = math.min(tableRows, n)
+        if rows > 0
+            for r = 0 to rows - 1
+                i = array.get(idx, r)
+                ac = array.get(accs, i)
+                dr = array.get(rkPrev, i) - array.get(rkNow, i)
+                table.cell(tb, 0, r + 1, str.tostring(r + 1), text_color=color.gray, text_size=size.small)
+                table.cell(tb, 1, r + 1, tick(array.get(syms, i)), text_color=array.get(cols, i), text_size=size.small)
+                table.cell(tb, 2, r + 1, "+" + str.tostring(array.get(vals, i), "#.##") + "%", text_color=color.lime, text_size=size.small)
+                table.cell(tb, 3, r + 1, na(ac) ? "-" : (ac >= 0 ? "▲ +" : "▼ ") + str.tostring(ac, "#.##"), text_color=na(ac) ? color.gray : ac >= 0 ? color.lime : color.orange, text_size=size.small)
+                table.cell(tb, 4, r + 1, dr > 0 ? "▲" + str.tostring(dr) : dr < 0 ? "▼" + str.tostring(-dr) : "=", text_color=dr > 0 ? color.lime : dr < 0 ? color.red : color.gray, text_size=size.small)
