@@ -602,10 +602,13 @@ function draw({vis, t0, now, o}){
     const c2 = Math.max(s[1] * 1.5, 1);
     if(s[0] > c2){ capV = c2; top = c2; }
   }
+  // plancher : le bas ne descend pas sous -15 % de la hauteur du haut (min -0,5 %), les courbes plus basses restent collées au plancher
+  const floorV = -Math.max(0.5, top * 0.15);
+  lo = Math.max(lo, floorV);
   if(top - lo < 0.5){ top += 0.25; lo -= 0.25; }
   const pad = (top - lo) * 0.06, yMin = lo - pad, yMax = top + pad;
   const x = t => padL + (t - t0) / (now - t0) * (W - padL - padR);
-  const y = v => padT + (yMax - Math.min(v, capV)) / (yMax - yMin) * (H - padT - padB);
+  const y = v => padT + (yMax - Math.max(Math.min(v, capV), floorV)) / (yMax - yMin) * (H - padT - padB);
   lastPlot = {x, y, vis};
 
   ctx.font = `${narrow ? 10 : 11}px IBM Plex Sans, sans-serif`; ctx.textAlign = 'left';
@@ -632,7 +635,7 @@ function draw({vis, t0, now, o}){
     const yy = Math.max(e.yy, lastY + (narrow ? 11 : 12)); if(yy > H - padB) return;
     lastY = yy; shown++;
     ctx.fillStyle = colorOf(e.r.c);
-    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.r.perf, narrow ? 1 : 2)}${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
+    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.r.perf, narrow ? 1 : 2)}${e.r.perf > capV ? ' ⤒' : e.r.perf < floorV ? ' ⤓' : ''}`, W - padR + 6, yy + 4);
   });
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
   for(let k = 0, n = narrow ? 2 : 4; k <= n; k++){ const t = t0 + (now - t0) * k / n; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}), x(t), H - 8); }
