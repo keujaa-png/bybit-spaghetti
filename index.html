@@ -538,13 +538,17 @@ function compute(){
   const key = SORTS[sortKey] || SORTS.score;
   const unknown = !frozen.order || all.some(r => !frozen.order.has(r.c.sym));
   if(unknown || frozen.key !== sortKey || now - frozen.at >= o.reorderMs){
-    frozen = {key: sortKey, at: now, order: new Map([...all].sort((a, b) => cmp(key(a), key(b))).map((r, i) => [r.c.sym, i]))};
+    frozen = {key: sortKey, at: now,
+      order: new Map([...all].sort((a, b) => cmp(key(a), key(b))).map((r, i) => [r.c.sym, i])),
+      perf:  new Map([...all].sort((a, b) => b.perf - a.perf).map((r, i) => [r.c.sym, i]))};
   }
-  const pos = r => frozen.order.get(r.c.sym);
-  const ordered = [...vis].sort((a, b) => (b.pinned - a.pinned) || (pos(a) - pos(b)));
-  // limite : les N premiers de ce classement, épinglés toujours inclus
+  // sélection : toujours les N meilleures perfs (quel que soit le tri choisi), épinglés toujours inclus
+  const pp = r => frozen.perf.get(r.c.sym);
   let kept = 0;
-  const shown = ordered.filter(r => r.pinned || (o.maxN > 0 ? kept++ < o.maxN : true));
+  const selected = [...vis].sort((a, b) => pp(a) - pp(b)).filter(r => r.pinned || (o.maxN > 0 ? kept++ < o.maxN : true));
+  // affichage : dans l'ordre du tri choisi
+  const pos = r => frozen.order.get(r.c.sym);
+  const shown = selected.sort((a, b) => (b.pinned - a.pinned) || (pos(a) - pos(b)));
   const nextIn = o.reorderMs ? Math.max(0, Math.ceil((frozen.at + o.reorderMs - now) / 1000)) : 0;
   // relative strength soudaine : perf courte - médiane du marché
   const hourNow = new Date().getHours();
