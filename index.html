@@ -26,7 +26,11 @@
   .dot.on{background:var(--up)} .dot.err{background:var(--down)}
   main{flex:1;display:grid;grid-template-columns:1fr 540px;min-height:0}
   #wrap{position:relative;min-width:0}
-  canvas{display:block;width:100%;height:100%}
+  canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas.drag{cursor:grabbing}
+  #resetView{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:3px 12px;font:inherit;font-size:12px;cursor:pointer}
+  #navHint{position:absolute;left:10px;bottom:30px;font-size:11px;color:var(--muted);opacity:.7;pointer-events:none}
+  @media (max-width:700px){#navHint{display:none}}
   #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:13px;display:none;white-space:nowrap}
   aside{border-left:1px solid var(--line);overflow:auto;background:var(--panel);display:flex;flex-direction:column}
   #alertBox{border-bottom:1px solid var(--line);max-height:132px;overflow-y:auto;font-size:12px}
@@ -150,7 +154,7 @@
   <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins<span id="countX"></span> · <span id="msg">connexion…</span></div>
 </header>
 <main>
-  <div id="wrap"><canvas id="c"></canvas><div id="tip"></div></div>
+  <div id="wrap"><canvas id="c"></canvas><div id="tip"></div><button id="resetView" hidden title="Revenir à la vue automatique (ou double-clic)">↺ Vue auto</button><div id="navHint">glisser = déplacer · molette = défiler · Ctrl + molette = zoom · double-clic = vue auto</div></div>
   <aside>
     <div id="alertBox"></div>
     <div class="grid head">
@@ -170,7 +174,7 @@
 <dialog id="help">
   <div class="help">
     <h2>Guide rapide <button id="helpClose" aria-label="Fermer">×</button></h2>
-    <p>Chaque courbe = un coin, parti de 0 % au début de la fenêtre. Survol = détail, clic = surligner.</p>
+    <p>Chaque courbe = un coin, parti de 0 % au début de la fenêtre. Survol = détail, clic = surligner.<br><b>Navigation</b> : glisser = déplacer dans tous les sens · molette = défiler verticalement · Maj + molette ou trackpad = horizontalement · Ctrl + molette (ou pincer) = zoomer · double-clic ou « ↺ Vue auto » = revenir à la vue automatique.</p>
     <details open><summary>Les colonnes</summary><ul>
       <li><b>Score</b> 0–100 : accélération + places gagnées + volume relatif, pénalisé si funding élevé.</li>
       <li><b>Accél</b> : le coin monte-t-il plus vite qu'avant ? ▲ = oui.</li>
@@ -207,7 +211,7 @@ const WS     = 'wss://stream.bybit.com/v5/public/linear';
 const HL_API = 'https://api.hyperliquid.xyz/info';
 const HL_WS  = 'wss://api.hyperliquid.xyz/ws';
 const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, VOL_REFRESH_MS = 3 * 60 * 1000, HL_CTX_MS = 60 * 1000;
-const KEEP_MS = 25 * 3600 * 1000, FINE_MS = 3600 * 1000;          // points 2 s gardés 1 h, puis 1 / min
+const KEEP_MS = 100 * 3600 * 1000, FINE_MS = 3600 * 1000;          // points 2 s gardés 1 h, puis 1 / min
 const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 3600 * 1000;
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
@@ -356,8 +360,9 @@ async function fetchCandles(c, ivMin, count){
 
 async function backfill(list){
   if(!list.length) return;
-  const iv = opt().win > 12 * 3600 * 1000 ? 5 : 1;
-  const need = Math.min(1000, Math.ceil(opt().win / (iv * 60000)) + 5);
+  const histSpan = Math.max(opt().win * 4, 4 * 3600000);           // historique chargé : 4× la fenêtre (min 4 h) pour pouvoir défiler
+  const iv = histSpan > 12 * 3600 * 1000 ? 5 : 1;
+  const need = Math.min(1000, Math.ceil(histSpan / (iv * 60000)) + 5);
   let done = 0;
   const step = async c => {
     try{
@@ -485,7 +490,7 @@ function compute(){
     if(i0 > 0) i0--;
     const base = c.hist[i0][1]; if(!base) return;
     const pts = [];
-    for(let i = i0; i < c.hist.length; i++) pts.push([Math.max(c.hist[i][0], t0), (c.hist[i][1] / base - 1) * 100]);
+    for(let i = 0; i < c.hist.length; i++) pts.push([c.hist[i][0], (c.hist[i][1] / base - 1) * 100]);
     const perf = (c.last / base - 1) * 100;
     const pA = (valueAt(c.hist, tA) / base - 1) * 100;
     const acc = isNaN(pA) ? NaN : (perf - pA) - pA / (o.win - accWin) * accWin;
@@ -586,30 +591,49 @@ function lineWidth(c, o){
   return 0.8 + 2.4 * k;
 }
 
+// vue manuelle (déplacement / zoom) : span = durée visible, shift = décalage de la fin par rapport à maintenant, y = [min, max]
+const view = {span: 0, shift: 0, y: null};
+const manualView = () => view.span > 0 || !!view.y;
 function draw({vis, t0, now, o}){
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
   if(cv.width !== W * dpr || cv.height !== H * dpr){ cv.width = W * dpr; cv.height = H * dpr; }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   lastPlot = null;
+  $('resetView').hidden = !manualView();
   if(!vis.length){ ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center'; ctx.font = '14px IBM Plex Sans, sans-serif';
     ctx.fillText(coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…', W / 2, H / 2); return; }
   const narrow = W < 520, padL = 8, padR = narrow ? 96 : 128, padT = 14, padB = 24;
-  let lo = 0, top = 0;
-  vis.forEach(r => r.pts.forEach(p => { lo = Math.min(lo, p[1]); top = Math.max(top, p[1]); }));
-  let capV = Infinity;
-  if(o.cap && vis.length >= 2){
-    const s = vis.map(r => Math.max(...r.pts.map(p => p[1]))).sort((a, b) => b - a);
-    const c2 = Math.max(s[1] * 1.5, 1);
-    if(s[0] > c2){ capV = c2; top = c2; }
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  // fenêtre de temps visible
+  const winSpan = now - t0;
+  let first = now; vis.forEach(r => { if(r.pts.length) first = Math.min(first, r.pts[0][0]); });
+  const full = Math.max(winSpan, now - first);                       // tout l'historique chargé
+  const span = view.span > 0 ? Math.min(view.span, full) : winSpan;
+  const shift = Math.max(-(full - span), Math.min(0, view.shift));
+  const tE = now + shift, tS = tE - span;
+  // valeur d'une courbe à l'instant t (dernier point ≤ t)
+  const at = (pts, t) => { let v = NaN; for(const p of pts){ if(p[0] > t) break; v = p[1]; } return v; };
+  let yMin, yMax, capV = Infinity, floorV = -Infinity;
+  if(view.y){
+    [yMin, yMax] = view.y;
+  } else {
+    let lo = 0, top = 0;
+    vis.forEach(r => r.pts.forEach(p => { if(p[0] >= tS && p[0] <= tE){ lo = Math.min(lo, p[1]); top = Math.max(top, p[1]); } }));
+    if(o.cap && vis.length >= 2){
+      const s = vis.map(r => Math.max(-1e9, ...r.pts.filter(p => p[0] >= tS && p[0] <= tE).map(p => p[1]))).sort((a, b) => b - a);
+      const c2 = Math.max(s[1] * 1.5, 1);
+      if(s[0] > c2){ capV = c2; top = c2; }
+    }
+    // plancher : le bas ne descend pas sous -15 % de la hauteur du haut (min -0,5 %)
+    floorV = -Math.max(0.5, top * 0.15);
+    lo = Math.max(lo, floorV);
+    if(top - lo < 0.5){ top += 0.25; lo -= 0.25; }
+    const pad = (top - lo) * 0.06; yMin = lo - pad; yMax = top + pad;
   }
-  // plancher : le bas ne descend pas sous -15 % de la hauteur du haut (min -0,5 %), les courbes plus basses restent collées au plancher
-  const floorV = -Math.max(0.5, top * 0.15);
-  lo = Math.max(lo, floorV);
-  if(top - lo < 0.5){ top += 0.25; lo -= 0.25; }
-  const pad = (top - lo) * 0.06, yMin = lo - pad, yMax = top + pad;
-  const x = t => padL + (t - t0) / (now - t0) * (W - padL - padR);
-  const y = v => padT + (yMax - Math.max(Math.min(v, capV), floorV)) / (yMax - yMin) * (H - padT - padB);
-  lastPlot = {x, y, vis};
+  const clampV = v => Math.max(Math.min(v, capV), floorV);
+  const x = t => padL + (t - tS) / span * plotW;
+  const y = v => padT + (yMax - clampV(v)) / (yMax - yMin) * plotH;
+  lastPlot = {x, y, vis, tS, tE, yMin, yMax, plotW, plotH, padL, padT, full, winSpan, now};
 
   ctx.font = `${narrow ? 10 : 11}px IBM Plex Sans, sans-serif`; ctx.textAlign = 'left';
   const step = niceStep((yMax - yMin) / 6);
@@ -617,28 +641,43 @@ function draw({vis, t0, now, o}){
     ctx.strokeStyle = Math.abs(v) < step / 2 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.06)';
     ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
   }
+  ctx.save();
+  ctx.beginPath(); ctx.rect(padL, padT - 2, plotW, plotH + 4); ctx.clip();
   [...vis].sort((a, b) => (a.c.sym === hi) - (b.c.sym === hi) || lineWidth(b.c, o) - lineWidth(a.c, o)).forEach(r => {
     const isHi = hi === r.c.sym;
     ctx.strokeStyle = colorOf(r.c); ctx.globalAlpha = hi && !isHi ? 0.15 : (r.pinned ? 1 : 0.88);
     ctx.lineWidth = isHi ? Math.max(2.8, lineWidth(r.c, o) + 1) : lineWidth(r.c, o);
     ctx.setLineDash(r.perf <= 0 ? [4, 3] : []);
-    ctx.beginPath(); r.pts.forEach((p, i) => i ? ctx.lineTo(x(p[0]), y(p[1])) : ctx.moveTo(x(p[0]), y(p[1]))); ctx.stroke();
+    ctx.beginPath();
+    let started = false;
+    for(let i = 0; i < r.pts.length; i++){
+      const p = r.pts[i], nx = r.pts[i + 1];
+      if(nx && nx[0] < tS) continue;                         // avant la fenêtre visible
+      if(started && r.pts[i - 1] && r.pts[i - 1][0] > tE) break; // après
+      const X = x(p[0]), Y = y(p[1]);
+      if(started) ctx.lineTo(X, Y); else { ctx.moveTo(X, Y); started = true; }
+    }
+    ctx.stroke();
   });
+  ctx.restore();
   ctx.setLineDash([]); ctx.globalAlpha = 1;
   ctx.fillStyle = '#7f8fa3';
   for(let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) ctx.fillText((v > 0 ? '+' : '') + v.toFixed(step < 1 ? 1 : 0) + '%', padL + 2, y(v) - 3);
-  const ends = vis.map(r => ({r, yy: y(r.perf)})).sort((a, b) => a.yy - b.yy);
+  // étiquettes : valeur à la fin de la zone visible (= maintenant si pas de décalage)
+  const ends = vis.map(r => { const v = shift === 0 ? r.perf : at(r.pts, tE); return {r, v, yy: isNaN(v) ? NaN : padT + (yMax - clampV(v)) / (yMax - yMin) * plotH}; })
+                  .filter(e => !isNaN(e.yy) && e.yy >= padT - 6 && e.yy <= H - padB + 6).sort((a, b) => a.yy - b.yy);
   let lastY = -99, shown = 0;
   ends.forEach(e => {
     const special = hi === e.r.c.sym || e.r.pinned;
     if(shown >= (narrow ? 12 : 18) && !special) return;
-    const yy = Math.max(e.yy, lastY + (narrow ? 11 : 12)); if(yy > H - padB) return;
+    const yy = Math.max(e.yy, lastY + (narrow ? 11 : 12)); if(yy > H - padB + 6) return;
     lastY = yy; shown++;
     ctx.fillStyle = colorOf(e.r.c);
-    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.r.perf, narrow ? 1 : 2)}${e.r.perf > capV ? ' ⤒' : e.r.perf < floorV ? ' ⤓' : ''}`, W - padR + 6, yy + 4);
+    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.v, narrow ? 1 : 2)}${e.v > capV ? ' ⤒' : e.v < floorV ? ' ⤓' : ''}`, W - padR + 6, yy + 4);
   });
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
-  for(let k = 0, n = narrow ? 2 : 4; k <= n; k++){ const t = t0 + (now - t0) * k / n; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}), x(t), H - 8); }
+  const opts = span > 20 * 3600000 ? {weekday: 'short', hour: '2-digit', minute: '2-digit'} : {hour: '2-digit', minute: '2-digit'};
+  for(let k = 0, n = narrow ? 2 : 4; k <= n; k++){ const t = tS + span * k / n; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', opts), x(t), H - 8); }
 }
 function niceStep(r){ const p = Math.pow(10, Math.floor(Math.log10(r || 1))); const m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
 
@@ -709,7 +748,64 @@ cv.addEventListener('mousemove', e => {
   tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${best.r.c.label}</b>${best.r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(best.p[1])} · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})} · score ${best.r.score}`;
 });
 cv.addEventListener('mouseleave', () => $('tip').style.display = 'none');
-cv.addEventListener('click', () => { const t = $('tip'); if(t.style.display === 'block' && t.dataset.s){ hi = hi === t.dataset.s ? null : t.dataset.s; render(); } });
+let drag = null, dragMoved = false;
+cv.addEventListener('click', () => {
+  if(dragMoved){ dragMoved = false; return; }
+  const t = $('tip'); if(t.style.display === 'block' && t.dataset.s){ hi = hi === t.dataset.s ? null : t.dataset.s; render(); }
+});
+cv.addEventListener('pointerdown', e => {
+  if(!lastPlot) return;
+  const L = lastPlot;
+  drag = {x0: e.clientX, y0: e.clientY, tE: L.tE, span: L.tE - L.tS, yMin: L.yMin, yMax: L.yMax, now: L.now};
+  dragMoved = false;
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e => {
+  if(!drag || !lastPlot) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if(!dragMoved && Math.hypot(dx, dy) < 4) return;
+  dragMoved = true; cv.classList.add('drag'); $('tip').style.display = 'none';
+  const L = lastPlot;
+  const dt = -dx / L.plotW * drag.span;
+  view.span = drag.span; view.shift = (drag.tE + dt) - drag.now;
+  const dv = dy / L.plotH * (drag.yMax - drag.yMin);
+  view.y = [drag.yMin + dv, drag.yMax + dv];
+  render();
+});
+const endDrag = () => { drag = null; cv.classList.remove('drag'); };
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('wheel', e => {
+  if(!lastPlot) return;
+  e.preventDefault();
+  const L = lastPlot;
+  const rect = cv.getBoundingClientRect();
+  const fx = Math.min(1, Math.max(0, (e.clientX - rect.left - L.padL) / L.plotW));
+  const fy = Math.min(1, Math.max(0, (e.clientY - rect.top - L.padT) / L.plotH));
+  let yMin = L.yMin, yMax = L.yMax, span = L.tE - L.tS, tE = L.tE;
+  if(e.ctrlKey || e.metaKey){
+    // zoom autour du curseur (pinch du trackpad = ctrl + molette)
+    const k = Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * 0.003)));
+    const tC = L.tS + fx * span, vC = yMax - fy * (yMax - yMin);
+    span = Math.min(L.full, Math.max(5 * 60000, span * k));
+    tE = tC + (1 - fx) * span;
+    yMax = vC + fy * (yMax - yMin) * k; yMin = yMax - (L.yMax - L.yMin) * k;
+    view.span = span;
+    view.shift = tE - L.now;
+  } else {
+    // défilement : vertical (molette), horizontal (trackpad ou Maj + molette)
+    const dxw = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+    const dyw = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+    const dv = dyw / L.plotH * (yMax - yMin);
+    yMin -= dv; yMax -= dv;
+    if(dxw){ view.span = span; view.shift = tE + dxw / L.plotW * span - L.now; }
+  }
+  view.y = [yMin, yMax];
+  render();
+}, {passive: false});
+const resetView = () => { view.span = 0; view.shift = 0; view.y = null; render(); };
+cv.addEventListener('dblclick', resetView);
+$('resetView').addEventListener('click', resetView);
 
 function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if(audioCtx.state === 'suspended') audioCtx.resume(); }catch(e){} }
 document.addEventListener('pointerdown', ensureAudio, {once: true});
@@ -723,8 +819,9 @@ $('alerts').addEventListener('change', async () => {
 ['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
+  view.span = 0; view.shift = 0; view.y = null;
   const w = opt().win;
-  coins.forEach(c => { if(c.hist.length && c.hist[0][0] > Date.now() - w) c.ready = false; });
+  coins.forEach(c => { if(c.hist.length && c.hist[0][0] > Date.now() - Math.max(w * 4, 4 * 3600000) + 10 * 60000) c.ready = false; });
   backfill([...coins.values()].filter(c => !c.ready)); render();
 });
 window.addEventListener('resize', render);
