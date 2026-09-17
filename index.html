@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bybit + Hyperliquid Spaghetti — temps réel</title>
+<title>Spaghetti 20 Best Performing Coins</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -28,8 +28,11 @@
   #wrap{position:relative;min-width:0}
   canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
   canvas.drag{cursor:grabbing}
-  #resetView{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:3px 12px;font:inherit;font-size:12px;cursor:pointer}
-  #navHint{position:absolute;left:10px;bottom:30px;font-size:11px;color:var(--muted);opacity:.7;pointer-events:none}
+  #chartBtns{position:absolute;right:8px;bottom:4px;display:flex;gap:4px}
+  #chartBtns button{min-width:22px;height:20px;background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:4px;font:600 11px/1 inherit;cursor:pointer;padding:0 5px}
+  #chartBtns button.on{color:var(--accent);border-color:var(--accent)}
+  #chartBtns button:hover{color:var(--text)}
+  #navHint{position:absolute;left:10px;bottom:28px;font-size:11px;color:var(--muted);opacity:.7;pointer-events:none}
   @media (max-width:700px){#navHint{display:none}}
   #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:13px;display:none;white-space:nowrap}
   aside{border-left:1px solid var(--line);overflow:auto;background:var(--panel);display:flex;flex-direction:column}
@@ -101,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Spaghetti Bybit + HL</h1>
+  <h1>Spaghetti 20 Best Performing Coins</h1>
   <button id="helpBtn" title="Guide d'utilisation" aria-label="Guide d'utilisation">?</button>
   <button id="setBtn" aria-expanded="false" aria-controls="controls">⚙ Réglages</button>
   <div class="controls" id="controls">
@@ -135,7 +138,7 @@
   <label title="Notification Chrome + son pour le meilleur setup long du moment"><input id="alerts" type="checkbox"> Alertes</label>
   <button id="notifBtn" class="nbtn" title="État des notifications Chrome (clic = tester)">🔔 …</button>
   <label title="Backtest : ~50 % des alertes atteignent 1R avant le stop (entre 8 h et minuit). Pas de réussite garantie."><input id="night" type="checkbox" checked> Pas d'alerte 0 h–8 h</label>
-  <label title="Stricte ≈ 15 alertes/jour (RS forte + volume). Normale ≈ 25/j. Large ≈ 50/j.">Sensibilité
+  <label title="Stricte : ≤ ~8 alertes/jour (RS forte + volume ≥ 2×). Normale : ≤ ~12/j (volume ≥ 1,5×). Large : ≈ 25/j.">Sensibilité
     <select id="alSens">
       <option value="strict">stricte</option>
       <option value="normal" selected>normale</option>
@@ -154,7 +157,7 @@
   <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins<span id="countX"></span> · <span id="msg">connexion…</span></div>
 </header>
 <main>
-  <div id="wrap"><canvas id="c"></canvas><div id="tip"></div><button id="resetView" hidden title="Revenir à la vue automatique (ou double-clic)">↺ Vue auto</button><div id="navHint">glisser = déplacer · molette = défiler · Ctrl + molette = zoom · double-clic = vue auto</div></div>
+  <div id="wrap"><canvas id="c"></canvas><div id="tip"></div><div id="chartBtns"><button id="resetView" hidden title="Revenir à la vue par défaut (double-clic dans le graphique)">⟲</button><button id="autoBtn" class="on" title="Échelle automatique (double-clic sur l'échelle de droite)">A</button></div><div id="navHint">molette = zoom · glisser = déplacer · glisser sur l'échelle de droite / l'axe du temps = zoom vertical / horizontal · double-clic = réinitialiser</div></div>
   <aside>
     <div id="alertBox"></div>
     <div class="grid head">
@@ -174,7 +177,7 @@
 <dialog id="help">
   <div class="help">
     <h2>Guide rapide <button id="helpClose" aria-label="Fermer">×</button></h2>
-    <p>Chaque courbe = un coin, parti de 0 % au début de la fenêtre. Survol = détail, clic = surligner.<br><b>Navigation</b> : glisser = déplacer dans tous les sens · molette = défiler verticalement · Maj + molette ou trackpad = horizontalement · Ctrl + molette (ou pincer) = zoomer · double-clic ou « ↺ Vue auto » = revenir à la vue automatique.</p>
+    <p>Chaque courbe = un coin, parti de 0 % au début de la fenêtre. Survol = détail, clic = surligner.<br><b>Navigation (comme TradingView)</b> : molette ou pincer = zoom horizontal · glisser = déplacer (vers le haut/bas = échelle manuelle) · glisser sur l'échelle de droite = zoom vertical · glisser sur l'axe du temps = zoom horizontal · Maj + molette ou trackpad = défiler · bouton <b>A</b> ou double-clic sur l'échelle = échelle auto · double-clic dans le graphique ou ⟲ = tout réinitialiser.</p>
     <details open><summary>Les colonnes</summary><ul>
       <li><b>Score</b> 0–100 : accélération + places gagnées + volume relatif, pénalisé si funding élevé.</li>
       <li><b>Accél</b> : le coin monte-t-il plus vite qu'avant ? ▲ = oui.</li>
@@ -188,7 +191,7 @@
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
       <li><b>🎯 Setup long</b> : une seule alerte à la fois, quand un coin monte d'un coup plus vite que le marché (⚡ RS), en hausse de +2 à +10 % sur la fenêtre, sans être parabolique, hors nuit (0 h–8 h). L'alerte donne un <b>stop ≈</b> (sous le plus bas des 10 dernières minutes) et les objectifs <b>TP1</b> (1R) et <b>TP1.5</b>. Réglages testés avec la fenêtre 1 h.</li>
       <li><b>Backtest</b> (5 jours, 84 perps) : ~50 % des alertes touchent TP1 avant le stop, ~40 % TP1.5 ; gain moyen faible (+0,1 à +0,2R avant frais). Ce n'est pas une garantie.</li>
-      <li><b>Alertes</b> : notification Chrome + son pour le meilleur setup du moment (l'onglet doit rester ouvert, même en arrière-plan). Le bouton 🔔 montre l'état et envoie un test ; clic sur la notification = ouvre le coin sur l'exchange. <b>Sensibilité</b> stricte = très peu d'alertes, large = plus. Un même coin n'est pas re-signalé avant 20 à 45 min.</li>
+      <li><b>Alertes</b> : notification Chrome + son pour le meilleur setup du moment (l'onglet doit rester ouvert, même en arrière-plan). Le bouton 🔔 montre l'état et envoie un test ; clic sur la notification = ouvre le coin sur l'exchange. <b>Sensibilité</b> stricte = très peu d'alertes, large = plus. Un même coin n'est pas re-signalé avant 2 à 4 h, et il y a au moins 20 à 60 min entre deux alertes.</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
       <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous). Par défaut le tri est <b>Perf</b> : la liste suit l'ordre des courbes du graphique.</li>
       <li><b>Reclasser</b> : l'ordre ne bouge qu'à cet intervalle (↻ = compte à rebours) ; les chiffres restent en direct.</li>
@@ -220,12 +223,13 @@ const SETTINGS = ['hl', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', '
 // Alerte « setup long » : toutes les conditions doivent être réunies. rs = multiplicateur du seuil RS,
 // rv = Vol× minimum, score = score minimum, cool = minutes entre 2 alertes d'un même coin, gap = minutes entre 2 alertes tout court
 // Réglages issus du backtest (5 jours, 84 perps Bybit, bougies 1 min, fenêtre 1 h, RS sur 10 min,
-// stop sous le plus bas des 10 dernières minutes, validation sur une période séparée) :
-//   stricte ≈ 15 alertes/jour, normale ≈ 25/j, large ≈ 50/j ; ~50 % de réussite à 1R, ~40 % à 1,5R.
+// stop sous le plus bas des 10 dernières minutes, validation sur une période séparée).
+// Les versions les plus sélectives (RS forte + volume) ont eu le meilleur taux de réussite (~50-60 % à 1R).
+//   stricte ≤ ~8 alertes/jour · normale ≤ ~12/j · large ≈ 25/j
 const PRESETS = {
-  strict: {rs: 1.5, rv: 1.5, cool: 120, gap: 20},
-  normal: {rs: 1.5, rv: 0,   cool: 120, gap: 20},
-  wide:   {rs: 1.0, rv: 0,   cool: 60,  gap: 10}
+  strict: {rs: 1.5, rv: 2.0, cool: 240, gap: 60},
+  normal: {rs: 1.5, rv: 1.5, cool: 240, gap: 30},
+  wide:   {rs: 1.0, rv: 0,   cool: 120, gap: 20}
 };
 let lastAlertAt = 0;
 const STORE_KEY = 'bybit-spaghetti-v2';
@@ -600,6 +604,7 @@ function draw({vis, t0, now, o}){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   lastPlot = null;
   $('resetView').hidden = !manualView();
+  $('autoBtn').classList.toggle('on', !view.y);
   if(!vis.length){ ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center'; ctx.font = '14px IBM Plex Sans, sans-serif';
     ctx.fillText(coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…', W / 2, H / 2); return; }
   const narrow = W < 520, padL = 8, padR = narrow ? 96 : 128, padT = 14, padB = 24;
@@ -748,7 +753,34 @@ cv.addEventListener('mousemove', e => {
   tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${best.r.c.label}</b>${best.r.c.ex === 'hl' ? ' (HL)' : ''} ${fmtPct(best.p[1])} · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})} · score ${best.r.score}`;
 });
 cv.addEventListener('mouseleave', () => $('tip').style.display = 'none');
+// ─── Navigation façon TradingView ─────────────────────────────────────────
+// molette = zoom horizontal autour du curseur · trackpad horizontal = défiler
+// glisser dans le graphique = déplacer (vertical aussi → échelle manuelle)
+// glisser sur l'échelle de droite = zoom vertical · glisser sur l'axe du temps = zoom horizontal
+// double-clic : échelle de droite = échelle auto · axe du temps = temps par défaut · graphique = tout réinitialiser
 let drag = null, dragMoved = false;
+function zoneAt(e){
+  const L = lastPlot; if(!L) return 'plot';
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if(px > L.padL + L.plotW) return 'price';
+  if(py > L.padT + L.plotH) return 'time';
+  return 'plot';
+}
+function setTime(L, span, tE){
+  span = Math.min(L.full, Math.max(5 * 60000, span));
+  view.span = span;
+  view.shift = Math.min(0, tE - L.now);
+}
+function zoomTime(L, factor, fx){
+  const span = L.tE - L.tS, tC = L.tS + fx * span;
+  const ns = Math.min(L.full, Math.max(5 * 60000, span * factor));
+  setTime(L, ns, tC + (1 - fx) * ns);
+}
+function zoomPrice(L, factor, fy){
+  const vC = L.yMax - fy * (L.yMax - L.yMin), h = (L.yMax - L.yMin) * factor;
+  const yMax = vC + fy * h;
+  view.y = [yMax - h, yMax];
+}
 cv.addEventListener('click', () => {
   if(dragMoved){ dragMoved = false; return; }
   const t = $('tip'); if(t.style.display === 'block' && t.dataset.s){ hi = hi === t.dataset.s ? null : t.dataset.s; render(); }
@@ -756,56 +788,71 @@ cv.addEventListener('click', () => {
 cv.addEventListener('pointerdown', e => {
   if(!lastPlot) return;
   const L = lastPlot;
-  drag = {x0: e.clientX, y0: e.clientY, tE: L.tE, span: L.tE - L.tS, yMin: L.yMin, yMax: L.yMax, now: L.now};
+  drag = {zone: zoneAt(e), x0: e.clientX, y0: e.clientY, L: {...L}, manualY: !!view.y};
   dragMoved = false;
   cv.setPointerCapture(e.pointerId);
 });
 cv.addEventListener('pointermove', e => {
-  if(!drag || !lastPlot) return;
+  if(!drag){
+    const z = zoneAt(e);
+    cv.style.cursor = z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : '';
+    return;
+  }
   const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
   if(!dragMoved && Math.hypot(dx, dy) < 4) return;
-  dragMoved = true; cv.classList.add('drag'); $('tip').style.display = 'none';
-  const L = lastPlot;
-  const dt = -dx / L.plotW * drag.span;
-  view.span = drag.span; view.shift = (drag.tE + dt) - drag.now;
-  const dv = dy / L.plotH * (drag.yMax - drag.yMin);
-  view.y = [drag.yMin + dv, drag.yMax + dv];
+  dragMoved = true; $('tip').style.display = 'none';
+  const L = drag.L;
+  if(drag.zone === 'price'){
+    zoomPrice(L, Math.exp(dy * 0.005), 0.5);                       // tirer vers le bas = dézoomer
+  } else if(drag.zone === 'time'){
+    const span = L.tE - L.tS;
+    setTime(L, span * Math.exp(-dx * 0.005), L.tE);                 // tirer vers la droite = zoomer (fin fixe)
+  } else {
+    cv.classList.add('drag');
+    const span = L.tE - L.tS;
+    setTime(L, span, L.tE - dx / L.plotW * span);
+    if(drag.manualY || Math.abs(dy) > 12){
+      const dv = dy / L.plotH * (L.yMax - L.yMin);
+      view.y = [L.yMin + dv, L.yMax + dv];
+    }
+  }
   render();
 });
 const endDrag = () => { drag = null; cv.classList.remove('drag'); };
 cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('pointerleave', () => { if(!drag) cv.style.cursor = ''; });
 cv.addEventListener('wheel', e => {
   if(!lastPlot) return;
   e.preventDefault();
-  const L = lastPlot;
-  const rect = cv.getBoundingClientRect();
-  const fx = Math.min(1, Math.max(0, (e.clientX - rect.left - L.padL) / L.plotW));
-  const fy = Math.min(1, Math.max(0, (e.clientY - rect.top - L.padT) / L.plotH));
-  let yMin = L.yMin, yMax = L.yMax, span = L.tE - L.tS, tE = L.tE;
-  if(e.ctrlKey || e.metaKey){
-    // zoom autour du curseur (pinch du trackpad = ctrl + molette)
-    const k = Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * 0.003)));
-    const tC = L.tS + fx * span, vC = yMax - fy * (yMax - yMin);
-    span = Math.min(L.full, Math.max(5 * 60000, span * k));
-    tE = tC + (1 - fx) * span;
-    yMax = vC + fy * (yMax - yMin) * k; yMin = yMax - (L.yMax - L.yMin) * k;
-    view.span = span;
-    view.shift = tE - L.now;
+  const L = lastPlot, r = cv.getBoundingClientRect();
+  const fx = Math.min(1, Math.max(0, (e.clientX - r.left - L.padL) / L.plotW));
+  const fy = Math.min(1, Math.max(0, (e.clientY - r.top - L.padT) / L.plotH));
+  const zone = zoneAt(e);
+  const k = Math.exp(Math.max(-0.4, Math.min(0.4, e.deltaY * (e.ctrlKey ? 0.01 : 0.002))));
+  if(zone === 'price'){
+    zoomPrice(L, k, fy);
+  } else if(Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey){
+    const span = L.tE - L.tS;                                       // balayage horizontal du trackpad
+    setTime(L, span, L.tE + e.deltaX / L.plotW * span);
+  } else if(e.shiftKey && !e.ctrlKey){
+    const span = L.tE - L.tS;                                       // Maj + molette = défiler dans le temps
+    setTime(L, span, L.tE + e.deltaY / L.plotW * span);
   } else {
-    // défilement : vertical (molette), horizontal (trackpad ou Maj + molette)
-    const dxw = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
-    const dyw = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
-    const dv = dyw / L.plotH * (yMax - yMin);
-    yMin -= dv; yMax -= dv;
-    if(dxw){ view.span = span; view.shift = tE + dxw / L.plotW * span - L.now; }
+    zoomTime(L, k, zone === 'time' ? 1 : fx);                       // molette / pincer = zoom horizontal
   }
-  view.y = [yMin, yMax];
   render();
 }, {passive: false});
+cv.addEventListener('dblclick', e => {
+  const z = zoneAt(e);
+  if(z === 'price') view.y = null;
+  else if(z === 'time'){ view.span = 0; view.shift = 0; }
+  else { view.span = 0; view.shift = 0; view.y = null; }
+  render();
+});
 const resetView = () => { view.span = 0; view.shift = 0; view.y = null; render(); };
-cv.addEventListener('dblclick', resetView);
 $('resetView').addEventListener('click', resetView);
+$('autoBtn').addEventListener('click', () => { view.y = null; render(); });
 
 function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if(audioCtx.state === 'suspended') audioCtx.resume(); }catch(e){} }
 document.addEventListener('pointerdown', ensureAudio, {once: true});
