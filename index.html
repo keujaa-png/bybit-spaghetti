@@ -459,26 +459,29 @@ function compute(){
     const acc = isNaN(pA) ? NaN : (perf - pA) - pA / (o.win - accWin) * accWin;
     all.push({c, pts, perf, pA, acc, rv: c.relVol, fr: c.funding * 100, pinned});
   });
-  const vis = all.filter(r => r.pinned || !o.bull || r.perf > o.minPerf);
-  const byNow = [...vis].sort((a, b) => b.perf - a.perf);
-  const byPrev = [...vis].sort((a, b) => (isNaN(b.pA) ? -1e9 : b.pA) - (isNaN(a.pA) ? -1e9 : a.pA));
+  // rangs et score calculés sur tous les coins suivis (plus stable que sur la seule sélection)
+  const byNow = [...all].sort((a, b) => b.perf - a.perf);
+  const byPrev = [...all].sort((a, b) => (isNaN(b.pA) ? -1e9 : b.pA) - (isNaN(a.pA) ? -1e9 : a.pA));
   byNow.forEach((r, i) => r.rank = i + 1);
   byPrev.forEach((r, i) => r.dr = (i + 1) - r.rank);
-  const P = Object.fromEntries(['acc', 'dr', 'rv'].map(k => [k, pctRanks(vis, k)]));
-  vis.forEach(r => {
+  const P = Object.fromEntries(['acc', 'dr', 'rv'].map(k => [k, pctRanks(all, k)]));
+  all.forEach(r => {
     let s = 100 * (0.40 * P.acc.get(r) + 0.30 * P.dr.get(r) + 0.30 * P.rv.get(r));
     if(r.fr >= 0.08) s -= 20; else if(r.fr >= 0.03) s -= 8;
     r.score = Math.max(0, Math.round(s));
   });
-  // ordre figé pendant o.reorderMs pour que le classement ne saute pas toutes les 2 s
+  const vis = all.filter(r => r.pinned || !o.bull || r.perf > o.minPerf);
+  // ordre figé pendant o.reorderMs ; reclassement immédiat si un coin encore inconnu apparaît (chargement)
   const key = SORTS[sortKey] || SORTS.score;
-  if(!frozen.order || frozen.key !== sortKey || now - frozen.at >= o.reorderMs){
-    frozen = {key: sortKey, at: now, order: new Map([...vis].sort((a, b) => cmp(key(a), key(b))).map((r, i) => [r.c.sym, i]))};
+  const unknown = !frozen.order || all.some(r => !frozen.order.has(r.c.sym));
+  if(unknown || frozen.key !== sortKey || now - frozen.at >= o.reorderMs){
+    frozen = {key: sortKey, at: now, order: new Map([...all].sort((a, b) => cmp(key(a), key(b))).map((r, i) => [r.c.sym, i]))};
   }
-  const pos = r => frozen.order.has(r.c.sym) ? frozen.order.get(r.c.sym) : 1e6;   // nouveaux venus en fin de liste
-  const ordered = [...vis].sort((a, b) => (b.pinned - a.pinned) || (pos(a) - pos(b)) || cmp(key(a), key(b)));
+  const pos = r => frozen.order.get(r.c.sym);
+  const ordered = [...vis].sort((a, b) => (b.pinned - a.pinned) || (pos(a) - pos(b)));
   // limite : les N premiers de ce classement, épinglés toujours inclus
-  const shown = o.maxN > 0 ? ordered.filter((r, i) => r.pinned || ordered.slice(0, i).filter(x => !x.pinned).length < o.maxN) : ordered;
+  let kept = 0;
+  const shown = ordered.filter(r => r.pinned || (o.maxN > 0 ? kept++ < o.maxN : true));
   const nextIn = o.reorderMs ? Math.max(0, Math.ceil((frozen.at + o.reorderMs - now) / 1000)) : 0;
   return {vis: shown, t0, now, accWin, o, total: all.length, eligible: vis.length, nextIn};
 }
@@ -682,6 +685,20 @@ $('setBtn').addEventListener('click', () => {
 });
 function setHeaderH(){ document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px'); }
 window.addEventListener('resize', setHeaderH); setHeaderH();
+
+// ─── Mise à jour automatique : recharge si une nouvelle version est publiée ─
+const pageUrl = location.href.split('#')[0].split('?')[0];
+let pageSig = null;
+const sigOf = t => t.length + ':' + [...t].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0);
+async function checkUpdate(){
+  try{
+    const t = await (await fetch(pageUrl + '?check=' + Date.now(), {cache: 'no-store'})).text();
+    const sig = sigOf(t);
+    if(pageSig === null){ pageSig = sig; return; }
+    if(sig !== pageSig) location.replace(pageUrl + '?v=' + Date.now());
+  }catch(e){}
+}
+if(location.protocol.startsWith('http')){ checkUpdate(); setInterval(checkUpdate, 5 * 60 * 1000); }
 
 // ─── Démarrage ────────────────────────────────────────────────────────────
 loadSettings();
