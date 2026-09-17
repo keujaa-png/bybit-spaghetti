@@ -1,147 +1,23 @@
 //@version=6
-indicator("Patterns : triple creux, sweep, supports D/W", shorttitle="Patterns", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=500)
+indicator("Sweeps (contexte + réussite)", shorttitle="Sweeps", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
-// ── 1. Triple creux
-useTB       = input.bool(true, "Afficher", group="1. Triple creux")
-pivLen      = input.int(5, "Creux : barres de chaque côté", minval=2, group="1. Triple creux")
-tbTolPct    = input.float(1.5, "Écart max entre les 3 creux (%)", minval=0.1, step=0.1, group="1. Triple creux")
-tbMinGap    = input.int(5, "Écart min entre creux (barres)", minval=1, group="1. Triple creux")
-tbMaxSpan   = input.int(150, "Durée max du motif (barres)", minval=20, maxval=400, group="1. Triple creux")
-tbMaxWait   = input.int(30, "Cassure attendue dans les N barres", minval=1, group="1. Triple creux")
-
-// ── 2. Sweep + taux de réussite
-useSweep    = input.bool(true, "Afficher", group="2. Sweep")
-swPivLen    = input.int(5, "Plus bas de référence : barres de chaque côté", minval=2, group="2. Sweep")
-swMaxAge    = input.int(100, "Plus bas de référence : âge max (barres)", minval=10, group="2. Sweep")
-swWickPct   = input.float(40, "Mèche basse ≥ % de la bougie", minval=0, maxval=100, group="2. Sweep")
-hideDown    = input.bool(false, "Masquer les sweeps en tendance baissière", group="2. Sweep")
-tpR         = input.float(1.5, "Réussite = objectif à x fois le risque", minval=0.5, step=0.25, group="2. Sweep : statistiques", tooltip="Entrée à la clôture du sweep, stop sous la mèche. Réussi si l'objectif est touché avant le stop.")
-maxHold     = input.int(30, "…dans les N barres (sinon échec)", minval=3, group="2. Sweep : statistiques")
-showStats   = input.bool(false, "Tableau des statistiques", group="2. Sweep : statistiques")
-consLen     = input.int(40, "Consolidation : durée (barres)", minval=10, maxval=300, group="2. Sweep : contexte")
-consAtr     = input.float(6.0, "Consolidation : range ≤ x ATR", minval=1, step=0.5, group="2. Sweep : contexte")
-trendLen    = input.int(50, "Tendance : EMA", minval=10, group="2. Sweep : contexte")
-downSlope   = input.float(0.5, "Baissière : EMA en baisse d'au moins x % sur 10 barres", minval=0, step=0.1, group="2. Sweep : contexte")
-
-// ── 3. Supports Daily / Weekly
-useHtf      = input.bool(true, "Afficher", group="3. Supports D / W")
-htfLen      = input.int(3, "Creux : bougies de chaque côté", minval=1, maxval=10, group="3. Supports D / W")
-showD       = input.bool(true, "Supports Daily", group="3. Supports D / W")
-showW       = input.bool(true, "Supports Weekly", group="3. Supports D / W")
-htfCount    = input.int(3, "Nombre de supports affichés par unité", minval=1, maxval=4, group="3. Supports D / W")
-htfMerge    = input.float(0.5, "Fusionner les niveaux à moins de x %", minval=0, step=0.1, group="3. Supports D / W")
-htfNearPct  = input.float(0.8, "Sweep « sur support » si à moins de x %", minval=0, step=0.1, group="3. Supports D / W")
-colD        = input.color(color.new(#7fb8a6, 0), "Couleur Daily", group="3. Supports D / W")
-colW        = input.color(color.new(#2bb3f0, 0), "Couleur Weekly", group="3. Supports D / W")
+// ── 1. Sweep + taux de réussite
+useSweep    = input.bool(true, "Afficher", group="1. Sweep")
+swPivLen    = input.int(5, "Plus bas de référence : barres de chaque côté", minval=2, group="1. Sweep")
+swMaxAge    = input.int(100, "Plus bas de référence : âge max (barres)", minval=10, group="1. Sweep")
+swWickPct   = input.float(40, "Mèche basse ≥ % de la bougie", minval=0, maxval=100, group="1. Sweep")
+hideDown    = input.bool(false, "Masquer les sweeps en tendance baissière", group="1. Sweep")
+tpR         = input.float(1.5, "Réussite = objectif à x fois le risque", minval=0.5, step=0.25, group="1. Sweep : statistiques", tooltip="Entrée à la clôture du sweep, stop sous la mèche. Réussi si l'objectif est touché avant le stop.")
+maxHold     = input.int(30, "…dans les N barres (sinon échec)", minval=3, group="1. Sweep : statistiques")
+showStats   = input.bool(false, "Tableau des statistiques", group="1. Sweep : statistiques")
+consLen     = input.int(40, "Consolidation : durée (barres)", minval=10, maxval=300, group="1. Sweep : contexte")
+consAtr     = input.float(6.0, "Consolidation : range ≤ x ATR", minval=1, step=0.5, group="1. Sweep : contexte")
+trendLen    = input.int(50, "Tendance : EMA", minval=10, group="1. Sweep : contexte")
+downSlope   = input.float(0.5, "Baissière : EMA en baisse d'au moins x % sur 10 barres", minval=0, step=0.1, group="1. Sweep : contexte")
 
 atr = ta.atr(14)
 
-// ═══ 1. TRIPLE CREUX ════════════════════════════════════════════════════
-pl = ta.pivotlow(low, pivLen, pivLen)
-var array<float> plP = array.new<float>()
-var array<int>   plB = array.new<int>()
-var float tbNeck = na
-var float tbLvl  = na
-var int   tbBar3 = na
-var int   tbBar1 = na
-if not na(pl)
-    array.push(plP, pl)
-    array.push(plB, bar_index - pivLen)
-    if array.size(plP) > 3
-        array.shift(plP)
-        array.shift(plB)
-    if array.size(plP) == 3
-        p1 = array.get(plP, 0)
-        p2 = array.get(plP, 1)
-        p3 = array.get(plP, 2)
-        b1 = array.get(plB, 0)
-        b2 = array.get(plB, 1)
-        b3 = array.get(plB, 2)
-        hiP = math.max(p1, p2, p3)
-        loP = math.min(p1, p2, p3)
-        okTol  = (hiP - loP) / loP * 100 <= tbTolPct
-        okGap  = b2 - b1 >= tbMinGap and b3 - b2 >= tbMinGap
-        okSpan = b3 - b1 <= tbMaxSpan
-        if okTol and okGap and okSpan
-            neck = 0.0
-            for k = bar_index - b3 to bar_index - b1
-                neck := math.max(neck, high[k])
-            tbNeck := neck
-            tbLvl  := loP
-            tbBar3 := b3
-            tbBar1 := b1
-
-tbBreak = false
-if useTB and not na(tbNeck)
-    if bar_index - tbBar3 > tbMaxWait + pivLen or close < tbLvl
-        tbNeck := na
-    else if close > tbNeck and close[1] <= tbNeck and barstate.isconfirmed
-        tbBreak := true
-        line.new(tbBar1, tbLvl, bar_index, tbLvl, color = color.new(color.lime, 30), style = line.style_dashed)
-        line.new(tbBar1, tbNeck, bar_index, tbNeck, color = color.lime, width = 2)
-        label.new(bar_index, low, "Triple creux", style = label.style_label_up, color = color.new(color.lime, 20), textcolor = color.black, size = size.small)
-        tbNeck := na
-
-// ═══ 3. SUPPORTS DAILY / WEEKLY ═════════════════════════════════════════
-htfPiv() =>
-    pv = ta.pivotlow(low, htfLen, htfLen)
-    found = not na(pv)
-    [ta.valuewhen(found, pv, 0), ta.valuewhen(found, pv, 1), ta.valuewhen(found, pv, 2), ta.valuewhen(found, pv, 3)]
-
-[d0, d1, d2, d3] = request.security(syminfo.tickerid, "D", htfPiv(), lookahead = barmerge.lookahead_off)
-[w0, w1, w2, w3] = request.security(syminfo.tickerid, "W", htfPiv(), lookahead = barmerge.lookahead_off)
-
-// supports = niveaux sous le prix, du plus proche au plus lointain
-supportsBelow(float a0, float a1, float a2, float a3, float px) =>
-    out = array.new<float>()
-    for v in array.from(a0, a1, a2, a3)
-        if not na(v) and v < px
-            array.push(out, v)
-    array.sort(out, order.descending)
-    out
-
-near(array<float> arr, float v, float pct) =>
-    bool r = false
-    for x in arr
-        if math.abs(v / x - 1) * 100 <= pct
-            r := true
-    r
-
-wLv = supportsBelow(w0, w1, w2, w3, close)
-dLv = supportsBelow(d0, d1, d2, d3, close)
-if not showW
-    array.clear(wLv)
-if not showD
-    array.clear(dLv)
-
-var array<line>  htfLines  = array.new<line>()
-var array<label> htfLabels = array.new<label>()
-if useHtf and barstate.islast
-    for l in htfLines
-        line.delete(l)
-    for l in htfLabels
-        label.delete(l)
-    array.clear(htfLines)
-    array.clear(htfLabels)
-    drawn = array.new<float>()
-    // Weekly d'abord (prioritaire), puis Daily sans doublon
-    for tf = 0 to 1
-        lv = array.copy(dLv)
-        if tf == 0
-            lv := array.copy(wLv)
-        col = tf == 0 ? colW : colD
-        n = 0
-        for v in lv
-            if n >= htfCount
-                break
-            if near(drawn, v, htfMerge)
-                continue
-            array.push(drawn, v)
-            n += 1
-            array.push(htfLines, line.new(math.max(0, bar_index - 120), v, bar_index, v, extend = extend.right, color = col, width = tf == 0 ? 2 : 1, style = tf == 0 ? line.style_solid : line.style_dashed))
-            array.push(htfLabels, label.new(bar_index + 3, v, (tf == 0 ? "W " : "D ") + str.tostring(v, format.mintick) + "  " + str.tostring((v / close - 1) * 100, "#.#") + "%", style = label.style_label_left, color = color.new(color.black, 100), textcolor = col, size = size.small))
-
-// ═══ 2. SWEEP + CONTEXTE + TAUX DE RÉUSSITE ═════════════════════════════
+// ═══ 1. SWEEP + CONTEXTE + TAUX DE RÉUSSITE ═════════════════════════════
 // contextes : 0 = après consolidation, 1 = tendance baissière, 2 = neutre
 ema      = ta.ema(close, trendLen)
 emaSlope = ema[10] != 0 ? (ema / ema[10] - 1) * 100 : 0.0
@@ -202,9 +78,8 @@ if sweep and barstate.isconfirmed
         array.push(tBar, bar_index)
     if not (hideDown and ctx == 1)
         probTxt = t < 5 ? "historique insuffisant (" + str.tostring(t) + ")" : str.tostring(swProb, "#") + "% réussite (" + str.tostring(t) + " cas)"
-        onSup = useHtf ? (near(wLv, low, htfNearPct) ? " sur support W" : near(dLv, low, htfNearPct) ? " sur support D" : "") : ""
         line.new(swBar, swLvl, bar_index, swLvl, color = color.new(ctxCol(ctx), 30), style = line.style_dotted)
-        label.new(bar_index, low, onSup == "" ? "Sweep" : "Sweep" + (str.contains(onSup, "W") ? " W" : " D"), style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.tiny, tooltip = "Sweep " + ctxName(ctx) + onSup + " : " + probTxt + ". Réussite = objectif " + str.tostring(tpR) + "R avant le stop (sous la mèche), en " + str.tostring(maxHold) + " barres max, sur l'historique de ce graphique.")
+        label.new(bar_index, low, "Sweep", style = label.style_label_up, color = color.new(ctxCol(ctx), 20), textcolor = color.black, size = size.tiny, tooltip = "Sweep " + ctxName(ctx) + " : " + probTxt + ". Réussite = objectif " + str.tostring(tpR) + "R avant le stop (sous la mèche), en " + str.tostring(maxHold) + " barres max, sur l'historique de ce graphique.")
     swLvl := na
 
 var table st = table.new(position.bottom_right, 3, 5, bgcolor = color.new(color.black, 15), border_width = 1)
@@ -221,14 +96,8 @@ if showStats and useSweep and barstate.islast
     table.cell(st, 0, 4, "Maintenant : " + ctxName(ctx), text_color = ctxCol(ctx), text_size = size.tiny)
 
 // ═══ ALERTES ════════════════════════════════════════════════════════════
-alertcondition(tbBreak, "Triple creux", "Triple creux cassé sur {{ticker}} ({{interval}})")
 alertcondition(sweep and ctx == 0, "Sweep après consolidation", "Sweep après consolidation sur {{ticker}} ({{interval}})")
-sweepOnSup = sweep and useHtf and (near(wLv, low, htfNearPct) or near(dLv, low, htfNearPct))
-alertcondition(sweepOnSup, "Sweep sur support D/W", "Sweep sur un support Daily/Weekly : {{ticker}} ({{interval}})")
 alertcondition(sweep, "Sweep (tous)", "Sweep d'un plus bas sur {{ticker}} ({{interval}})")
 if barstate.isconfirmed
-    if tbBreak
-        alert("Triple creux : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
     if sweep and not (hideDown and ctx == 1)
-        sup = useHtf ? (near(wLv, low, htfNearPct) ? " sur support W" : near(dLv, low, htfNearPct) ? " sur support D" : "") : ""
-        alert("Sweep " + ctxName(ctx) + sup + " : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+        alert("Sweep " + ctxName(ctx) + " : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
