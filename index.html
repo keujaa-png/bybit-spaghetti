@@ -8,36 +8,50 @@
 <style>
   :root{
     --bg:#101720; --panel:#161f2b; --line:#243141; --text:#dfe6ee; --muted:#7f8fa3;
-    --up:#4fd1a0; --down:#f2705a; --warn:#f2b35a; --accent:#8fb3ff;
+    --up:#4fd1a0; --down:#f2705a; --warn:#f2b35a; --accent:#8fb3ff; --gold:#f5c542;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{background:var(--bg);color:var(--text);font:14px/1.4 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
-  header{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
-  header h1{font-size:16px;font-weight:600;margin:0 6px 0 0}
-  header label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
-  input[type=number]{width:80px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:inherit}
+  header{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;font-weight:600;margin:0 4px 0 0}
+  header label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;white-space:nowrap}
+  input[type=number]{width:64px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:inherit}
   select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:inherit}
   input[type=checkbox]{accent-color:var(--up)}
-  .status{margin-left:auto;color:var(--muted);font-size:13px}
+  .sep{width:1px;height:18px;background:var(--line)}
+  .status{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
   .status b{color:var(--text);font-weight:500}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
   .dot.on{background:var(--up)} .dot.err{background:var(--down)}
-  main{flex:1;display:grid;grid-template-columns:1fr 300px;min-height:0}
+  main{flex:1;display:grid;grid-template-columns:1fr 640px;min-height:0}
   #wrap{position:relative;min-width:0}
   canvas{display:block;width:100%;height:100%}
   #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:13px;display:none;white-space:nowrap}
-  aside{border-left:1px solid var(--line);overflow-y:auto;background:var(--panel)}
-  .head,.row{display:grid;grid-template-columns:10px 1fr 70px 72px 36px;gap:6px;align-items:center;padding:4px 12px;font-size:13px}
-  .head{position:sticky;top:0;background:var(--panel);color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)}
-  .head span{cursor:pointer} .head span.sel{color:var(--text)}
+  aside{border-left:1px solid var(--line);overflow:auto;background:var(--panel);display:flex;flex-direction:column}
+  #alertBox{border-bottom:1px solid var(--line);max-height:132px;overflow-y:auto;font-size:12px}
+  #alertBox:empty{display:none}
+  #alertBox div{padding:3px 12px;cursor:pointer;display:flex;gap:8px}
+  #alertBox div:hover{background:rgba(143,179,255,.12)}
+  #alertBox time{color:var(--muted)}
+  .grid{display:grid;grid-template-columns:16px 10px minmax(92px,1fr) 42px 64px 62px 38px 42px 58px 58px 62px;gap:6px;align-items:center;padding:4px 10px;font-size:13px;min-width:600px}
+  .head{position:sticky;top:0;z-index:1;background:var(--panel);color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)}
+  .head span{cursor:pointer;user-select:none} .head span.sel{color:var(--text)}
   .row{cursor:pointer}
   .row:hover,.row.hi{background:rgba(143,179,255,.12)}
+  .row.pin{background:rgba(245,197,66,.06)}
   .row i{width:10px;height:3px;border-radius:2px}
+  .star{color:var(--muted);cursor:pointer;text-align:center}
+  .star.on{color:var(--gold)}
+  .name{display:flex;align-items:center;gap:5px;min-width:0}
+  .name a{color:var(--muted);text-decoration:none;font-size:12px}
+  .name a:hover{color:var(--accent)}
+  .new{font-size:10px;font-weight:600;color:var(--bg);background:var(--accent);border-radius:3px;padding:0 3px}
   .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .score{font-weight:600}
   .up{color:var(--up)} .down{color:var(--down)} .warn{color:var(--warn)} .mut{color:var(--muted)}
   #empty{padding:40px 18px;color:var(--muted);text-align:center}
-  @media (max-width:820px){main{grid-template-columns:1fr;grid-template-rows:1fr 40%}aside{border-left:0;border-top:1px solid var(--line)}}
+  @media (max-width:1250px){main{grid-template-columns:1fr;grid-template-rows:minmax(320px,1fr) 45%}aside{border-left:0;border-top:1px solid var(--line)}}
 </style>
 </head>
 <body>
@@ -57,12 +71,29 @@
   <label>Perf min % <input id="minPerf" type="number" value="0" step="0.5"></label>
   <label><input id="cap" type="checkbox" checked> Plafonner le leader</label>
   <label><input id="noStock" type="checkbox" checked> Masquer actions/métaux</label>
+  <label title="Épaisseur des courbes proportionnelle au volume 24h"><input id="thick" type="checkbox" checked> Épaisseur ∝ volume</label>
+  <span class="sep"></span>
+  <label title="Notification + son quand un coin remplit une condition (1 alerte max par coin toutes les 15 min)"><input id="alerts" type="checkbox"> Alertes</label>
+  <label title="Alerte si le coin gagne au moins N places">rang ▲≥ <input id="alRank" type="number" value="5" min="1" step="1"></label>
+  <label title="Alerte si le score atteint ce seuil">score ≥ <input id="alScore" type="number" value="80" min="0" max="100" step="5"></label>
   <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins · <span id="msg">connexion…</span></div>
 </header>
 <main>
   <div id="wrap"><canvas id="c"></canvas><div id="tip"></div></div>
   <aside>
-    <div class="head"><i></i><span data-k="name">Coin</span><span data-k="perf" class="num sel">Perf</span><span data-k="acc" class="num">Accél</span><span data-k="dr" class="num">Rang</span></div>
+    <div id="alertBox"></div>
+    <div class="grid head">
+      <span title="Épingler">★</span><i></i>
+      <span data-k="name">Coin</span>
+      <span data-k="score" class="num" title="Score 0–100 : accélération, places gagnées, volume relatif, force vs BTC et open interest (pénalité si funding élevé)">Score</span>
+      <span data-k="perf" class="num" title="Performance depuis le début de la fenêtre">Perf</span>
+      <span data-k="acc" class="num" id="accHead" title="Gain récent (dernier 1/6 de la fenêtre) moins le rythme moyen d'avant, en points de %">Accél</span>
+      <span data-k="dr" class="num" title="Places gagnées ou perdues sur la même durée">Rang</span>
+      <span data-k="rv" class="num" title="Volume des 15 dernières minutes ÷ moyenne des 4 h précédentes">Vol×</span>
+      <span data-k="vb" class="num" title="Perf du coin moins perf du BTC sur la fenêtre">vs BTC</span>
+      <span data-k="oi" class="num" title="Variation de l'open interest sur la fenêtre">OI</span>
+      <span data-k="fr" class="num" title="Funding rate actuel (8 h). Orange ≥ 0,03 %, rouge ≥ 0,08 %">Funding</span>
+    </div>
     <div id="list"><div id="empty">Chargement de l'historique Bybit…</div></div>
   </aside>
 </main>
@@ -70,67 +101,120 @@
 <script>
 const API  = 'https://api.bybit.com/v5/market';
 const WS   = 'wss://stream.bybit.com/v5/public/linear';
-const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, KEEP_MS = 25 * 3600 * 1000;
-// Perps Bybit qui ne sont pas des cryptos (actions, ETF, métaux, pétrole)
+const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, VOL_REFRESH_MS = 3 * 60 * 1000;
+const KEEP_MS = 25 * 3600 * 1000, FINE_MS = 3600 * 1000;          // points 2 s gardés 1 h, puis 1 / min
+const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 3600 * 1000;
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
+const SETTINGS = ['minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
+const STORE_KEY = 'bybit-spaghetti-v2';
 
-const coins = new Map();   // sym -> {sym, last, turnover, prev24, hist:[[t,price]], hue, ready}
-let ws, pingTimer, hi = null, sortKey = 'perf', lastRows = [], lastPlot = null;
+const coins = new Map();  // sym -> {sym,last,turnover,prev24,funding,oi,hist,oiHist,relVol,hue,ready,oiReady,addedAt,lastAlert}
+let ws, pingTimer, hi = null, sortKey = 'score', lastPlot = null, listLoaded = false, audioCtx = null;
+let pins = new Set();
+const startedAt = Date.now();
+const alertLog = [];
 const $ = id => document.getElementById(id);
 const opt = () => ({
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
-  cap: $('cap').checked, noStock: $('noStock').checked
+  cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
+  alerts: $('alerts').checked, alRank: +$('alRank').value || 5, alScore: +$('alScore').value || 80
 });
 const tick = s => s.replace(/USDT$/, '');
 const colorOf = c => `hsl(${c.hue} 72% 62%)`;
+const fmtPct = (v, d = 2) => isNaN(v) ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(d)}%`;
 let hueIdx = 0;
 function setStatus(txt, state){ $('msg').textContent = txt; $('dot').className = 'dot' + (state ? ' ' + state : ''); }
 
-// ─── Liste des coins ≥ volume min + historique 1 min ─────────────────────
+// ─── Réglages mémorisés ───────────────────────────────────────────────────
+function loadSettings(){
+  try{
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    SETTINGS.forEach(id => { if(s[id] === undefined) return; const el = $(id); if(el.type === 'checkbox') el.checked = s[id]; else el.value = s[id]; });
+    if(s.sortKey) sortKey = s.sortKey;
+    if(Array.isArray(s.pins)) pins = new Set(s.pins);
+  }catch(e){}
+  document.querySelectorAll('.head [data-k]').forEach(s => s.classList.toggle('sel', s.dataset.k === sortKey));
+}
+function saveSettings(){
+  try{
+    const s = {sortKey, pins: [...pins]};
+    SETTINGS.forEach(id => { const el = $(id); s[id] = el.type === 'checkbox' ? el.checked : el.value; });
+    localStorage.setItem(STORE_KEY, JSON.stringify(s));
+  }catch(e){}
+}
+
+// ─── Liste des coins + historiques ────────────────────────────────────────
+async function getJSON(url){ const r = await fetch(url); const d = await r.json(); if(d.retCode !== 0) throw new Error(d.retMsg); return d.result; }
+
 async function refreshList(){
   let list;
-  try{
-    const r = await fetch(`${API}/tickers?category=linear`); const d = await r.json();
-    if(d.retCode !== 0) throw new Error(d.retMsg);
-    list = d.result.list;
-  }catch(e){ setStatus('API Bybit injoignable : ' + e.message, 'err'); return; }
-  const o = opt(), keep = new Set();
+  try{ list = (await getJSON(`${API}/tickers?category=linear`)).list; }
+  catch(e){ setStatus('API Bybit injoignable : ' + e.message, 'err'); return; }
+  const o = opt(), keep = new Set(), now = Date.now();
   for(const t of list){
     if(!t.symbol.endsWith('USDT')) continue;
     const turnover = +t.turnover24h;
-    if(turnover < o.minVol) continue;
+    if(turnover < o.minVol && !pins.has(t.symbol)) continue;
     keep.add(t.symbol);
     const c = coins.get(t.symbol);
-    if(c){ c.turnover = turnover; c.prev24 = +t.prevPrice24h; c.last = +t.lastPrice; }
-    else coins.set(t.symbol, {sym:t.symbol, last:+t.lastPrice, turnover, prev24:+t.prevPrice24h, hist:[], hue:(hueIdx++ * 137.508) % 360, ready:false});
+    const f = {turnover, prev24: +t.prevPrice24h, last: +t.lastPrice, funding: +t.fundingRate, oi: +t.openInterest};
+    if(c) Object.assign(c, f);
+    else coins.set(t.symbol, {sym: t.symbol, ...f, hist: [], oiHist: [], relVol: NaN, hue: (hueIdx++ * 137.508) % 360,
+                               ready: false, oiReady: false, addedAt: listLoaded ? now : 0, lastAlert: 0});
   }
   const removed = [...coins.keys()].filter(s => !keep.has(s));
   removed.forEach(s => coins.delete(s));
+  listLoaded = true;
   resubscribe([...keep], removed);
-  await backfill([...coins.values()].filter(c => !c.ready));
+  const fresh = [...coins.values()].filter(c => !c.ready);
+  await backfill(fresh);
+  await refreshExtras(fresh);
+}
+
+async function pool(items, n, fn){
+  const q = [...items];
+  await Promise.all(Array.from({length: n}, async () => { while(q.length){ const it = q.shift(); try{ await fn(it); }catch(e){} } }));
 }
 
 async function backfill(list){
-  const iv = opt().win > 12 * 3600 * 1000 ? 5 : 1;                 // bougies 1 min, ou 5 min pour 24 h
+  if(!list.length) return;
+  const iv = opt().win > 12 * 3600 * 1000 ? 5 : 1;
   const need = Math.min(1000, Math.ceil(opt().win / (iv * 60000)) + 5);
   let done = 0;
-  const worker = async () => {
-    while(list.length){
-      const c = list.shift();
-      try{
-        const r = await fetch(`${API}/kline?category=linear&symbol=${c.sym}&interval=${iv}&limit=${need}`);
-        const d = await r.json();
-        const rows = (d.result && d.result.list || []).map(k => [+k[0] + iv * 60000, +k[4]]).reverse();
-        const firstLive = c.hist.length ? c.hist[0][0] : Infinity;
-        c.hist = rows.filter(p => p[0] < firstLive).concat(c.hist);
-        c.ready = true;
-      }catch(e){ c.ready = true; }
-      if(++done % 10 === 0){ setStatus(`historique ${done} coins…`, 'on'); render(); }
+  await pool(list, 6, async c => {
+    try{
+      const rows = (await getJSON(`${API}/kline?category=linear&symbol=${c.sym}&interval=${iv}&limit=${need}`)).list
+        .map(k => [+k[0] + iv * 60000, +k[4]]).reverse();
+      const firstLive = c.hist.length ? c.hist[0][0] : Infinity;
+      c.hist = rows.filter(p => p[0] < firstLive).concat(c.hist);
+    }finally{
+      c.ready = true;
+      if(++done % 10 === 0){ setStatus(`historique ${done}/${list.length}…`, 'on'); render(); }
     }
-  };
-  await Promise.all(Array.from({length:6}, worker));
+  });
   setStatus(ws && ws.readyState === 1 ? 'en direct' : 'connexion…', ws && ws.readyState === 1 ? 'on' : '');
+  render();
+}
+
+// Volume relatif (bougies 1 min) + historique d'open interest
+async function refreshExtras(list){
+  await pool(list, 6, async c => {
+    const k = (await getJSON(`${API}/kline?category=linear&symbol=${c.sym}&interval=1&limit=240`)).list; // plus récente d'abord
+    const closed = k.slice(1).map(r => +r[6]);
+    if(closed.length >= 60){
+      const recent = closed.slice(0, 15).reduce((a, b) => a + b, 0);
+      const avg15 = closed.reduce((a, b) => a + b, 0) / closed.length * 15;
+      c.relVol = avg15 > 0 ? recent / avg15 : NaN;
+    }
+    if(!c.oiReady){
+      const oi = (await getJSON(`${API}/open-interest?category=linear&symbol=${c.sym}&intervalTime=15min&limit=110`)).list
+        .map(r => [+r.timestamp, +r.openInterest]).reverse();
+      const firstLive = c.oiHist.length ? c.oiHist[0][0] : Infinity;
+      c.oiHist = oi.filter(p => p[0] < firstLive).concat(c.oiHist);
+      c.oiReady = true;
+    }
+  });
   render();
 }
 
@@ -144,9 +228,12 @@ function connect(){
     const m = JSON.parse(ev.data);
     if(!m.topic || !m.topic.startsWith('tickers.')) return;
     const c = coins.get(m.data.symbol); if(!c) return;
-    if(m.data.lastPrice) c.last = +m.data.lastPrice;
-    if(m.data.prevPrice24h) c.prev24 = +m.data.prevPrice24h;
-    if(m.data.turnover24h) c.turnover = +m.data.turnover24h;
+    const d = m.data;
+    if(d.lastPrice) c.last = +d.lastPrice;
+    if(d.prevPrice24h) c.prev24 = +d.prevPrice24h;
+    if(d.turnover24h) c.turnover = +d.turnover24h;
+    if(d.fundingRate) c.funding = +d.fundingRate;
+    if(d.openInterest) c.oi = +d.openInterest;
   };
 }
 function resubscribe(add, remove){
@@ -156,21 +243,45 @@ function resubscribe(add, remove){
 }
 
 // ─── Échantillonnage ──────────────────────────────────────────────────────
+let lastCompact = 0, lastOiSample = 0;
+function thin(h, now){
+  // garde tout sur la dernière heure, 1 point / minute avant, rien au-delà de 25 h
+  const out = []; let lastMin = -1;
+  for(const p of h){
+    if(p[0] < now - KEEP_MS) continue;
+    if(p[0] >= now - FINE_MS){ out.push(p); continue; }
+    const m = Math.floor(p[0] / 60000);
+    if(m !== lastMin){ out.push(p); lastMin = m; } else out[out.length - 1] = p;
+  }
+  return out;
+}
 function sample(){
-  const now = Date.now();
+  const now = Date.now(), oiTick = now - lastOiSample >= 30000;
   coins.forEach(c => {
-    if(!c.last) return;
-    c.hist.push([now, c.last]);
-    while(c.hist.length && c.hist[0][0] < now - KEEP_MS) c.hist.shift();
+    if(c.last) c.hist.push([now, c.last]);
+    if(oiTick && c.oi && c.oiReady) c.oiHist.push([now, c.oi]);
   });
+  if(oiTick) lastOiSample = now;
+  if(now - lastCompact > 60000){ coins.forEach(c => { c.hist = thin(c.hist, now); c.oiHist = thin(c.oiHist, now); }); lastCompact = now; }
   render();
 }
 
-// prix à l'instant t (dernier point ≤ t)
-function priceAt(h, t){
+function valueAt(h, t){
   let lo = 0, hi_ = h.length - 1, r = -1;
   while(lo <= hi_){ const m = (lo + hi_) >> 1; if(h[m][0] <= t){ r = m; lo = m + 1; } else hi_ = m - 1; }
   return r < 0 ? NaN : h[r][1];
+}
+function pctRanks(rows, key){
+  const vals = rows.map(r => r[key]).filter(v => !isNaN(v)).sort((a, b) => a - b);
+  const out = new Map();
+  rows.forEach(r => {
+    const v = r[key];
+    if(isNaN(v) || vals.length < 2){ out.set(r, 0.5); return; }
+    let lo = 0, hi_ = vals.length;                       // nombre de valeurs < v
+    while(lo < hi_){ const m = (lo + hi_) >> 1; if(vals[m] < v) lo = m + 1; else hi_ = m; }
+    out.set(r, lo / (vals.length - 1));
+  });
+  return out;
 }
 
 // ─── Calcul ───────────────────────────────────────────────────────────────
@@ -178,31 +289,77 @@ function compute(){
   const o = opt(), now = Date.now(), t0 = now - o.win, accWin = o.win / 6, tA = now - accWin;
   const all = [];
   coins.forEach(c => {
-    if(!c.ready || c.hist.length < 2 || c.turnover < o.minVol) return;
-    if(o.noStock && NON_CRYPTO.has(tick(c.sym))) return;
+    if(!c.ready || c.hist.length < 2) return;
+    const pinned = pins.has(c.sym);
+    if(!pinned && c.turnover < o.minVol) return;
+    if(!pinned && o.noStock && NON_CRYPTO.has(tick(c.sym))) return;
     let i0 = c.hist.findIndex(p => p[0] >= t0);
     if(i0 < 0) return;
-    if(i0 > 0) i0--;                          // point juste avant le début : base propre
+    if(i0 > 0) i0--;
     const base = c.hist[i0][1]; if(!base) return;
     const pts = [];
     for(let i = i0; i < c.hist.length; i++) pts.push([Math.max(c.hist[i][0], t0), (c.hist[i][1] / base - 1) * 100]);
     const perf = (c.last / base - 1) * 100;
-    const pA = (priceAt(c.hist, tA) / base - 1) * 100;
+    const pA = (valueAt(c.hist, tA) / base - 1) * 100;
     const acc = isNaN(pA) ? NaN : (perf - pA) - pA / (o.win - accWin) * accWin;
-    all.push({c, pts, perf, pA, acc});
+    const oi0 = valueAt(c.oiHist, t0);
+    const oi = c.oi && oi0 ? (c.oi / oi0 - 1) * 100 : NaN;
+    all.push({c, pts, perf, pA, acc, oi, rv: c.relVol, fr: c.funding * 100, pinned});
   });
-  const vis = all.filter(r => !o.bull || r.perf > o.minPerf);
-  // rangs : maintenant vs il y a accWin
+  const btc = all.find(r => r.c.sym === 'BTCUSDT');
+  all.forEach(r => r.vb = btc ? r.perf - btc.perf : NaN);
+  const vis = all.filter(r => r.pinned || !o.bull || r.perf > o.minPerf);
   const byNow = [...vis].sort((a, b) => b.perf - a.perf);
   const byPrev = [...vis].sort((a, b) => (isNaN(b.pA) ? -1e9 : b.pA) - (isNaN(a.pA) ? -1e9 : a.pA));
   byNow.forEach((r, i) => r.rank = i + 1);
   byPrev.forEach((r, i) => r.dr = (i + 1) - r.rank);
+  const P = Object.fromEntries(['acc', 'dr', 'rv', 'vb', 'oi'].map(k => [k, pctRanks(vis, k)]));
+  vis.forEach(r => {
+    let s = 100 * (0.30 * P.acc.get(r) + 0.20 * P.dr.get(r) + 0.20 * P.rv.get(r) + 0.15 * P.vb.get(r) + 0.15 * P.oi.get(r));
+    if(r.fr >= 0.08) s -= 20; else if(r.fr >= 0.03) s -= 8;
+    r.score = Math.max(0, Math.round(s));
+  });
   return {vis, t0, now, accWin, o, total: all.length};
+}
+
+// ─── Alertes ──────────────────────────────────────────────────────────────
+function beep(){
+  try{
+    if(!audioCtx) return;
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.frequency.value = 880; g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+    osc.connect(g).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+  }catch(e){}
+}
+function checkAlerts({vis, o}){
+  if(!o.alerts || Date.now() - startedAt < ALERT_WARMUP) return;
+  const now = Date.now();
+  vis.forEach(r => {
+    if(r.perf <= 0 || now - r.c.lastAlert < ALERT_COOLDOWN) return;
+    const why = [];
+    if(r.dr >= o.alRank) why.push(`▲${r.dr} places`);
+    if(r.score >= o.alScore) why.push(`score ${r.score}`);
+    if(!why.length) return;
+    r.c.lastAlert = now;
+    const text = `${tick(r.c.sym)} ${fmtPct(r.perf)} · ${why.join(' · ')}`;
+    alertLog.unshift({t: now, sym: r.c.sym, text}); alertLog.length = Math.min(alertLog.length, 30);
+    try{ if('Notification' in window && Notification.permission === 'granted') new Notification('Bybit Spaghetti', {body: text, tag: r.c.sym}); }catch(e){}
+    beep();
+  });
+  $('alertBox').innerHTML = alertLog.map(a =>
+    `<div data-s="${a.sym}"><time>${new Date(a.t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}</time><span>${a.text}</span></div>`).join('');
 }
 
 // ─── Rendu ────────────────────────────────────────────────────────────────
 const cv = $('c'), ctx = cv.getContext('2d');
-function render(){ const d = compute(); draw(d); renderList(d); $('count').textContent = `${d.vis.length}/${d.total}`; }
+function render(){ const d = compute(); draw(d); renderList(d); checkAlerts(d); $('count').textContent = `${d.vis.length}/${d.total}`; }
+
+function lineWidth(c, o){
+  if(!o.thick) return 1.4;
+  const k = Math.min(1, Math.max(0, (Math.log10(c.turnover || 1) - 6.7) / 2.8));
+  return 0.8 + 2.4 * k;
+}
 
 function draw({vis, t0, now, o}){
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
@@ -211,7 +368,7 @@ function draw({vis, t0, now, o}){
   lastPlot = null;
   if(!vis.length){ ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center'; ctx.font = '14px IBM Plex Sans, sans-serif';
     ctx.fillText(coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…', W / 2, H / 2); return; }
-  const padL = 12, padR = 120, padT = 16, padB = 26;
+  const padL = 12, padR = 128, padT = 16, padB = 26;
   let lo = 0, top = 0;
   vis.forEach(r => r.pts.forEach(p => { lo = Math.min(lo, p[1]); top = Math.max(top, p[1]); }));
   let capV = Infinity;
@@ -221,10 +378,10 @@ function draw({vis, t0, now, o}){
     if(s[0] > c2){ capV = c2; top = c2; }
   }
   if(top - lo < 0.5){ top += 0.25; lo -= 0.25; }
-  const pad = (top - lo) * 0.06; const yMin = lo - pad, yMax = top + pad;
+  const pad = (top - lo) * 0.06, yMin = lo - pad, yMax = top + pad;
   const x = t => padL + (t - t0) / (now - t0) * (W - padL - padR);
   const y = v => padT + (yMax - Math.min(v, capV)) / (yMax - yMin) * (H - padT - padB);
-  lastPlot = {x, y, vis, capV};
+  lastPlot = {x, y, vis};
 
   ctx.font = '11px IBM Plex Sans, sans-serif'; ctx.textAlign = 'left';
   const step = niceStep((yMax - yMin) / 6);
@@ -232,53 +389,77 @@ function draw({vis, t0, now, o}){
     ctx.strokeStyle = Math.abs(v) < step / 2 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.06)';
     ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
   }
-  // lignes
-  vis.forEach(r => {
+  // les plus épaisses dessous, la surlignée par-dessus
+  [...vis].sort((a, b) => (a.c.sym === hi) - (b.c.sym === hi) || lineWidth(b.c, o) - lineWidth(a.c, o)).forEach(r => {
     const isHi = hi === r.c.sym;
-    ctx.strokeStyle = colorOf(r.c); ctx.globalAlpha = hi && !isHi ? 0.15 : 0.9; ctx.lineWidth = isHi ? 2.6 : 1.4;
+    ctx.strokeStyle = colorOf(r.c); ctx.globalAlpha = hi && !isHi ? 0.15 : (r.pinned ? 1 : 0.88);
+    ctx.lineWidth = isHi ? Math.max(2.8, lineWidth(r.c, o) + 1) : lineWidth(r.c, o);
+    ctx.setLineDash(r.pinned && !o.bull ? [] : r.perf <= 0 ? [4, 3] : []);
     ctx.beginPath(); r.pts.forEach((p, i) => i ? ctx.lineTo(x(p[0]), y(p[1])) : ctx.moveTo(x(p[0]), y(p[1]))); ctx.stroke();
   });
-  ctx.globalAlpha = 1;
-  // axe % à droite des lignes
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
   ctx.fillStyle = '#7f8fa3';
   for(let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) ctx.fillText((v > 0 ? '+' : '') + v.toFixed(step < 1 ? 1 : 0) + '%', padL + 2, y(v) - 3);
-  // labels bout de ligne (sans chevauchement), du haut vers le bas
   const ends = vis.map(r => ({r, yy: y(r.perf)})).sort((a, b) => a.yy - b.yy);
   let lastY = -99, shown = 0;
   ends.forEach(e => {
-    if(shown >= 18 && hi !== e.r.c.sym) return;
-    let yy = Math.max(e.yy, lastY + 12); if(yy > H - padB) return;
+    const special = hi === e.r.c.sym || e.r.pinned;
+    if(shown >= 18 && !special) return;
+    const yy = Math.max(e.yy, lastY + 12); if(yy > H - padB) return;
     lastY = yy; shown++;
     ctx.fillStyle = colorOf(e.r.c);
-    ctx.fillText(`${tick(e.r.c.sym)} ${e.r.perf >= 0 ? '+' : ''}${e.r.perf.toFixed(2)}%${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
+    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${tick(e.r.c.sym)} ${fmtPct(e.r.perf)}${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
   });
-  // axe temps
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
-  for(let k = 0; k <= 4; k++){ const t = t0 + (now - t0) * k / 4; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}), x(t), H - 8); }
+  for(let k = 0; k <= 4; k++){ const t = t0 + (now - t0) * k / 4; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}), x(t), H - 8); }
 }
 function niceStep(r){ const p = Math.pow(10, Math.floor(Math.log10(r || 1))); const m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
 
+const SORTS = {
+  name: r => tick(r.c.sym), score: r => -r.score, perf: r => -r.perf, acc: r => isNaN(r.acc) ? 1e9 : -r.acc,
+  dr: r => -r.dr, rv: r => isNaN(r.rv) ? 1e9 : -r.rv, vb: r => isNaN(r.vb) ? 1e9 : -r.vb,
+  oi: r => isNaN(r.oi) ? 1e9 : -r.oi, fr: r => isNaN(r.fr) ? 1e9 : r.fr
+};
 function renderList({vis, accWin}){
-  document.querySelector('.head [data-k=acc]').textContent = `Accél ${accWin >= 3600000 ? Math.round(accWin / 3600000) + 'h' : Math.round(accWin / 60000) + 'm'}`;
-  const key = {name: r => tick(r.c.sym), perf: r => -r.perf, acc: r => isNaN(r.acc) ? 1e9 : -r.acc, dr: r => -r.dr}[sortKey];
-  const rows = [...vis].sort((a, b) => { const A = key(a), B = key(b); return A < B ? -1 : A > B ? 1 : 0; });
-  lastRows = rows;
+  $('accHead').textContent = `Accél ${accWin >= 3600000 ? Math.round(accWin / 3600000) + 'h' : Math.round(accWin / 60000) + 'm'}`;
+  const key = SORTS[sortKey] || SORTS.score;
+  const rows = [...vis].sort((a, b) => (b.pinned - a.pinned) || ((A, B) => A < B ? -1 : A > B ? 1 : 0)(key(a), key(b)));
   if(!rows.length){ $('list').innerHTML = `<div id="empty">${coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…'}</div>`; return; }
+  const now = Date.now();
   $('list').innerHTML = rows.map(r => {
-    const acc = isNaN(r.acc) ? '<span class="mut">–</span>' : `<span class="${r.acc >= 0 ? 'up' : 'warn'}">${r.acc >= 0 ? '▲ +' : '▼ '}${r.acc.toFixed(2)}</span>`;
+    const s = r.c.sym;
+    const acc = isNaN(r.acc) ? '<span class="mut">–</span>' : `<span class="${r.acc >= 0 ? 'up' : 'warn'}">${r.acc >= 0 ? '▲' : '▼'}${Math.abs(r.acc).toFixed(2)}</span>`;
     const dr = r.dr > 0 ? `<span class="up">▲${r.dr}</span>` : r.dr < 0 ? `<span class="down">▼${-r.dr}</span>` : '<span class="mut">=</span>';
-    return `<div class="row ${hi === r.c.sym ? 'hi' : ''}" data-s="${r.c.sym}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
-      <i style="background:${colorOf(r.c)}"></i><span>${tick(r.c.sym)}</span>
-      <span class="num ${r.perf >= 0 ? 'up' : 'down'}">${r.perf >= 0 ? '+' : ''}${r.perf.toFixed(2)}%</span>
-      <span class="num">${acc}</span><span class="num">${dr}</span></div>`;
+    const rv = isNaN(r.rv) ? '<span class="mut">–</span>' : `<span class="${r.rv >= 2 ? 'up' : r.rv < 0.7 ? 'mut' : ''}">${r.rv.toFixed(1)}×</span>`;
+    const vb = isNaN(r.vb) ? '<span class="mut">–</span>' : `<span class="${r.vb >= 0 ? 'up' : 'down'}">${fmtPct(r.vb, 1)}</span>`;
+    const oi = isNaN(r.oi) ? '<span class="mut">–</span>' : `<span class="${r.oi >= 0 ? 'up' : 'down'}">${fmtPct(r.oi, 1)}</span>`;
+    const fr = isNaN(r.fr) ? '<span class="mut">–</span>' : `<span class="${r.fr >= 0.08 ? 'down' : r.fr >= 0.03 ? 'warn' : r.fr < 0 ? 'up' : 'mut'}">${r.fr.toFixed(4)}%</span>`;
+    const sc = `<span class="score ${r.score >= 75 ? 'up' : r.score < 40 ? 'mut' : ''}">${r.score}</span>`;
+    const isNew = r.c.addedAt && now - r.c.addedAt < NEW_BADGE_MS ? '<span class="new">NEW</span>' : '';
+    return `<div class="grid row ${hi === s ? 'hi' : ''} ${r.pinned ? 'pin' : ''}" data-s="${s}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
+      <span class="star ${r.pinned ? 'on' : ''}" data-pin="${s}">${r.pinned ? '★' : '☆'}</span>
+      <i style="background:${colorOf(r.c)}"></i>
+      <span class="name">${tick(s)}${isNew}<a href="https://www.tradingview.com/chart/?symbol=BYBIT:${s}.P" target="_blank" rel="noopener" title="Ouvrir sur TradingView">↗</a></span>
+      <span class="num">${sc}</span>
+      <span class="num ${r.perf >= 0 ? 'up' : 'down'}">${fmtPct(r.perf)}</span>
+      <span class="num">${acc}</span><span class="num">${dr}</span><span class="num">${rv}</span>
+      <span class="num">${vb}</span><span class="num">${oi}</span><span class="num">${fr}</span></div>`;
   }).join('');
 }
 
 // ─── Interactions ─────────────────────────────────────────────────────────
-$('list').addEventListener('click', e => { const r = e.target.closest('.row'); if(!r) return; hi = hi === r.dataset.s ? null : r.dataset.s; render(); });
+$('list').addEventListener('click', e => {
+  if(e.target.closest('a')) return;
+  const star = e.target.closest('[data-pin]');
+  if(star){ const s = star.dataset.pin; pins.has(s) ? pins.delete(s) : pins.add(s); saveSettings(); render(); return; }
+  const r = e.target.closest('.row'); if(!r) return;
+  hi = hi === r.dataset.s ? null : r.dataset.s; render();
+});
+$('alertBox').addEventListener('click', e => { const r = e.target.closest('[data-s]'); if(!r) return; hi = r.dataset.s; render(); });
 document.querySelector('.head').addEventListener('click', e => {
   const k = e.target.dataset && e.target.dataset.k; if(!k) return;
-  sortKey = k; document.querySelectorAll('.head span').forEach(s => s.classList.toggle('sel', s.dataset.k === k)); render();
+  sortKey = k; document.querySelectorAll('.head [data-k]').forEach(s => s.classList.toggle('sel', s.dataset.k === k));
+  saveSettings(); render();
 });
 cv.addEventListener('mousemove', e => {
   const tip = $('tip'); if(!lastPlot){ tip.style.display = 'none'; return; }
@@ -290,22 +471,40 @@ cv.addEventListener('mousemove', e => {
     const d = Math.abs(y(near[1]) - e.offsetY);
     if(d < bd){ bd = d; best = {r, p: near}; }
   });
-  if(!best){ tip.style.display = 'none'; return; }
+  if(!best){ tip.style.display = 'none'; tip.dataset.s = ''; return; }
   tip.style.display = 'block'; tip.style.left = (e.offsetX + 12) + 'px'; tip.style.top = (e.offsetY - 12) + 'px';
-  tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${tick(best.r.c.sym)}</b> ${best.p[1] >= 0 ? '+' : ''}${best.p[1].toFixed(2)}% · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
+  tip.dataset.s = best.r.c.sym;
+  tip.innerHTML = `<b style="color:${colorOf(best.r.c)}">${tick(best.r.c.sym)}</b> ${fmtPct(best.p[1])} · ${new Date(best.p[0]).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})} · score ${best.r.score}`;
 });
 cv.addEventListener('mouseleave', () => $('tip').style.display = 'none');
-cv.addEventListener('click', () => { const t = $('tip'); if(t.style.display === 'block'){ const s = t.querySelector('b').textContent + 'USDT'; hi = hi === s ? null : s; render(); } });
+cv.addEventListener('click', () => { const t = $('tip'); if(t.style.display === 'block' && t.dataset.s){ hi = hi === t.dataset.s ? null : t.dataset.s; render(); } });
 
-['bull', 'minPerf', 'cap', 'noStock'].forEach(id => $(id).addEventListener('change', render));
-$('minVol').addEventListener('change', refreshList);
-$('win').addEventListener('change', () => { coins.forEach(c => { if(c.hist.length && c.hist[0][0] > Date.now() - opt().win) c.ready = false; }); backfill([...coins.values()].filter(c => !c.ready)); render(); });
+['bull', 'minPerf', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if(audioCtx.state === 'suspended') audioCtx.resume(); }catch(e){} }
+document.addEventListener('pointerdown', ensureAudio, {once: true});
+$('alerts').addEventListener('change', async () => {
+  ensureAudio();
+  if($('alerts').checked && 'Notification' in window && Notification.permission === 'default'){
+    try{ await Notification.requestPermission(); }catch(e){}
+  }
+  if($('alerts').checked) beep();
+  saveSettings();
+});
+$('minVol').addEventListener('change', () => { saveSettings(); refreshList(); });
+$('win').addEventListener('change', () => {
+  saveSettings();
+  const w = opt().win;
+  coins.forEach(c => { if(c.hist.length && c.hist[0][0] > Date.now() - w) c.ready = false; });
+  backfill([...coins.values()].filter(c => !c.ready)); render();
+});
 window.addEventListener('resize', render);
 
 // ─── Démarrage ────────────────────────────────────────────────────────────
+loadSettings();
 connect();
 refreshList();
 setInterval(refreshList, LIST_REFRESH_MS);
+setInterval(() => refreshExtras([...coins.values()].filter(c => c.ready)), VOL_REFRESH_MS);
 setInterval(sample, SAMPLE_MS);
 </script>
 </body>
