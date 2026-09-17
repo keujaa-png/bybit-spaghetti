@@ -1,0 +1,102 @@
+//@version=6
+indicator("Daily Sweep Scanner (top 10 Bybit)", shorttitle="Daily Sweeps", overlay=true)
+
+// Un « sweep daily » : la bougie daily passe sous un plus bas (veille ou creux daily récent)
+// puis clôture au-dessus, avec une mèche basse marquée. Signal sur bougie daily clôturée.
+
+usePDL    = input.bool(true, "Sweep du plus bas de la veille", group="Détection")
+useSwing  = input.bool(true, "Sweep d'un creux daily (plus fort)", group="Détection")
+swLen     = input.int(3, "Creux daily : bougies de chaque côté", minval=1, maxval=10, group="Détection")
+swAge     = input.int(60, "Creux daily : âge max (jours)", minval=5, group="Détection")
+wickMin   = input.float(30, "Mèche basse ≥ % de la bougie", minval=0, maxval=100, group="Détection")
+onlySwing = input.bool(false, "Alerter seulement les sweeps de creux daily", group="Alertes")
+recentK   = input.int(5, "Tableau : sweeps des K derniers jours", minval=0, maxval=30, group="Affichage")
+tblPos    = input.string("Haut gauche", "Position du tableau", options=["Haut droite", "Haut gauche", "Bas droite", "Bas gauche"], group="Affichage")
+
+s01 = input.symbol("BYBIT:LSKUSDT.P", "#1", group="Coins (top 10 trend)")
+s02 = input.symbol("BYBIT:BRUSDT.P", "#2", group="Coins (top 10 trend)")
+s03 = input.symbol("BYBIT:AVAUSDT.P", "#3", group="Coins (top 10 trend)")
+s04 = input.symbol("BYBIT:AKEUSDT.P", "#4", group="Coins (top 10 trend)")
+s05 = input.symbol("BYBIT:BTWUSDT.P", "#5", group="Coins (top 10 trend)")
+s06 = input.symbol("BYBIT:CASHCATUSDT.P", "#6", group="Coins (top 10 trend)")
+s07 = input.symbol("BYBIT:ZECUSDT.P", "#7", group="Coins (top 10 trend)")
+s08 = input.symbol("BYBIT:SAGAUSDT.P", "#8", group="Coins (top 10 trend)")
+s09 = input.symbol("BYBIT:USELESSUSDT.P", "#9", group="Coins (top 10 trend)")
+s10 = input.symbol("BYBIT:ARBUSDT.P", "#10", group="Coins (top 10 trend)")
+
+// code : 2 = sweep d'un creux daily, 1 = sweep du plus bas de la veille, 0 = rien (valeurs de la dernière bougie daily clôturée)
+sweepD() =>
+    pv = ta.pivotlow(low, swLen, swLen)
+    var float active = na
+    var int activeBar = na
+    if not na(pv)
+        active := pv
+        activeBar := bar_index - swLen
+    rng = high - low
+    wickOk = rng > 0 and (math.min(open, close) - low) / rng * 100 >= wickMin
+    swingSw = useSwing and not na(active) and bar_index - activeBar <= swAge and low < active and close > active and wickOk
+    pdlSw = usePDL and low < low[1] and close > low[1] and wickOk
+    lvl = swingSw ? active : low[1]
+    if swingSw
+        active := na
+    code = swingSw ? 2 : pdlSw ? 1 : 0
+    since = ta.barssince(code > 0)
+    lastCode = ta.valuewhen(code > 0, code, 0)
+    lastLvl = ta.valuewhen(code > 0, lvl, 0)
+    [code[1], since[1], lastCode[1], lastLvl[1], time[1]]
+
+[c01, d01, k01, v01, t01] = request.security(s01, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c02, d02, k02, v02, t02] = request.security(s02, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c03, d03, k03, v03, t03] = request.security(s03, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c04, d04, k04, v04, t04] = request.security(s04, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c05, d05, k05, v05, t05] = request.security(s05, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c06, d06, k06, v06, t06] = request.security(s06, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c07, d07, k07, v07, t07] = request.security(s07, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c08, d08, k08, v08, t08] = request.security(s08, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c09, d09, k09, v09, t09] = request.security(s09, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c10, d10, k10, v10, t10] = request.security(s10, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+
+tick(string s) =>
+    str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
+
+pos = tblPos == "Haut droite" ? position.top_right : tblPos == "Bas droite" ? position.bottom_right : tblPos == "Bas gauche" ? position.bottom_left : position.top_left
+var table tb = table.new(pos, 4, 12, bgcolor = color.new(color.black, 15), border_width = 1)
+
+newDay = timeframe.change("D")
+
+if barstate.islast
+    ss = array.from(s01, s02, s03, s04, s05, s06, s07, s08, s09, s10)
+    cs = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10)
+    ds = array.from(d01, d02, d03, d04, d05, d06, d07, d08, d09, d10)
+    ks = array.from(k01, k02, k03, k04, k05, k06, k07, k08, k09, k10)
+    vs = array.from(v01, v02, v03, v04, v05, v06, v07, v08, v09, v10)
+    ts = array.from(t01, t02, t03, t04, t05, t06, t07, t08, t09, t10)
+    table.clear(tb, 0, 0, 3, 11)
+    table.cell(tb, 0, 0, "Coin", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, "Sweep daily", text_color = color.white, text_size = size.small)
+    table.cell(tb, 2, 0, "Type", text_color = color.white, text_size = size.small)
+    table.cell(tb, 3, 0, "Niveau", text_color = color.white, text_size = size.small)
+    string msg = ""
+    for i = 0 to 9
+        name = tick(array.get(ss, i))
+        d = array.get(ds, i)
+        k = array.get(ks, i)
+        valid = not na(array.get(ts, i))
+        table.cell(tb, 0, i + 1, name, text_color = color.white, text_size = size.small)
+        if not valid
+            table.cell(tb, 1, i + 1, "symbole introuvable", text_color = color.gray, text_size = size.small)
+            table.cell(tb, 2, i + 1, "", text_size = size.small)
+            table.cell(tb, 3, i + 1, "", text_size = size.small)
+            continue
+        recent = not na(d) and d <= recentK
+        table.cell(tb, 1, i + 1, not recent ? "–" : d == 0 ? "hier ✔" : "il y a " + str.tostring(d + 1) + " j", text_color = recent ? (d == 0 ? color.lime : color.silver) : color.gray, text_size = size.small)
+        table.cell(tb, 2, i + 1, recent ? (k == 2 ? "creux daily" : "plus bas veille") : "", text_color = k == 2 ? color.aqua : color.orange, text_size = size.small)
+        table.cell(tb, 3, i + 1, recent ? str.tostring(array.get(vs, i), "#.####") : "", text_color = color.silver, text_size = size.small)
+        // alerte : sur la première bougie de la journée, pour la bougie daily qui vient de clôturer
+        c = array.get(cs, i)
+        if newDay and c > 0 and (not onlySwing or c == 2)
+            msg += name + (c == 2 ? " (creux daily " : " (plus bas veille ") + str.tostring(array.get(vs, i), "#.####") + ")  "
+    if str.length(msg) > 0
+        alert("Sweep daily : " + msg, alert.freq_once_per_bar)
+
+plot(na, "ancre", display = display.none)
