@@ -139,7 +139,7 @@
       <span title="Épingler">★</span><i></i>
       <span data-k="name">Coin<small id="reHead" class="mut" title="Prochain reclassement"></small></span>
       <span data-k="score" class="num" title="Score 0–100 : accélération 40 %, places gagnées 30 %, volume relatif 30 % (pénalité si funding élevé)">Score</span>
-      <span data-k="perf" class="num" title="Performance depuis le début de la fenêtre">Perf</span>
+      <span data-k="perf" class="num sel" title="Performance depuis le début de la fenêtre (= hauteur de la courbe)">Perf</span>
       <span data-k="acc" class="num" id="accHead" title="Gain récent (dernier 1/6 de la fenêtre) moins le rythme moyen d'avant, en points de %">Accél</span>
       <span data-k="dr" class="num" title="Places gagnées ou perdues sur la même durée">Rang</span>
       <span data-k="rv" class="num" title="Volume des 15 dernières minutes ÷ moyenne des 4 h précédentes">Vol×</span>
@@ -166,7 +166,7 @@
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
       <li><b>Alertes</b> : son + notification si un coin gagne N places ou atteint le score choisi (onglet ouvert).</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
-      <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous).</li>
+      <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous). Par défaut le tri est <b>Perf</b> : la liste suit l'ordre des courbes du graphique.</li>
       <li><b>Reclasser</b> : l'ordre ne bouge qu'à cet intervalle (↻ = compte à rebours) ; les chiffres restent en direct.</li>
       <li>Ex. filtre « +5 % sur 4 h » : Fenêtre 4 h + Perf min 5.</li>
     </ul></details>
@@ -202,7 +202,7 @@ function baseOf(name){
 }
 
 const coins = new Map();  // id -> {sym,ex,name,label,base,last,turnover,prev24,funding,hist,relVol,hue,ready,addedAt,lastAlert}
-let ws, hlWs, pingTimer, hlPingTimer, hi = null, sortKey = 'score', lastPlot = null, listLoaded = false, audioCtx = null;
+let ws, hlWs, pingTimer, hlPingTimer, hi = null, sortKey = 'perf', lastPlot = null, listLoaded = false, audioCtx = null;
 let pins = new Set();
 let frozen = {};
 const startedAt = Date.now();
@@ -225,14 +225,15 @@ function loadSettings(){
   try{
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
     SETTINGS.forEach(id => { if(s[id] === undefined) return; const el = $(id); if(el.type === 'checkbox') el.checked = s[id]; else el.value = s[id]; });
-    if(s.sortKey && s.sortKey !== 'oi' && s.sortKey !== 'vb') sortKey = s.sortKey;
+    // v3 : tri par défaut = Perf (comme le graphique). Les anciens réglages repassent sur Perf une fois.
+    if(s.sortV === 3 && s.sortKey && SORTS[s.sortKey]) sortKey = s.sortKey;
     if(Array.isArray(s.pins)) pins = new Set(s.pins);
   }catch(e){}
   document.querySelectorAll('.head [data-k]').forEach(s => s.classList.toggle('sel', s.dataset.k === sortKey));
 }
 function saveSettings(){
   try{
-    const s = {sortKey, pins: [...pins]};
+    const s = {sortKey, sortV: 3, pins: [...pins]};
     SETTINGS.forEach(id => { const el = $(id); s[id] = el.type === 'checkbox' ? el.checked : el.value; });
     localStorage.setItem(STORE_KEY, JSON.stringify(s));
   }catch(e){}

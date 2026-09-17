@@ -1,0 +1,171 @@
+//@version=6
+indicator("Breakout Scanner (Bybit)", shorttitle="Breakout Scanner", overlay=true)
+
+// ── 1. Compression -> expansion (Bollinger)
+bbLen     = input.int(20, "Bollinger : longueur", minval=5, group="1. Compression → expansion")
+bbMult    = input.float(2.0, "Bollinger : écart-type", step=0.1, group="1. Compression → expansion")
+sqzLook   = input.int(50, "Compression = bande la plus serrée sur N barres", minval=10, group="1. Compression → expansion")
+sqzRecent = input.int(5, "Compression vue dans les X dernières barres", minval=1, group="1. Compression → expansion")
+
+// ── 2. Cassure de range + volume
+rangeLen  = input.int(20, "Range : plus haut des N barres", minval=5, group="2. Cassure + volume")
+volMult   = input.float(2.0, "Volume ≥ x fois la moyenne", step=0.1, group="2. Cassure + volume")
+volLen    = input.int(20, "Moyenne de volume sur N barres", minval=5, group="2. Cassure + volume")
+
+// ── Général
+closedOnly = input.bool(true, "Signaux sur bougies clôturées uniquement", group="Général")
+recentK    = input.int(3, "Afficher les signaux des K dernières barres", minval=0, maxval=50, group="Général")
+minTurnM   = input.float(5.0, "Volume 24h minimum (M USDT)", minval=0, step=0.5, group="Général")
+tblPos     = input.string("Haut droite", "Position du tableau", options=["Haut droite", "Haut gauche", "Bas droite", "Bas gauche"], group="Général")
+
+off     = closedOnly ? 1 : 0
+barsDay = math.max(1, int(86400 / timeframe.in_seconds()))
+
+sig() =>
+    basis = ta.sma(close, bbLen)
+    dev   = bbMult * ta.stdev(close, bbLen)
+    upper = basis + dev
+    bw    = basis != 0 ? 2 * dev / basis : na
+    sqz   = bw <= ta.lowest(bw, sqzLook)
+    sinceSqz = ta.barssince(sqz)
+    expand = close > upper and bw > bw[1] and sinceSqz[1] <= sqzRecent
+    hh     = ta.highest(high, rangeLen)[1]
+    vAvg   = ta.sma(volume, volLen)[1]
+    vRel   = vAvg > 0 ? volume / vAvg : na
+    brk    = close > hh and vRel >= volMult
+    bsExp  = ta.barssince(expand)
+    bsBrk  = ta.barssince(brk)
+    turn   = math.sum(volume * close, barsDay)
+    [bsExp[off], bsBrk[off], vRel[off], turn]
+
+tick(string s) =>
+    str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
+
+// ── Symboles (modifiables)
+s01 = input.symbol("BYBIT:BTCUSDT.P", "#1", group="Symboles")
+s02 = input.symbol("BYBIT:ETHUSDT.P", "#2", group="Symboles")
+s03 = input.symbol("BYBIT:SOLUSDT.P", "#3", group="Symboles")
+s04 = input.symbol("BYBIT:XRPUSDT.P", "#4", group="Symboles")
+s05 = input.symbol("BYBIT:HYPEUSDT.P", "#5", group="Symboles")
+s06 = input.symbol("BYBIT:ZECUSDT.P", "#6", group="Symboles")
+s07 = input.symbol("BYBIT:DOGEUSDT.P", "#7", group="Symboles")
+s08 = input.symbol("BYBIT:ENAUSDT.P", "#8", group="Symboles")
+s09 = input.symbol("BYBIT:NEARUSDT.P", "#9", group="Symboles")
+s10 = input.symbol("BYBIT:ARBUSDT.P", "#10", group="Symboles")
+s11 = input.symbol("BYBIT:SUIUSDT.P", "#11", group="Symboles")
+s12 = input.symbol("BYBIT:ADAUSDT.P", "#12", group="Symboles")
+s13 = input.symbol("BYBIT:LINKUSDT.P", "#13", group="Symboles")
+s14 = input.symbol("BYBIT:1000PEPEUSDT.P", "#14", group="Symboles")
+s15 = input.symbol("BYBIT:UNIUSDT.P", "#15", group="Symboles")
+s16 = input.symbol("BYBIT:AAVEUSDT.P", "#16", group="Symboles")
+s17 = input.symbol("BYBIT:ONDOUSDT.P", "#17", group="Symboles")
+s18 = input.symbol("BYBIT:TAOUSDT.P", "#18", group="Symboles")
+s19 = input.symbol("BYBIT:BNBUSDT.P", "#19", group="Symboles")
+s20 = input.symbol("BYBIT:WLDUSDT.P", "#20", group="Symboles")
+s21 = input.symbol("BYBIT:LTCUSDT.P", "#21", group="Symboles")
+s22 = input.symbol("BYBIT:AVAXUSDT.P", "#22", group="Symboles")
+s23 = input.symbol("BYBIT:DOTUSDT.P", "#23", group="Symboles")
+s24 = input.symbol("BYBIT:XLMUSDT.P", "#24", group="Symboles")
+s25 = input.symbol("BYBIT:TRUMPUSDT.P", "#25", group="Symboles")
+s26 = input.symbol("BYBIT:INJUSDT.P", "#26", group="Symboles")
+s27 = input.symbol("BYBIT:FARTCOINUSDT.P", "#27", group="Symboles")
+s28 = input.symbol("BYBIT:APTUSDT.P", "#28", group="Symboles")
+s29 = input.symbol("BYBIT:OPUSDT.P", "#29", group="Symboles")
+s30 = input.symbol("BYBIT:HBARUSDT.P", "#30", group="Symboles")
+s31 = input.symbol("BYBIT:PENGUUSDT.P", "#31", group="Symboles")
+s32 = input.symbol("BYBIT:LITUSDT.P", "#32", group="Symboles")
+s33 = input.symbol("BYBIT:SAGAUSDT.P", "#33", group="Symboles")
+s34 = input.symbol("BYBIT:LSKUSDT.P", "#34", group="Symboles")
+s35 = input.symbol("BYBIT:VVVUSDT.P", "#35", group="Symboles")
+s36 = input.symbol("BYBIT:DASHUSDT.P", "#36", group="Symboles")
+s37 = input.symbol("BYBIT:XMRUSDT.P", "#37", group="Symboles")
+s38 = input.symbol("BYBIT:CRVUSDT.P", "#38", group="Symboles")
+s39 = input.symbol("BYBIT:FILUSDT.P", "#39", group="Symboles")
+s40 = input.symbol("BYBIT:WIFUSDT.P", "#40", group="Symboles")
+
+[e01, b01, r01, u01] = request.security(s01, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e02, b02, r02, u02] = request.security(s02, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e03, b03, r03, u03] = request.security(s03, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e04, b04, r04, u04] = request.security(s04, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e05, b05, r05, u05] = request.security(s05, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e06, b06, r06, u06] = request.security(s06, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e07, b07, r07, u07] = request.security(s07, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e08, b08, r08, u08] = request.security(s08, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e09, b09, r09, u09] = request.security(s09, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e10, b10, r10, u10] = request.security(s10, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e11, b11, r11, u11] = request.security(s11, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e12, b12, r12, u12] = request.security(s12, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e13, b13, r13, u13] = request.security(s13, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e14, b14, r14, u14] = request.security(s14, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e15, b15, r15, u15] = request.security(s15, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e16, b16, r16, u16] = request.security(s16, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e17, b17, r17, u17] = request.security(s17, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e18, b18, r18, u18] = request.security(s18, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e19, b19, r19, u19] = request.security(s19, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e20, b20, r20, u20] = request.security(s20, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e21, b21, r21, u21] = request.security(s21, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e22, b22, r22, u22] = request.security(s22, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e23, b23, r23, u23] = request.security(s23, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e24, b24, r24, u24] = request.security(s24, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e25, b25, r25, u25] = request.security(s25, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e26, b26, r26, u26] = request.security(s26, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e27, b27, r27, u27] = request.security(s27, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e28, b28, r28, u28] = request.security(s28, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e29, b29, r29, u29] = request.security(s29, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e30, b30, r30, u30] = request.security(s30, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e31, b31, r31, u31] = request.security(s31, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e32, b32, r32, u32] = request.security(s32, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e33, b33, r33, u33] = request.security(s33, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e34, b34, r34, u34] = request.security(s34, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e35, b35, r35, u35] = request.security(s35, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e36, b36, r36, u36] = request.security(s36, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e37, b37, r37, u37] = request.security(s37, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e38, b38, r38, u38] = request.security(s38, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e39, b39, r39, u39] = request.security(s39, timeframe.period, sig(), ignore_invalid_symbol = true)
+[e40, b40, r40, u40] = request.security(s40, timeframe.period, sig(), ignore_invalid_symbol = true)
+
+pos = tblPos == "Haut gauche" ? position.top_left : tblPos == "Bas droite" ? position.bottom_right : tblPos == "Bas gauche" ? position.bottom_left : position.top_right
+var table tb = table.new(pos, 4, 42, bgcolor = color.new(color.black, 15), border_width = 1)
+
+if barstate.islast
+    es = array.from(e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11, e12, e13, e14, e15, e16, e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30, e31, e32, e33, e34, e35, e36, e37, e38, e39, e40)
+    bs = array.from(b01, b02, b03, b04, b05, b06, b07, b08, b09, b10, b11, b12, b13, b14, b15, b16, b17, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27, b28, b29, b30, b31, b32, b33, b34, b35, b36, b37, b38, b39, b40)
+    rs = array.from(r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40)
+    us = array.from(u01, u02, u03, u04, u05, u06, u07, u08, u09, u10, u11, u12, u13, u14, u15, u16, u17, u18, u19, u20, u21, u22, u23, u24, u25, u26, u27, u28, u29, u30, u31, u32, u33, u34, u35, u36, u37, u38, u39, u40)
+    ss = array.from(s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27, s28, s29, s30, s31, s32, s33, s34, s35, s36, s37, s38, s39, s40)
+    table.clear(tb, 0, 0, 3, 41)
+    table.cell(tb, 0, 0, "Coin", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, "Compr.→exp.", text_color = color.white, text_size = size.small)
+    table.cell(tb, 2, 0, "Cassure", text_color = color.white, text_size = size.small)
+    table.cell(tb, 3, 0, "Vol×", text_color = color.white, text_size = size.small)
+    row = 1
+    string fresh = ""
+    // les plus récents d'abord : k = 0, 1, 2…
+    for k = 0 to recentK
+        for i = 0 to 39
+            e = array.get(es, i)
+            b = array.get(bs, i)
+            u = array.get(us, i)
+            if na(u) or u < minTurnM * 1e6
+                continue
+            hitE = not na(e) and e == k
+            hitB = not na(b) and b == k
+            // un coin n'apparaît qu'une fois, à son signal le plus récent
+            older = (not na(e) and e < k) or (not na(b) and b < k)
+            if (hitE or hitB) and not older and row <= 40
+                name = tick(array.get(ss, i))
+                ago = k == 0 ? "maintenant" : "il y a " + str.tostring(k)
+                table.cell(tb, 0, row, name, text_color = color.white, text_size = size.small)
+                table.cell(tb, 1, row, hitE ? "▲ " + ago : (not na(e) and e <= recentK ? "▲ il y a " + str.tostring(e) : "–"), text_color = hitE ? color.lime : color.gray, text_size = size.small)
+                table.cell(tb, 2, row, hitB ? "▲ " + ago : (not na(b) and b <= recentK ? "▲ il y a " + str.tostring(b) : "–"), text_color = hitB ? color.aqua : color.gray, text_size = size.small)
+                rv = array.get(rs, i)
+                table.cell(tb, 3, row, na(rv) ? "–" : str.tostring(rv, "#.#") + "×", text_color = color.silver, text_size = size.small)
+                row += 1
+                if k == 0
+                    fresh += name + (hitE and hitB ? " (compr.+cassure)" : hitE ? " (compr.→exp.)" : " (cassure vol)") + "  "
+    if row == 1
+        table.cell(tb, 0, 1, "Aucun signal sur les " + str.tostring(recentK + 1) + " dernières barres", text_color = color.gray, text_size = size.small)
+    if str.length(fresh) > 0
+        alert("Breakout Scanner " + timeframe.period + " : " + fresh, closedOnly ? alert.freq_once_per_bar : alert.freq_once_per_bar_close)
+
+plot(na, "ancre", display = display.none)

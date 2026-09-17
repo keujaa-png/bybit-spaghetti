@@ -1,0 +1,118 @@
+//@version=6
+indicator("Patterns : bull flag, triple creux, sweep", shorttitle="Patterns", overlay=true, max_boxes_count=100, max_lines_count=300, max_labels_count=300)
+
+// ── 1. Bull flag
+useFlag     = input.bool(true, "Afficher", group="1. Bull flag")
+poleLen     = input.int(10, "Mât : sur N barres max", minval=3, group="1. Bull flag")
+poleMinPct  = input.float(4.0, "Mât : hausse minimum (%)", minval=0.5, step=0.5, group="1. Bull flag")
+flagLen     = input.int(8, "Drapeau : durée (barres)", minval=3, group="1. Bull flag")
+flagMaxRetr = input.float(50, "Drapeau : repli max (% du mât)", minval=10, maxval=100, group="1. Bull flag")
+flagVolMult = input.float(1.2, "Cassure : volume ≥ x moyenne", minval=0, step=0.1, group="1. Bull flag")
+
+// ── 2. Triple creux
+useTB       = input.bool(true, "Afficher", group="2. Triple creux")
+pivLen      = input.int(5, "Creux : barres de chaque côté", minval=2, group="2. Triple creux")
+tbTolPct    = input.float(1.5, "Écart max entre les 3 creux (%)", minval=0.1, step=0.1, group="2. Triple creux")
+tbMinGap    = input.int(5, "Écart min entre creux (barres)", minval=1, group="2. Triple creux")
+tbMaxSpan   = input.int(150, "Durée max du motif (barres)", minval=20, group="2. Triple creux")
+tbMaxWait   = input.int(30, "Cassure attendue dans les N barres", minval=1, group="2. Triple creux")
+
+// ── 3. Balayage de liquidité (sweep)
+useSweep    = input.bool(true, "Afficher", group="3. Sweep")
+swPivLen    = input.int(5, "Plus bas de référence : barres de chaque côté", minval=2, group="3. Sweep")
+swMaxAge    = input.int(100, "Plus bas de référence : âge max (barres)", minval=10, group="3. Sweep")
+swWickPct   = input.float(40, "Mèche basse ≥ % de la bougie", minval=0, maxval=100, group="3. Sweep")
+
+volAvg = ta.sma(volume, 20)
+
+// ═══ 1. BULL FLAG ═══════════════════════════════════════════════════════
+flagHigh  = ta.highest(high, flagLen)[1]
+flagLow   = ta.lowest(low, flagLen)[1]
+poleLow   = ta.lowest(low, poleLen)[flagLen]
+poleGain  = poleLow > 0 ? (flagHigh / poleLow - 1) * 100 : 0.0
+retrPct   = flagHigh > poleLow ? (flagHigh - flagLow) / (flagHigh - poleLow) * 100 : 100.0
+// le sommet du mât doit être au début du drapeau, et le drapeau doit baisser ou stagner
+topEarly  = ta.highestbars(high, flagLen)[1] <= -(flagLen / 2)
+drift     = ta.linreg(close, flagLen, 0)[1] <= ta.linreg(close, flagLen, flagLen - 1)[1] * 1.002
+isFlag    = poleGain >= poleMinPct and retrPct <= flagMaxRetr and topEarly and drift
+flagBreak = useFlag and isFlag and close > flagHigh and close[1] <= flagHigh and volume >= flagVolMult * volAvg
+
+var int lastFlagBar = na
+if flagBreak and barstate.isconfirmed and (na(lastFlagBar) or bar_index - lastFlagBar > flagLen)
+    lastFlagBar := bar_index
+    box.new(bar_index - flagLen, flagHigh, bar_index - 1, flagLow, border_color = color.new(color.aqua, 20), bgcolor = color.new(color.aqua, 88))
+    line.new(bar_index - flagLen - poleLen, poleLow, bar_index - flagLen, flagHigh, color = color.aqua, width = 2)
+    label.new(bar_index, low, "Bull flag\n+" + str.tostring(poleGain, "#.#") + "%", style = label.style_label_up, color = color.new(color.aqua, 20), textcolor = color.black, size = size.small)
+
+// ═══ 2. TRIPLE CREUX ════════════════════════════════════════════════════
+pl = ta.pivotlow(low, pivLen, pivLen)
+var array<float> plP = array.new<float>()
+var array<int>   plB = array.new<int>()
+var float tbNeck = na
+var float tbLvl  = na
+var int   tbBar3 = na
+var int   tbBar1 = na
+if not na(pl)
+    array.push(plP, pl)
+    array.push(plB, bar_index - pivLen)
+    if array.size(plP) > 3
+        array.shift(plP)
+        array.shift(plB)
+    if array.size(plP) == 3
+        p1 = array.get(plP, 0)
+        p2 = array.get(plP, 1)
+        p3 = array.get(plP, 2)
+        b1 = array.get(plB, 0)
+        b2 = array.get(plB, 1)
+        b3 = array.get(plB, 2)
+        hiP = math.max(p1, p2, p3)
+        loP = math.min(p1, p2, p3)
+        okTol  = (hiP - loP) / loP * 100 <= tbTolPct
+        okGap  = b2 - b1 >= tbMinGap and b3 - b2 >= tbMinGap
+        okSpan = b3 - b1 <= tbMaxSpan
+        if okTol and okGap and okSpan
+            neck = 0.0
+            for k = bar_index - b3 to bar_index - b1
+                neck := math.max(neck, high[k])
+            tbNeck := neck
+            tbLvl  := loP
+            tbBar3 := b3
+            tbBar1 := b1
+
+tbBreak = false
+if useTB and not na(tbNeck)
+    if bar_index - tbBar3 > tbMaxWait + pivLen or close < tbLvl
+        tbNeck := na
+    else if close > tbNeck and close[1] <= tbNeck and barstate.isconfirmed
+        tbBreak := true
+        line.new(tbBar1, tbLvl, bar_index, tbLvl, color = color.new(color.lime, 30), style = line.style_dashed)
+        line.new(tbBar1, tbNeck, bar_index, tbNeck, color = color.lime, width = 2)
+        label.new(bar_index, low, "Triple creux", style = label.style_label_up, color = color.new(color.lime, 20), textcolor = color.black, size = size.small)
+        tbNeck := na
+
+// ═══ 3. SWEEP ═══════════════════════════════════════════════════════════
+spl = ta.pivotlow(low, swPivLen, swPivLen)
+var float swLvl = na
+var int   swBar = na
+if not na(spl)
+    swLvl := spl
+    swBar := bar_index - swPivLen
+range_  = high - low
+lowWick = math.min(open, close) - low
+sweep = useSweep and not na(swLvl) and bar_index - swBar <= swMaxAge and low < swLvl and close > swLvl and range_ > 0 and lowWick / range_ * 100 >= swWickPct
+if sweep and barstate.isconfirmed
+    line.new(swBar, swLvl, bar_index, swLvl, color = color.new(color.orange, 20), style = line.style_dotted)
+    label.new(bar_index, low, "Sweep", style = label.style_label_up, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny)
+    swLvl := na      // un plus bas n'est balayé qu'une fois
+
+// ═══ ALERTES ════════════════════════════════════════════════════════════
+alertcondition(flagBreak, "Bull flag", "Bull flag cassé sur {{ticker}} ({{interval}})")
+alertcondition(tbBreak, "Triple creux", "Triple creux cassé sur {{ticker}} ({{interval}})")
+alertcondition(sweep, "Sweep", "Sweep d'un plus bas sur {{ticker}} ({{interval}})")
+if barstate.isconfirmed
+    if flagBreak
+        alert("Bull flag : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+    if tbBreak
+        alert("Triple creux : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+    if sweep
+        alert("Sweep : " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
