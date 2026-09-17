@@ -64,12 +64,40 @@
   .help button{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer}
   .help details{border-top:1px solid var(--line);padding:6px 0} .help summary{cursor:pointer;font-weight:600}
   .help .note{color:var(--muted);font-size:12px;margin-top:12px}
+  .controls{display:contents}
+  #setBtn{display:none;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer}
+  .fw{color:var(--warn);font-size:11px}
+  @media (max-width:700px){
+    html,body{height:auto}
+    body{min-height:100%}
+    header{position:sticky;top:0;z-index:5;background:var(--bg);gap:8px 10px;padding:8px 12px}
+    header h1{font-size:15px}
+    #setBtn{display:inline-block}
+    .status{order:5;width:100%;margin-left:0;font-size:12px}
+    .controls{display:none;order:6;width:100%;grid-template-columns:1fr 1fr;gap:8px 12px;padding-top:4px}
+    .controls.open{display:grid}
+    .controls .sep{display:none}
+    .controls label{white-space:normal}
+    input[type=number]{width:58px}
+    main{display:block}
+    #wrap{height:52vh;min-height:260px}
+    aside{border-left:0;border-top:1px solid var(--line);overflow:visible}
+    .head{top:var(--hh,0px)}
+    .grid{min-width:0;padding:6px 10px;gap:4px;font-size:12px;grid-template-columns:14px 8px minmax(0,1fr) 30px 58px 50px 30px 38px}
+    .grid > :nth-child(9){display:none}
+    .name{overflow:hidden}
+    .name a{padding:2px 4px}
+    #tip{font-size:12px}
+  }
+  @media (min-width:701px){ .fw{display:none} }
 </style>
 </head>
 <body>
 <header>
   <h1>Spaghetti Bybit + HL</h1>
   <button id="helpBtn" title="Guide d'utilisation" aria-label="Guide d'utilisation">?</button>
+  <button id="setBtn" aria-expanded="false" aria-controls="controls">⚙ Réglages</button>
+  <div class="controls" id="controls">
   <label title="Coins Hyperliquid ajoutés seulement s'ils ne sont pas déjà dans la liste Bybit"><input id="hl" type="checkbox" checked> + Hyperliquid</label>
   <label>Vol 24h min (M$) <input id="minVol" type="number" value="5" step="1" min="0"></label>
   <label>Fenêtre
@@ -81,6 +109,16 @@
       <option value="86400">24 h</option>
     </select>
   </label>
+  <label title="Nombre maximum de coins affichés, choisis selon le tri de la liste (0 = tous). Les coins épinglés restent toujours affichés.">Max coins <input id="maxN" type="number" value="20" min="0" step="5"></label>
+  <label title="Fréquence à laquelle l'ordre du classement est recalculé (les valeurs, elles, restent en direct)">Reclasser
+    <select id="reorder">
+      <option value="0">en continu</option>
+      <option value="15">15 s</option>
+      <option value="30" selected>30 s</option>
+      <option value="60">1 min</option>
+      <option value="300">5 min</option>
+    </select>
+  </label>
   <label><input id="bull" type="checkbox" checked> Bullish uniquement</label>
   <label>Perf min % <input id="minPerf" type="number" value="0" step="0.5"></label>
   <label><input id="cap" type="checkbox" checked> Plafonner le leader</label>
@@ -90,7 +128,8 @@
   <label title="Notification + son quand un coin remplit une condition (1 alerte max par coin toutes les 15 min)"><input id="alerts" type="checkbox"> Alertes</label>
   <label title="Alerte si le coin gagne au moins N places">rang ▲≥ <input id="alRank" type="number" value="5" min="1" step="1"></label>
   <label title="Alerte si le score atteint ce seuil">score ≥ <input id="alScore" type="number" value="80" min="0" max="100" step="5"></label>
-  <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins · <span id="msg">connexion…</span></div>
+  </div>
+  <div class="status"><span class="dot" id="dot"></span><b id="count">0</b> coins<span id="countX"></span> · <span id="msg">connexion…</span></div>
 </header>
 <main>
   <div id="wrap"><canvas id="c"></canvas><div id="tip"></div></div>
@@ -98,7 +137,7 @@
     <div id="alertBox"></div>
     <div class="grid head">
       <span title="Épingler">★</span><i></i>
-      <span data-k="name">Coin</span>
+      <span data-k="name">Coin<small id="reHead" class="mut" title="Prochain reclassement"></small></span>
       <span data-k="score" class="num" title="Score 0–100 : accélération 40 %, places gagnées 30 %, volume relatif 30 % (pénalité si funding élevé)">Score</span>
       <span data-k="perf" class="num" title="Performance depuis le début de la fenêtre">Perf</span>
       <span data-k="acc" class="num" id="accHead" title="Gain récent (dernier 1/6 de la fenêtre) moins le rythme moyen d'avant, en points de %">Accél</span>
@@ -127,6 +166,8 @@
       <li><b>NEW</b> : coin qui vient de passer le seuil de volume.</li>
       <li><b>Alertes</b> : son + notification si un coin gagne N places ou atteint le score choisi (onglet ouvert).</li>
       <li>Clic sur un en-tête = trier. Tes réglages sont mémorisés.</li>
+      <li><b>Max coins</b> : garde les N meilleurs selon le tri choisi (0 = tous).</li>
+      <li><b>Reclasser</b> : l'ordre ne bouge qu'à cet intervalle (↻ = compte à rebours) ; les chiffres restent en direct.</li>
       <li>Ex. filtre « +5 % sur 4 h » : Fenêtre 4 h + Perf min 5.</li>
     </ul></details>
     <details><summary>Méthode d'entrée (exemple)</summary><ol>
@@ -151,7 +192,7 @@ const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
 const ALIASES = {PUMPFUN: 'PUMP'};
-const SETTINGS = ['hl', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
+const SETTINGS = ['hl', 'maxN', 'reorder', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alRank', 'alScore'];
 const STORE_KEY = 'bybit-spaghetti-v2';
 
 // clé de dédoublonnage : 1000PEPEUSDT, SHIB1000USDT, kPEPE -> PEPE / SHIB
@@ -163,11 +204,12 @@ function baseOf(name){
 const coins = new Map();  // id -> {sym,ex,name,label,base,last,turnover,prev24,funding,hist,relVol,hue,ready,addedAt,lastAlert}
 let ws, hlWs, pingTimer, hlPingTimer, hi = null, sortKey = 'score', lastPlot = null, listLoaded = false, audioCtx = null;
 let pins = new Set();
+let frozen = {};
 const startedAt = Date.now();
 const alertLog = [];
 const $ = id => document.getElementById(id);
 const opt = () => ({
-  hl: $('hl').checked,
+  hl: $('hl').checked, reorderMs: (+$('reorder').value || 0) * 1000, maxN: Math.max(0, Math.floor(+$('maxN').value || 0)),
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
@@ -428,7 +470,17 @@ function compute(){
     if(r.fr >= 0.08) s -= 20; else if(r.fr >= 0.03) s -= 8;
     r.score = Math.max(0, Math.round(s));
   });
-  return {vis, t0, now, accWin, o, total: all.length};
+  // ordre figé pendant o.reorderMs pour que le classement ne saute pas toutes les 2 s
+  const key = SORTS[sortKey] || SORTS.score;
+  if(!frozen.order || frozen.key !== sortKey || now - frozen.at >= o.reorderMs){
+    frozen = {key: sortKey, at: now, order: new Map([...vis].sort((a, b) => cmp(key(a), key(b))).map((r, i) => [r.c.sym, i]))};
+  }
+  const pos = r => frozen.order.has(r.c.sym) ? frozen.order.get(r.c.sym) : 1e6;   // nouveaux venus en fin de liste
+  const ordered = [...vis].sort((a, b) => (b.pinned - a.pinned) || (pos(a) - pos(b)) || cmp(key(a), key(b)));
+  // limite : les N premiers de ce classement, épinglés toujours inclus
+  const shown = o.maxN > 0 ? ordered.filter((r, i) => r.pinned || ordered.slice(0, i).filter(x => !x.pinned).length < o.maxN) : ordered;
+  const nextIn = o.reorderMs ? Math.max(0, Math.ceil((frozen.at + o.reorderMs - now) / 1000)) : 0;
+  return {vis: shown, t0, now, accWin, o, total: all.length, eligible: vis.length, nextIn};
 }
 
 // ─── Alertes ──────────────────────────────────────────────────────────────
@@ -465,7 +517,8 @@ const cv = $('c'), ctx = cv.getContext('2d');
 function render(){
   const d = compute(); draw(d); renderList(d); checkAlerts(d);
   const nHL = d.vis.filter(r => r.c.ex === 'hl').length;
-  $('count').textContent = `${d.vis.length}/${d.total}${nHL ? ` (dont ${nHL} HL)` : ''}`;
+  $('count').textContent = d.vis.length;
+  $('countX').textContent = (d.eligible > d.vis.length ? ` (top sur ${d.eligible})` : '') + (nHL ? ` · ${nHL} HL` : '');
 }
 
 function lineWidth(c, o){
@@ -481,7 +534,7 @@ function draw({vis, t0, now, o}){
   lastPlot = null;
   if(!vis.length){ ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center'; ctx.font = '14px IBM Plex Sans, sans-serif';
     ctx.fillText(coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…', W / 2, H / 2); return; }
-  const padL = 12, padR = 128, padT = 16, padB = 26;
+  const narrow = W < 520, padL = 8, padR = narrow ? 96 : 128, padT = 14, padB = 24;
   let lo = 0, top = 0;
   vis.forEach(r => r.pts.forEach(p => { lo = Math.min(lo, p[1]); top = Math.max(top, p[1]); }));
   let capV = Infinity;
@@ -496,7 +549,7 @@ function draw({vis, t0, now, o}){
   const y = v => padT + (yMax - Math.min(v, capV)) / (yMax - yMin) * (H - padT - padB);
   lastPlot = {x, y, vis};
 
-  ctx.font = '11px IBM Plex Sans, sans-serif'; ctx.textAlign = 'left';
+  ctx.font = `${narrow ? 10 : 11}px IBM Plex Sans, sans-serif`; ctx.textAlign = 'left';
   const step = niceStep((yMax - yMin) / 6);
   for(let v = Math.ceil(yMin / step) * step; v <= yMax; v += step){
     ctx.strokeStyle = Math.abs(v) < step / 2 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.06)';
@@ -516,17 +569,18 @@ function draw({vis, t0, now, o}){
   let lastY = -99, shown = 0;
   ends.forEach(e => {
     const special = hi === e.r.c.sym || e.r.pinned;
-    if(shown >= 18 && !special) return;
-    const yy = Math.max(e.yy, lastY + 12); if(yy > H - padB) return;
+    if(shown >= (narrow ? 12 : 18) && !special) return;
+    const yy = Math.max(e.yy, lastY + (narrow ? 11 : 12)); if(yy > H - padB) return;
     lastY = yy; shown++;
     ctx.fillStyle = colorOf(e.r.c);
-    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' ? ' ·HL' : ''} ${fmtPct(e.r.perf)}${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
+    ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.r.perf, narrow ? 1 : 2)}${e.r.perf > capV ? ' ⤒' : ''}`, W - padR + 6, yy + 4);
   });
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
-  for(let k = 0; k <= 4; k++){ const t = t0 + (now - t0) * k / 4; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}), x(t), H - 8); }
+  for(let k = 0, n = narrow ? 2 : 4; k <= n; k++){ const t = t0 + (now - t0) * k / n; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}), x(t), H - 8); }
 }
 function niceStep(r){ const p = Math.pow(10, Math.floor(Math.log10(r || 1))); const m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
 
+const cmp = (A, B) => A < B ? -1 : A > B ? 1 : 0;
 const SORTS = {
   name: r => r.c.label, score: r => -r.score, perf: r => -r.perf, acc: r => isNaN(r.acc) ? 1e9 : -r.acc,
   dr: r => -r.dr, rv: r => isNaN(r.rv) ? 1e9 : -r.rv, fr: r => isNaN(r.fr) ? 1e9 : r.fr
@@ -536,10 +590,10 @@ function linkOf(c){
     ? {href: `https://app.hyperliquid.xyz/trade/${encodeURIComponent(c.name)}`, title: 'Ouvrir sur Hyperliquid'}
     : {href: `https://www.tradingview.com/chart/?symbol=BYBIT:${c.name}.P`, title: 'Ouvrir sur TradingView'};
 }
-function renderList({vis, accWin}){
+function renderList({vis, accWin, nextIn}){
   $('accHead').textContent = `Accél ${accWin >= 3600000 ? Math.round(accWin / 3600000) + 'h' : Math.round(accWin / 60000) + 'm'}`;
-  const key = SORTS[sortKey] || SORTS.score;
-  const rows = [...vis].sort((a, b) => (b.pinned - a.pinned) || ((A, B) => A < B ? -1 : A > B ? 1 : 0)(key(a), key(b)));
+  const rows = vis;                                   // déjà ordonné (ordre figé) par compute()
+  $('reHead').textContent = nextIn ? ` ↻${nextIn}s` : '';
   if(!rows.length){ $('list').innerHTML = `<div id="empty">${coins.size ? 'Aucun coin ne correspond aux filtres' : 'Chargement…'}</div>`; return; }
   const now = Date.now();
   $('list').innerHTML = rows.map(r => {
@@ -554,7 +608,7 @@ function renderList({vis, accWin}){
     return `<div class="grid row ${hi === s ? 'hi' : ''} ${r.pinned ? 'pin' : ''}" data-s="${s}" title="Volume 24h : ${(r.c.turnover / 1e6).toFixed(1)} M$">
       <span class="star ${r.pinned ? 'on' : ''}" data-pin="${s}">${r.pinned ? '★' : '☆'}</span>
       <i style="background:${colorOf(r.c)}"></i>
-      <span class="name">${r.c.label}${ex}${isNew}<a href="${L.href}" target="_blank" rel="noopener" title="${L.title}">↗</a></span>
+      <span class="name">${r.c.label}${ex}${isNew}${r.fr >= 0.03 ? `<span class="fw" title="Funding ${r.fr.toFixed(3)}%">⚠</span>` : ''}<a href="${L.href}" target="_blank" rel="noopener" title="${L.title}">↗</a></span>
       <span class="num">${sc}</span>
       <span class="num ${r.perf >= 0 ? 'up' : 'down'}">${fmtPct(r.perf)}</span>
       <span class="num">${acc}</span><span class="num">${dr}</span><span class="num">${rv}</span>
@@ -604,7 +658,7 @@ $('alerts').addEventListener('change', async () => {
   if($('alerts').checked) beep();
   saveSettings();
 });
-['bull', 'minPerf', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+['maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alRank', 'alScore'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
 ['minVol', 'hl'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
@@ -620,6 +674,14 @@ $('helpBtn').addEventListener('click', () => helpDlg.showModal());
 $('helpClose').addEventListener('click', () => helpDlg.close());
 helpDlg.addEventListener('click', e => { if(e.target === helpDlg) helpDlg.close(); });
 try{ if(!localStorage.getItem('bybit-spaghetti-help-seen')){ helpDlg.showModal(); localStorage.setItem('bybit-spaghetti-help-seen', '1'); } }catch(e){}
+
+$('setBtn').addEventListener('click', () => {
+  const open = $('controls').classList.toggle('open');
+  $('setBtn').setAttribute('aria-expanded', open);
+  setHeaderH();
+});
+function setHeaderH(){ document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px'); }
+window.addEventListener('resize', setHeaderH); setHeaderH();
 
 // ─── Démarrage ────────────────────────────────────────────────────────────
 loadSettings();
