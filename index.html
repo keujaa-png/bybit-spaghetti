@@ -290,7 +290,11 @@ async function pool(items, n, fn){
 }
 function addCoin(id, f){
   const c = coins.get(id);
-  if(c){ Object.assign(c, f); return; }
+  if(c){
+    const live = c.lastAt && Date.now() - c.lastAt < 60000;                  // flux temps réel encore actif
+    Object.assign(c, f, live ? {last: c.last} : {});                         // sinon le REST reprend la main
+    return;
+  }
   coins.set(id, {sym: id, ...f, hist: [], relVol: NaN, hue: (hueIdx++ * 137.508) % 360,
                  ready: false, addedAt: listLoaded ? Date.now() : 0, lastAlert: 0});
 }
@@ -369,9 +373,11 @@ async function backfill(list){
   let done = 0;
   const step = async c => {
     try{
-      const rows = (await fetchCandles(c, iv, need)).map(k => [k.t, k.close]);
+      const now = Date.now();
+      // la bougie en cours porte une heure de clôture dans le futur : on l'ignore, sinon la courbe repart en arrière
+      const rows = (await fetchCandles(c, iv, need)).filter(k => k.t <= now).map(k => [k.t, k.close]);
       const firstLive = c.hist.length ? c.hist[0][0] : Infinity;
-      c.hist = rows.filter(p => p[0] < firstLive).concat(c.hist);
+      c.hist = clean(rows.filter(p => p[0] < firstLive).concat(c.hist));
     }finally{
       c.ready = true;
       if(++done % 10 === 0){ setStatus(`historique ${done}/${list.length}…`, 'on'); render(); }
@@ -417,6 +423,7 @@ function connect(){
     if(d.ask1Price) c.ask = +d.ask1Price;
     if(c.bid > 0 && c.ask > c.bid && (c.ask - c.bid) / c.bid < 0.01) c.last = (c.bid + c.ask) / 2;
     else if(d.lastPrice) c.last = +d.lastPrice;
+    c.lastAt = Date.now();
     if(d.prevPrice24h) c.prev24 = +d.prevPrice24h;
     if(d.turnover24h) c.turnover = +d.turnover24h;
     if(d.fundingRate) c.funding = +d.fundingRate;
@@ -439,7 +446,7 @@ function connectHL(){
     if(m.channel !== 'allMids' || !m.data || !m.data.mids) return;
     for(const [name, px] of Object.entries(m.data.mids)){
       const c = coins.get('HL:' + name);
-      if(c) c.last = +px;
+      if(c){ c.last = +px; c.lastAt = Date.now(); }
     }
   };
 }
@@ -464,7 +471,7 @@ async function repairGaps(from){
     const rows = (await fetchCandles(c, 1, n)).map(k => [k.t, k.close]).filter(p => p[0] > from && p[0] < now - 30000);
     if(!rows.length) return;
     const lo = rows[0][0], hi = rows[rows.length - 1][0];
-    c.hist = c.hist.filter(p => p[0] < lo).concat(rows, c.hist.filter(p => p[0] > hi)).sort((a, b) => a[0] - b[0]);
+    c.hist = clean(c.hist.filter(p => p[0] < lo).concat(rows, c.hist.filter(p => p[0] > hi)));
   };
   try{
     const list = [...coins.values()].filter(c => c.ready);
@@ -472,11 +479,32 @@ async function repairGaps(from){
   }finally{ repairing = false; render(); }
 }
 document.addEventListener('visibilitychange', () => { if(!document.hidden) sample(); });
+// supprime un point aberrant isolé : très éloigné de ses deux voisins, qui eux se ressemblent
+function despike(h){
+  const n = h.length;
+  if(n < 3) return;
+  const a = h[n - 3][1], b = h[n - 2][1], c = h[n - 1][1];
+  if(!(a > 0 && b > 0 && c > 0)) return;
+  const dAB = Math.abs(b / a - 1), dBC = Math.abs(c / b - 1), dAC = Math.abs(c / a - 1);
+  if(dAB > 0.02 && dBC > 0.02 && dAC < dAB / 3 && h[n - 1][0] - h[n - 3][0] < 20000) h.splice(n - 2, 1);
+}
+function clean(h){
+  h.sort((a, b) => a[0] - b[0]);
+  const out = [];
+  for(const p of h){ if(out.length && out[out.length - 1][0] === p[0]) out[out.length - 1] = p; else out.push(p); }
+  return out;
+}
 function sample(){
   const now = Date.now();
   if(lastSampleAt && now - lastSampleAt > 90000) repairGaps(lastSampleAt - 60000);
   lastSampleAt = now;
-  coins.forEach(c => { if(c.last && c.ready) c.hist.push([now, c.last]); });
+  coins.forEach(c => {
+    if(!(c.last > 0) || !c.ready) return;
+    const h = c.hist;
+    if(h.length && h[h.length - 1][0] >= now) return;                        // jamais de point dans le passé
+    h.push([now, c.last]);
+    despike(h);
+  });
   if(now - lastCompact > 60000){ coins.forEach(c => { c.hist = thin(c.hist, now); }); lastCompact = now; }
   render();
 }
