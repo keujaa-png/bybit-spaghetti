@@ -133,6 +133,7 @@
   <label><input id="cap" type="checkbox" checked> Plafonner le leader</label>
   <label><input id="noStock" type="checkbox" checked> Masquer actions/métaux</label>
   <label title="Épaisseur des courbes proportionnelle au volume 24h"><input id="thick" type="checkbox" checked> Épaisseur ∝ volume</label>
+  <label title="Cherche automatiquement la dernière news des 5 coins qui montent le plus et l'affiche dans une bulle près de leur courbe (clic = ouvrir l'article)"><input id="news" type="checkbox" checked> 📰 News</label>
   <span class="sep"></span>
   <label title="Notification Chrome + son pour le meilleur setup long du moment"><input id="alerts" type="checkbox"> Alertes</label>
   <button id="notifBtn" class="nbtn" title="État des notifications Chrome (clic = tester)">🔔 …</button>
@@ -218,7 +219,7 @@ const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
 const ALIASES = {PUMPFUN: 'PUMP'};
-const SETTINGS = ['maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens', 'night'];
+const SETTINGS = ['news', 'maxN', 'reorder', 'alRs', 'alRsWin', 'minVol', 'win', 'bull', 'minPerf', 'cap', 'noStock', 'thick', 'alerts', 'alSens', 'night'];
 // Alerte « setup long » : toutes les conditions doivent être réunies. rs = multiplicateur du seuil RS,
 // rv = Vol× minimum, score = score minimum, cool = minutes entre 2 alertes d'un même coin, gap = minutes entre 2 alertes tout court
 // Réglages issus du backtest (5 jours, 84 perps Bybit, bougies 1 min, fenêtre 1 h, RS sur 10 min,
@@ -247,7 +248,7 @@ const startedAt = Date.now();
 const alertLog = [];
 const $ = id => document.getElementById(id);
 const opt = () => ({
-  hl: true, reorderMs: (+$('reorder').value || 0) * 1000, maxN: Math.max(0, Math.floor(+$('maxN').value || 0)),
+  hl: true, news: $('news').checked, reorderMs: (+$('reorder').value || 0) * 1000, maxN: Math.max(0, Math.floor(+$('maxN').value || 0)),
   minVol: (+$('minVol').value || 0) * 1e6, win: +$('win').value * 1000,
   bull: $('bull').checked, minPerf: +$('minPerf').value || 0,
   cap: $('cap').checked, noStock: $('noStock').checked, thick: $('thick').checked,
@@ -604,10 +605,61 @@ function checkAlerts({all, o}){
     `<div data-s="${a.sym}"><time>${new Date(a.t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}</time><span>${a.text}</span></div>`).join('');
 }
 
+// ─── News : scan auto des coins qui montent le plus ──────────────────────
+// Sources : annonces Bybit (listings…) puis actualité web (flux Bing News via rss2json).
+const ANN = 'https://api.bybit.com/v5/announcements/index?locale=en-US&limit=50';
+const NEWS_TTL = 20 * 60000, NEWS_MAX_AGE = 48 * 3600000, NEWS_TOP = 5;
+const newsBy = new Map();                    // sym -> {at, item:{title,url,ts,src}|null}
+let newsHits = [];                           // zones cliquables des bulles
+let ann = {at: 0, list: []}, newsBusy = false;
+async function rssItems(url){
+  const d = await (await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url))).json();
+  if(d.status !== 'ok') throw new Error(d.message || 'flux indisponible');
+  return d.items || [];
+}
+async function findNews(c){
+  const now = Date.now();
+  if(now - ann.at > 30 * 60000){
+    ann = {at: now, list: ann.list};
+    try{ ann.list = (await getJSON(ANN)).list || []; }catch(e){}
+  }
+  const re = new RegExp('\\b' + c.label.replace(/[^A-Za-z0-9]/g, '') + '\\b', 'i');
+  const a = ann.list.find(x => re.test(x.title) && now - x.dateTimestamp < NEWS_MAX_AGE);
+  if(a) return {title: a.title, url: a.url, ts: a.dateTimestamp, src: 'Bybit'};
+  const items = await rssItems(`https://www.bing.com/news/search?q=${encodeURIComponent('"' + c.label + '" crypto')}&format=RSS`);
+  return items.map(i => {
+      let host = ''; try{ host = new URL(i.link).hostname.replace(/^www\./, ''); }catch(e){}
+      return {title: i.title, url: i.link, ts: Date.parse(i.pubDate.replace(' ', 'T') + 'Z') || Date.parse(i.pubDate), src: host};
+    }).filter(i => i.ts && now - i.ts < NEWS_MAX_AGE && re.test(i.title))
+      .sort((a, b) => b.ts - a.ts)[0] || null;
+}
+async function scanNews(){
+  if(!$('news').checked || newsBusy || document.hidden || !lastData) return;
+  newsBusy = true;
+  try{
+    const top = [...lastData.vis].sort((a, b) => b.perf - a.perf).slice(0, NEWS_TOP);
+    for(const r of top){
+      const cur = newsBy.get(r.c.sym);
+      if(cur && Date.now() - cur.at < NEWS_TTL) continue;
+      let item = null;
+      try{ item = await findNews(r.c); }catch(e){}
+      newsBy.set(r.c.sym, {at: Date.now(), item});
+      render();
+      await new Promise(f => setTimeout(f, 1200));
+    }
+    if(newsBy.size > 60) for(const k of [...newsBy.keys()].slice(0, 30)) newsBy.delete(k);
+  }finally{ newsBusy = false; }
+}
+function ago(ts){
+  const m = Math.round((Date.now() - ts) / 60000);
+  return m < 60 ? m + ' min' : m < 1440 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' j';
+}
+
 // ─── Rendu ────────────────────────────────────────────────────────────────
 const cv = $('c'), ctx = cv.getContext('2d');
+let lastData = null;
 function render(){
-  const d = compute(); draw(d); renderList(d); checkAlerts(d);
+  const d = compute(); lastData = d; draw(d); renderList(d); checkAlerts(d);
   const nHL = d.vis.filter(r => r.c.ex === 'hl').length;
   $('count').textContent = d.vis.length;
   $('countX').textContent = (d.eligible > d.vis.length ? ` (top sur ${d.eligible})` : '') + (nHL ? ` · ${nHL} HL` : '');
@@ -701,6 +753,7 @@ function draw({vis, t0, now, o}){
   const ends = vis.map(r => { const v = shift === 0 ? r.perf : at(r.pts, tE); return {r, v, yy: isNaN(v) ? NaN : padT + (yMax - clampV(v)) / (yMax - yMin) * plotH}; })
                   .filter(e => !isNaN(e.yy) && e.yy >= padT - 6 && e.yy <= H - padB + 6).sort((a, b) => a.yy - b.yy);
   let lastY = -99, shown = 0;
+  newsHits = [];
   ends.forEach(e => {
     const special = hi === e.r.c.sym || e.r.pinned;
     if(shown >= (narrow ? 12 : 18) && !special) return;
@@ -708,6 +761,23 @@ function draw({vis, t0, now, o}){
     lastY = yy; shown++;
     ctx.fillStyle = colorOf(e.r.c);
     ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.v, narrow ? 1 : 2)}${e.v > capV ? ' ⤒' : e.v < floorV ? ' ⤓' : ''}`, W - padR + 6, yy + 4);
+    // bulle news discrète, collée à la fin de la courbe
+    const n = o.news && newsBy.get(e.r.c.sym);
+    if(n && n.item){
+      const maxW = Math.min(narrow ? 90 : 240, plotW - 20);
+      let txt = '📰 ' + n.item.title;
+      while(ctx.measureText(txt).width > maxW - 12 && txt.length > 6) txt = txt.slice(0, -2) + '…';
+      const bw = ctx.measureText(txt).width + 12, bh = 15;
+      const bx = Math.max(padL + 2, padL + plotW - 6 - bw), by = yy - bh / 2 - 1;
+      ctx.globalAlpha = hi && hi !== e.r.c.sym ? 0.25 : 0.85;
+      ctx.fillStyle = 'rgba(15,22,33,.92)';
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 7); ctx.fill();
+      ctx.strokeStyle = colorOf(e.r.c); ctx.lineWidth = 1; ctx.globalAlpha *= 0.55; ctx.stroke();
+      ctx.globalAlpha = hi && hi !== e.r.c.sym ? 0.3 : 1;
+      ctx.fillStyle = '#c8d6e5'; ctx.fillText(txt, bx + 6, by + 11);
+      ctx.globalAlpha = 1;
+      newsHits.push({x: bx, y: by, w: bw, h: bh, item: n.item, c: e.r.c});
+    }
   });
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
   const opts = span > 20 * 3600000 ? {weekday: 'short', hour: '2-digit', minute: '2-digit'} : {hour: '2-digit', minute: '2-digit'};
@@ -766,8 +836,21 @@ document.querySelector('.head').addEventListener('click', e => {
   sortKey = k; document.querySelectorAll('.head [data-k]').forEach(s => s.classList.toggle('sel', s.dataset.k === k));
   saveSettings(); render();
 });
+const newsAt = (px, py) => newsHits.find(n => px >= n.x && px <= n.x + n.w && py >= n.y && py <= n.y + n.h);
+cv.addEventListener('click', e => {
+  if(dragMoved) return;
+  const n = newsAt(e.offsetX, e.offsetY);
+  if(n) window.open(n.item.url, '_blank', 'noopener');
+});
 cv.addEventListener('mousemove', e => {
   const tip = $('tip'); if(!lastPlot){ tip.style.display = 'none'; return; }
+  const nh = newsAt(e.offsetX, e.offsetY);
+  cv.style.cursor = nh ? 'pointer' : '';
+  if(nh){
+    tip.style.display = 'block'; tip.style.left = Math.max(4, e.offsetX - 240) + 'px'; tip.style.top = (e.offsetY + 14) + 'px';
+    tip.innerHTML = `<b style="color:${colorOf(nh.c)}">${nh.c.label}</b> · ${nh.item.src || 'news'} · il y a ${ago(nh.item.ts)}<br><span style="max-width:280px;display:inline-block">${nh.item.title.replace(/</g, '&lt;')}</span><br><span class="mut">clic = ouvrir l'article</span>`;
+    return;
+  }
   const {x, y, vis} = lastPlot; let best = null, bd = 14;
   vis.forEach(r => {
     let near = null, dx = Infinity;
@@ -891,7 +974,7 @@ $('alerts').addEventListener('change', async () => {
   if($('alerts').checked) beep();
   saveSettings();
 });
-['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alSens', 'night'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
+['alRs', 'alRsWin', 'maxN', 'bull', 'minPerf', 'reorder', 'cap', 'noStock', 'thick', 'alSens', 'night', 'news'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); render(); }));
 ['minVol'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); refreshList(); }));
 $('win').addEventListener('change', () => {
   saveSettings();
@@ -982,6 +1065,7 @@ setInterval(refreshList, LIST_REFRESH_MS);
 setInterval(() => refreshVol([...coins.values()].filter(c => c.ready)), VOL_REFRESH_MS);
 setInterval(pollHL, HL_CTX_MS);
 setInterval(sample, SAMPLE_MS);
+setTimeout(scanNews, 8000); setInterval(scanNews, 60000);
 </script>
 </body>
 </html>
