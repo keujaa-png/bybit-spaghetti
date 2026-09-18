@@ -1,9 +1,14 @@
 //@version=6
-indicator("Daily Sweep Scanner (top 10 Bybit + majors)", shorttitle="Daily Sweeps", overlay=true)
+indicator("Daily Sweep Scanner (top bullish Bybit + majors)", shorttitle="Daily Sweeps", overlay=true)
 
-// Un « sweep daily » : la bougie daily passe sous un plus bas (veille ou creux daily récent)
-// puis clôture au-dessus, avec une mèche basse marquée. Signal sur bougie daily clôturée.
+// Sweep daily : la bougie daily passe sous un plus bas (veille ou creux daily récent) puis
+// clôture au-dessus, avec une mèche basse marquée. Signal sur bougie daily clôturée.
+// Le classement se fait tout seul : le script surveille un univers de 36 perps Bybit liquides,
+// les trie par performance et n'affiche/n'alerte que les N plus bullish du moment + BTC/ETH/SOL.
 
+topN      = input.int(10, "Nombre de coins les plus bullish suivis", minval=1, maxval=25, group="Sélection")
+perfDays  = input.int(1, "Performance mesurée sur N jours", minval=1, maxval=30, group="Sélection")
+minPerf   = input.float(0, "Performance minimale (%)", step=0.5, group="Sélection")
 usePDL    = input.bool(true, "Sweep du plus bas de la veille", group="Détection")
 useSwing  = input.bool(true, "Sweep d'un creux daily (plus fort)", group="Détection")
 swLen     = input.int(3, "Creux daily : bougies de chaque côté", minval=1, maxval=10, group="Détection")
@@ -13,21 +18,45 @@ onlySwing = input.bool(false, "Alerter seulement les sweeps de creux daily", gro
 recentK   = input.int(5, "Tableau : sweeps des K derniers jours", minval=0, maxval=30, group="Affichage")
 tblPos    = input.string("Haut gauche", "Position du tableau", options=["Haut droite", "Haut gauche", "Bas droite", "Bas gauche"], group="Affichage")
 
-s01 = input.symbol("BYBIT:UNIUSDT.P", "#1", group="Top 10 bullish Bybit")
-s02 = input.symbol("BYBIT:DRIFTUSDT.P", "#2", group="Top 10 bullish Bybit")
-s03 = input.symbol("BYBIT:ARBUSDT.P", "#3", group="Top 10 bullish Bybit")
-s04 = input.symbol("BYBIT:AKEUSDT.P", "#4", group="Top 10 bullish Bybit")
-s05 = input.symbol("BYBIT:NEARUSDT.P", "#5", group="Top 10 bullish Bybit")
-s06 = input.symbol("BYBIT:INJUSDT.P", "#6", group="Top 10 bullish Bybit")
-s07 = input.symbol("BYBIT:STRKUSDT.P", "#7", group="Top 10 bullish Bybit")
-s08 = input.symbol("BYBIT:APTUSDT.P", "#8", group="Top 10 bullish Bybit")
-s09 = input.symbol("BYBIT:WLDUSDT.P", "#9", group="Top 10 bullish Bybit")
-s10 = input.symbol("BYBIT:COTIUSDT.P", "#10", group="Top 10 bullish Bybit")
-s11 = input.symbol("BYBIT:BTCUSDT.P", "#11", group="Majors")
-s12 = input.symbol("BYBIT:ETHUSDT.P", "#12", group="Majors")
-s13 = input.symbol("BYBIT:SOLUSDT.P", "#13", group="Majors")
+sy01 = input.symbol("BYBIT:BTCUSDT.P", "#1", group="Majors (toujours affichés)")
+sy02 = input.symbol("BYBIT:ETHUSDT.P", "#2", group="Majors (toujours affichés)")
+sy03 = input.symbol("BYBIT:SOLUSDT.P", "#3", group="Majors (toujours affichés)")
+sy04 = input.symbol("BYBIT:ZECUSDT.P", "#4", group="Univers surveillé (les plus liquides)")
+sy05 = input.symbol("BYBIT:HYPEUSDT.P", "#5", group="Univers surveillé (les plus liquides)")
+sy06 = input.symbol("BYBIT:XRPUSDT.P", "#6", group="Univers surveillé (les plus liquides)")
+sy07 = input.symbol("BYBIT:NEARUSDT.P", "#7", group="Univers surveillé (les plus liquides)")
+sy08 = input.symbol("BYBIT:UNIUSDT.P", "#8", group="Univers surveillé (les plus liquides)")
+sy09 = input.symbol("BYBIT:ARBUSDT.P", "#9", group="Univers surveillé (les plus liquides)")
+sy10 = input.symbol("BYBIT:DOGEUSDT.P", "#10", group="Univers surveillé (les plus liquides)")
+sy11 = input.symbol("BYBIT:ENAUSDT.P", "#11", group="Univers surveillé (les plus liquides)")
+sy12 = input.symbol("BYBIT:ONDOUSDT.P", "#12", group="Univers surveillé (les plus liquides)")
+sy13 = input.symbol("BYBIT:SUIUSDT.P", "#13", group="Univers surveillé (les plus liquides)")
+sy14 = input.symbol("BYBIT:ADAUSDT.P", "#14", group="Univers surveillé (les plus liquides)")
+sy15 = input.symbol("BYBIT:LSKUSDT.P", "#15", group="Univers surveillé (les plus liquides)")
+sy16 = input.symbol("BYBIT:1000PEPEUSDT.P", "#16", group="Univers surveillé (les plus liquides)")
+sy17 = input.symbol("BYBIT:WLDUSDT.P", "#17", group="Univers surveillé (les plus liquides)")
+sy18 = input.symbol("BYBIT:PONSUSDT.P", "#18", group="Univers surveillé (les plus liquides)")
+sy19 = input.symbol("BYBIT:PUMPFUNUSDT.P", "#19", group="Univers surveillé (les plus liquides)")
+sy20 = input.symbol("BYBIT:BNBUSDT.P", "#20", group="Univers surveillé (les plus liquides)")
+sy21 = input.symbol("BYBIT:LINKUSDT.P", "#21", group="Univers surveillé (les plus liquides)")
+sy22 = input.symbol("BYBIT:AAVEUSDT.P", "#22", group="Univers surveillé (les plus liquides)")
+sy23 = input.symbol("BYBIT:TAOUSDT.P", "#23", group="Univers surveillé (les plus liquides)")
+sy24 = input.symbol("BYBIT:LITUSDT.P", "#24", group="Univers surveillé (les plus liquides)")
+sy25 = input.symbol("BYBIT:VVVUSDT.P", "#25", group="Univers surveillé (les plus liquides)")
+sy26 = input.symbol("BYBIT:USELESSUSDT.P", "#26", group="Univers surveillé (les plus liquides)")
+sy27 = input.symbol("BYBIT:APTUSDT.P", "#27", group="Univers surveillé (les plus liquides)")
+sy28 = input.symbol("BYBIT:DASHUSDT.P", "#28", group="Univers surveillé (les plus liquides)")
+sy29 = input.symbol("BYBIT:XMRUSDT.P", "#29", group="Univers surveillé (les plus liquides)")
+sy30 = input.symbol("BYBIT:COTIUSDT.P", "#30", group="Univers surveillé (les plus liquides)")
+sy31 = input.symbol("BYBIT:GENIUSUSDT.P", "#31", group="Univers surveillé (les plus liquides)")
+sy32 = input.symbol("BYBIT:AVAXUSDT.P", "#32", group="Univers surveillé (les plus liquides)")
+sy33 = input.symbol("BYBIT:LTCUSDT.P", "#33", group="Univers surveillé (les plus liquides)")
+sy34 = input.symbol("BYBIT:BRUSDT.P", "#34", group="Univers surveillé (les plus liquides)")
+sy35 = input.symbol("BYBIT:DOTUSDT.P", "#35", group="Univers surveillé (les plus liquides)")
+sy36 = input.symbol("BYBIT:AKEUSDT.P", "#36", group="Univers surveillé (les plus liquides)")
 
-// code : 2 = sweep d'un creux daily, 1 = sweep du plus bas de la veille, 0 = rien (valeurs de la dernière bougie daily clôturée)
+// code : 2 = sweep d'un creux daily, 1 = sweep du plus bas de la veille, 0 = rien
+// (les 5 premières valeurs sont décalées d'une bougie : elles viennent de la dernière daily clôturée)
 sweepD() =>
     pv = ta.pivotlow(low, swLen, swLen)
     var float active = na
@@ -46,59 +75,101 @@ sweepD() =>
     since = ta.barssince(code > 0)
     lastCode = ta.valuewhen(code > 0, code, 0)
     lastLvl = ta.valuewhen(code > 0, lvl, 0)
-    [code[1], since[1], lastCode[1], lastLvl[1], time[1]]
+    perf = close[perfDays] > 0 ? (close / close[perfDays] - 1) * 100 : na     // performance en cours (bougie du jour)
+    [code[1], since[1], lastCode[1], lastLvl[1], time[1], perf]
 
-[c01, d01, k01, v01, t01] = request.security(s01, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c02, d02, k02, v02, t02] = request.security(s02, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c03, d03, k03, v03, t03] = request.security(s03, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c04, d04, k04, v04, t04] = request.security(s04, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c05, d05, k05, v05, t05] = request.security(s05, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c06, d06, k06, v06, t06] = request.security(s06, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c07, d07, k07, v07, t07] = request.security(s07, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c08, d08, k08, v08, t08] = request.security(s08, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c09, d09, k09, v09, t09] = request.security(s09, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c10, d10, k10, v10, t10] = request.security(s10, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c11, d11, k11, v11, t11] = request.security(s11, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c12, d12, k12, v12, t12] = request.security(s12, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[c13, d13, k13, v13, t13] = request.security(s13, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c01, d01, k01, v01, t01, p01] = request.security(sy01, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c02, d02, k02, v02, t02, p02] = request.security(sy02, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c03, d03, k03, v03, t03, p03] = request.security(sy03, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c04, d04, k04, v04, t04, p04] = request.security(sy04, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c05, d05, k05, v05, t05, p05] = request.security(sy05, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c06, d06, k06, v06, t06, p06] = request.security(sy06, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c07, d07, k07, v07, t07, p07] = request.security(sy07, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c08, d08, k08, v08, t08, p08] = request.security(sy08, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c09, d09, k09, v09, t09, p09] = request.security(sy09, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c10, d10, k10, v10, t10, p10] = request.security(sy10, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c11, d11, k11, v11, t11, p11] = request.security(sy11, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c12, d12, k12, v12, t12, p12] = request.security(sy12, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c13, d13, k13, v13, t13, p13] = request.security(sy13, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c14, d14, k14, v14, t14, p14] = request.security(sy14, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c15, d15, k15, v15, t15, p15] = request.security(sy15, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c16, d16, k16, v16, t16, p16] = request.security(sy16, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c17, d17, k17, v17, t17, p17] = request.security(sy17, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c18, d18, k18, v18, t18, p18] = request.security(sy18, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c19, d19, k19, v19, t19, p19] = request.security(sy19, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c20, d20, k20, v20, t20, p20] = request.security(sy20, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c21, d21, k21, v21, t21, p21] = request.security(sy21, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c22, d22, k22, v22, t22, p22] = request.security(sy22, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c23, d23, k23, v23, t23, p23] = request.security(sy23, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c24, d24, k24, v24, t24, p24] = request.security(sy24, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c25, d25, k25, v25, t25, p25] = request.security(sy25, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c26, d26, k26, v26, t26, p26] = request.security(sy26, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c27, d27, k27, v27, t27, p27] = request.security(sy27, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c28, d28, k28, v28, t28, p28] = request.security(sy28, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c29, d29, k29, v29, t29, p29] = request.security(sy29, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c30, d30, k30, v30, t30, p30] = request.security(sy30, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c31, d31, k31, v31, t31, p31] = request.security(sy31, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c32, d32, k32, v32, t32, p32] = request.security(sy32, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c33, d33, k33, v33, t33, p33] = request.security(sy33, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c34, d34, k34, v34, t34, p34] = request.security(sy34, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c35, d35, k35, v35, t35, p35] = request.security(sy35, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[c36, d36, k36, v36, t36, p36] = request.security(sy36, "D", sweepD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
 
 tick(string s) =>
     str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
 
 pos = tblPos == "Haut droite" ? position.top_right : tblPos == "Bas droite" ? position.bottom_right : tblPos == "Bas gauche" ? position.bottom_left : position.top_left
-var table tb = table.new(pos, 4, 15, bgcolor = color.new(color.black, 15), border_width = 1)
-
+var table tb = table.new(pos, 5, 30, bgcolor = color.new(color.black, 15), border_width = 1)
 newDay = timeframe.change("D")
 
 if barstate.islast
-    ss = array.from(s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13)
-    cs = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10, c11, c12, c13)
-    ds = array.from(d01, d02, d03, d04, d05, d06, d07, d08, d09, d10, d11, d12, d13)
-    ks = array.from(k01, k02, k03, k04, k05, k06, k07, k08, k09, k10, k11, k12, k13)
-    vs = array.from(v01, v02, v03, v04, v05, v06, v07, v08, v09, v10, v11, v12, v13)
-    ts = array.from(t01, t02, t03, t04, t05, t06, t07, t08, t09, t10, t11, t12, t13)
-    table.clear(tb, 0, 0, 3, 13)
+    ss = array.from(sy01, sy02, sy03, sy04, sy05, sy06, sy07, sy08, sy09, sy10, sy11, sy12, sy13, sy14, sy15, sy16, sy17, sy18, sy19, sy20, sy21, sy22, sy23, sy24, sy25, sy26, sy27, sy28, sy29, sy30, sy31, sy32, sy33, sy34, sy35, sy36)
+    cs = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32, c33, c34, c35, c36)
+    ds = array.from(d01, d02, d03, d04, d05, d06, d07, d08, d09, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27, d28, d29, d30, d31, d32, d33, d34, d35, d36)
+    ks = array.from(k01, k02, k03, k04, k05, k06, k07, k08, k09, k10, k11, k12, k13, k14, k15, k16, k17, k18, k19, k20, k21, k22, k23, k24, k25, k26, k27, k28, k29, k30, k31, k32, k33, k34, k35, k36)
+    vs = array.from(v01, v02, v03, v04, v05, v06, v07, v08, v09, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36)
+    ts = array.from(t01, t02, t03, t04, t05, t06, t07, t08, t09, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31, t32, t33, t34, t35, t36)
+    ps = array.from(p01, p02, p03, p04, p05, p06, p07, p08, p09, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36)
+    // classement : les majors sont mis de côté (affichés à part), les symboles invalides écartés
+    rank = array.new<float>()
+    for i = 0 to 35
+        pi = array.get(ps, i)
+        bad = i < 3 or na(array.get(ts, i)) or na(pi) or pi < minPerf
+        array.push(rank, bad ? -1e9 : pi)
+    order = array.sort_indices(rank, order.descending)
+    sel = array.new<int>()
+    for r = 0 to array.size(order) - 1
+        if array.size(sel) >= topN
+            break
+        idx = array.get(order, r)
+        if array.get(rank, idx) > -1e8
+            array.push(sel, idx)
+    for m = 0 to 2
+        if not na(array.get(ts, m))
+            array.push(sel, m)
+
+    table.clear(tb, 0, 0, 4, 29)
     table.cell(tb, 0, 0, "Coin", text_color = color.white, text_size = size.small)
-    table.cell(tb, 1, 0, "Sweep daily", text_color = color.white, text_size = size.small)
-    table.cell(tb, 2, 0, "Type", text_color = color.white, text_size = size.small)
-    table.cell(tb, 3, 0, "Niveau", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, str.tostring(perfDays) + "j %", text_color = color.white, text_size = size.small)
+    table.cell(tb, 2, 0, "Sweep daily", text_color = color.white, text_size = size.small)
+    table.cell(tb, 3, 0, "Type", text_color = color.white, text_size = size.small)
+    table.cell(tb, 4, 0, "Niveau", text_color = color.white, text_size = size.small)
     string msg = ""
-    for i = 0 to 12
+    for r = 0 to array.size(sel) - 1
+        i = array.get(sel, r)
+        row = r + 1
         name = tick(array.get(ss, i))
         d = array.get(ds, i)
         k = array.get(ks, i)
-        valid = not na(array.get(ts, i))
-        table.cell(tb, 0, i + 1, name, text_color = color.white, text_size = size.small)
-        if not valid
-            table.cell(tb, 1, i + 1, "symbole introuvable", text_color = color.gray, text_size = size.small)
-            table.cell(tb, 2, i + 1, "", text_size = size.small)
-            table.cell(tb, 3, i + 1, "", text_size = size.small)
-            continue
+        pi = array.get(ps, i)
+        major = i < 3
         recent = not na(d) and d <= recentK
-        table.cell(tb, 1, i + 1, not recent ? "–" : d == 0 ? "hier ✔" : "il y a " + str.tostring(d + 1) + " j", text_color = recent ? (d == 0 ? color.lime : color.silver) : color.gray, text_size = size.small)
-        table.cell(tb, 2, i + 1, recent ? (k == 2 ? "creux daily" : "plus bas veille") : "", text_color = k == 2 ? color.aqua : color.orange, text_size = size.small)
-        table.cell(tb, 3, i + 1, recent ? str.tostring(array.get(vs, i), "#.####") : "", text_color = color.silver, text_size = size.small)
-        // alerte : sur la première bougie de la journée, pour la bougie daily qui vient de clôturer
+        table.cell(tb, 0, row, name, text_color = major ? color.silver : color.white, text_size = size.small)
+        table.cell(tb, 1, row, na(pi) ? "–" : str.tostring(pi, "#.#") + "%", text_color = na(pi) ? color.gray : pi >= 0 ? color.lime : color.red, text_size = size.small)
+        table.cell(tb, 2, row, not recent ? "–" : d == 0 ? "hier ✔" : "il y a " + str.tostring(d + 1) + " j", text_color = recent ? (d == 0 ? color.lime : color.silver) : color.gray, text_size = size.small)
+        table.cell(tb, 3, row, recent ? (k == 2 ? "creux daily" : "plus bas veille") : "", text_color = k == 2 ? color.aqua : color.orange, text_size = size.small)
+        table.cell(tb, 4, row, recent ? str.tostring(array.get(vs, i), "#.####") : "", text_color = color.silver, text_size = size.small)
+        // alerte : à la première bougie du jour, pour la bougie daily qui vient de clôturer
         c = array.get(cs, i)
         if newDay and c > 0 and (not onlySwing or c == 2)
             msg += name + (c == 2 ? " (creux daily " : " (plus bas veille ") + str.tostring(array.get(vs, i), "#.####") + ")  "
