@@ -628,9 +628,11 @@ async function findNews(c){
   if(a) return {title: a.title, url: a.url, ts: a.dateTimestamp, src: 'Bybit'};
   const items = await rssItems(`https://www.bing.com/news/search?q=${encodeURIComponent('"' + c.label + '" crypto')}&format=RSS`);
   return items.map(i => {
-      let host = ''; try{ host = new URL(i.link).hostname.replace(/^www\./, ''); }catch(e){}
-      return {title: i.title, url: i.link, ts: Date.parse(i.pubDate.replace(' ', 'T') + 'Z') || Date.parse(i.pubDate), src: host};
-    }).filter(i => i.ts && now - i.ts < NEWS_MAX_AGE && re.test(i.title))
+      let url = i.link, host = '';
+      try{ url = new URL(i.link).searchParams.get('url') || i.link; host = new URL(url).hostname.replace(/^www\./, ''); }catch(e){}
+      const txt = i.title + ' ' + (i.description || '');
+      return {title: i.title, url, ts: Date.parse(i.pubDate.replace(' ', 'T') + 'Z') || Date.parse(i.pubDate), src: host, ok: re.test(txt)};
+    }).filter(i => i.ok && i.ts && now - i.ts < NEWS_MAX_AGE)
       .sort((a, b) => b.ts - a.ts)[0] || null;
 }
 async function scanNews(){
