@@ -115,7 +115,9 @@
       <option value="1800">30 min</option>
       <option value="3600" selected>1 h</option>
       <option value="14400">4 h</option>
-      <option value="86400">24 h</option>
+      <option value="86400">1 j</option>
+      <option value="259200">3 j</option>
+      <option value="604800">7 j</option>
     </select>
   </label>
   <label title="Nombre maximum de coins affichés, choisis selon le tri de la liste (0 = tous). Les coins épinglés restent toujours affichés.">Max coins <input id="maxN" type="number" value="20" min="0" step="5"></label>
@@ -213,7 +215,7 @@ const WS     = 'wss://stream.bybit.com/v5/public/linear';
 const HL_API = 'https://api.hyperliquid.xyz/info';
 const HL_WS  = 'wss://api.hyperliquid.xyz/ws';
 const SAMPLE_MS = 2000, LIST_REFRESH_MS = 5 * 60 * 1000, VOL_REFRESH_MS = 3 * 60 * 1000, HL_CTX_MS = 60 * 1000;
-const KEEP_MS = 100 * 3600 * 1000, FINE_MS = 3600 * 1000;          // points 2 s gardés 1 h, puis 1 / min
+const KEEP_MS = 30 * 24 * 3600 * 1000, FINE_MS = 3600 * 1000;      // 2 s gardés 1 h, puis 1/min, 1/5 min après 1 j, 1/15 min après 3 j
 const ALERT_COOLDOWN = 15 * 60 * 1000, ALERT_WARMUP = 90 * 1000, NEW_BADGE_MS = 3600 * 1000;
 const NON_CRYPTO = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA SAMSUNG EWY MSFT HOOD 4STOCK DRAM CHIP AMZN GOOGL COIN QQQ SPY'.split(' '));
 // Même token, noms différents selon l'exchange
@@ -358,17 +360,21 @@ async function pollHL(){
 async function fetchCandles(c, ivMin, count){
   if(c.ex === 'hl'){
     const end = Date.now();
-    const rows = await hlPost({type: 'candleSnapshot', req: {coin: c.name, interval: ivMin + 'm', startTime: end - count * ivMin * 60000, endTime: end}});
+    const ivStr = ivMin >= 60 ? (ivMin / 60) + 'h' : ivMin + 'm';
+    const rows = await hlPost({type: 'candleSnapshot', req: {coin: c.name, interval: ivStr, startTime: end - count * ivMin * 60000, endTime: end}});
     return rows.map(k => ({t: k.T + 1, close: +k.c, turnover: +k.v * +k.c}));   // plus ancienne d'abord
   }
   const list = (await getJSON(`${API}/kline?category=linear&symbol=${c.name}&interval=${ivMin}&limit=${count}`)).list;
   return list.map(k => ({t: +k[0] + ivMin * 60000, close: +k[4], turnover: +k[6]})).reverse();
 }
 
+// historique chargé : 4× la fenêtre (min 4 h) pour pouvoir défiler, avec des bougies assez grandes (≤ 1000 par requête)
+const histSpanFor = win => Math.max(win * 4, 4 * 3600000);
+const candleIv = span => [1, 5, 15, 30, 60, 240].find(v => span / (v * 60000) <= 950) || 240;
+
 async function backfill(list){
   if(!list.length) return;
-  const histSpan = Math.max(opt().win * 4, 4 * 3600000);           // historique chargé : 4× la fenêtre (min 4 h) pour pouvoir défiler
-  const iv = histSpan > 12 * 3600 * 1000 ? 5 : 1;
+  const histSpan = histSpanFor(opt().win), iv = candleIv(histSpan);
   const need = Math.min(1000, Math.ceil(histSpan / (iv * 60000)) + 5);
   let done = 0;
   const step = async c => {
@@ -377,7 +383,9 @@ async function backfill(list){
       // la bougie en cours porte une heure de clôture dans le futur : on l'ignore, sinon la courbe repart en arrière
       const rows = (await fetchCandles(c, iv, need)).filter(k => k.t <= now).map(k => [k.t, k.close]);
       const firstLive = c.hist.length ? c.hist[0][0] : Infinity;
-      c.hist = clean(rows.filter(p => p[0] < firstLive).concat(c.hist));
+      const finer = c.iv && iv < c.iv;                              // on repasse sur une fenêtre plus courte : historique plus fin
+      c.iv = iv;
+      c.hist = finer ? clean(rows) : clean(rows.filter(p => p[0] < firstLive).concat(c.hist));
     }finally{
       c.ready = true;
       if(++done % 10 === 0){ setStatus(`historique ${done}/${list.length}…`, 'on'); render(); }
@@ -454,12 +462,14 @@ function connectHL(){
 // ─── Échantillonnage ──────────────────────────────────────────────────────
 let lastCompact = 0;
 function thin(h, now){
-  const out = []; let lastMin = -1;
+  const out = []; let lastSlot = -1;
   for(const p of h){
-    if(p[0] < now - KEEP_MS) continue;
-    if(p[0] >= now - FINE_MS){ out.push(p); continue; }
-    const m = Math.floor(p[0] / 60000);
-    if(m !== lastMin){ out.push(p); lastMin = m; } else out[out.length - 1] = p;
+    const age = now - p[0];
+    if(age > KEEP_MS) continue;
+    if(age <= FINE_MS){ out.push(p); lastSlot = -1; continue; }         // dernière heure : tout
+    const grain = age > 3 * 86400000 ? 900000 : age > 86400000 ? 300000 : 60000;
+    const slot = Math.floor(p[0] / grain);
+    if(slot !== lastSlot){ out.push(p); lastSlot = slot; } else out[out.length - 1] = p;
   }
   return out;
 }
@@ -701,7 +711,7 @@ function draw({vis, t0, now, o}){
   }
   ctx.save();
   ctx.beginPath(); ctx.rect(padL, padT - 2, plotW, plotH + 4); ctx.clip();
-  const bucket = Math.max(10000, Math.min(300000, span / 120));  // lissage : ~120 points par courbe, comme les bougies
+  const bucket = Math.max(10000, Math.min(1800000, span / 120)); // lissage : ~120 points par courbe, comme les bougies
   [...vis].sort((a, b) => (a.c.sym === hi) - (b.c.sym === hi) || lineWidth(b.c, o) - lineWidth(a.c, o)).forEach(r => {
     const isHi = hi === r.c.sym;
     ctx.strokeStyle = colorOf(r.c); ctx.globalAlpha = hi && !isHi ? 0.15 : (r.pinned ? 1 : 0.88);
@@ -739,8 +749,13 @@ function draw({vis, t0, now, o}){
     ctx.fillText(`${e.r.pinned ? '★ ' : ''}${e.r.c.label}${e.r.c.ex === 'hl' && !narrow ? ' ·HL' : ''} ${fmtPct(e.v, narrow ? 1 : 2)}${e.v > capV ? ' ⤒' : e.v < floorV ? ' ⤓' : ''}`, W - padR + 6, yy + 4);
   });
   ctx.fillStyle = '#7f8fa3'; ctx.textAlign = 'center';
-  const opts = span > 20 * 3600000 ? {weekday: 'short', hour: '2-digit', minute: '2-digit'} : {hour: '2-digit', minute: '2-digit'};
-  for(let k = 0, n = narrow ? 2 : 4; k <= n; k++){ const t = tS + span * k / n; ctx.fillText(new Date(t).toLocaleTimeString('fr-FR', opts), x(t), H - 8); }
+  const fmtT = t => {
+    const d = new Date(t);
+    if(span > 2 * 86400000) return d.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
+    if(span > 20 * 3600000) return d.toLocaleTimeString('fr-FR', {weekday: 'short', hour: '2-digit', minute: '2-digit'});
+    return d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+  };
+  for(let k = 0, n = narrow ? 2 : 4; k <= n; k++){ const t = tS + span * k / n; ctx.fillText(fmtT(t), x(t), H - 8); }
 }
 function niceStep(r){ const p = Math.pow(10, Math.floor(Math.log10(r || 1))); const m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
 
@@ -925,8 +940,12 @@ $('alerts').addEventListener('change', async () => {
 $('win').addEventListener('change', () => {
   saveSettings();
   view.span = 0; view.shift = 0; view.y = null;
-  const w = opt().win;
-  coins.forEach(c => { if(c.hist.length && c.hist[0][0] > Date.now() - Math.max(w * 4, 4 * 3600000) + 10 * 60000) c.ready = false; });
+  const span = histSpanFor(opt().win), iv = candleIv(span), now = Date.now();
+  coins.forEach(c => {
+    const tooShort = !c.hist.length || c.hist[0][0] > now - span + 10 * 60000;   // historique trop court
+    const tooCoarse = c.iv && iv < c.iv;                                          // bougies trop grosses pour cette fenêtre
+    if(tooShort || tooCoarse) c.ready = false;
+  });
   backfill([...coins.values()].filter(c => !c.ready)); render();
 });
 window.addEventListener('resize', render);
