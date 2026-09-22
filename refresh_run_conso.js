@@ -94,4 +94,6 @@
   } catch (e) {
     window.__refreshResult = 'ERREUR · ' + e.message + ' · ' + log.join(' · ');
   }
+  // trace du dernier passage (lisible depuis n'importe quel onglet TradingView)
+  try { localStorage.setItem('runconso_last_refresh', new Date().toISOString() + ' · ' + window.__refreshResult); } catch (e) {}
 })();
