@@ -1,5 +1,5 @@
 //@version=6
-indicator("Run + Conso Sweeps (top 20 weekly Bybit)", shorttitle="Run+Conso Sweeps", overlay=true)
+indicator("Run + Conso Sweeps (top 20 weekly Bybit)", shorttitle="Run+Conso Sweeps", overlay=true, max_boxes_count=50, max_lines_count=100, max_labels_count=100, max_bars_back=500)
 
 // Setup : un RUN (forte hausse), puis une CONSOLIDATION serrée qui garde l'essentiel du run,
 // puis un SWEEP daily : la bougie passe sous le bas de la consolidation et reclôture dedans.
@@ -15,6 +15,8 @@ retrMax  = input.float(50, "Consolidation : retracement max du run (%)", minval=
 wickMin  = input.float(25, "Sweep : mèche basse ≥ % de la bougie", minval=0, maxval=100, group="Sweep")
 recentK  = input.int(7, "Afficher les sweeps des K derniers jours", minval=1, maxval=30, group="Affichage")
 onlySetup = input.bool(false, "N'afficher que les coins en conso ou avec sweep", group="Affichage")
+showDraw = input.bool(true, "Dessiner le setup sur le coin affiché", group="Graphique")
+nDraw    = input.int(3, "Nombre de sweeps dessinés", minval=1, maxval=3, group="Graphique")
 tblPos   = input.string("Haut droite", "Position du panneau", options=["Haut droite", "Haut gauche", "Bas droite", "Bas gauche"], group="Affichage")
 
 sy01 = input.symbol("BYBIT:BRUSDT.P", "#1", group="Univers surveillé")
@@ -57,6 +59,27 @@ sy37 = input.symbol("BYBIT:ZECUSDT.P", "#37", group="Univers surveillé")
 sy38 = input.symbol("BYBIT:BNBUSDT.P", "#38", group="Univers surveillé")
 
 // Sur la daily. Les valeurs « sweep » viennent de la dernière bougie clôturée ([1]) : pas de repaint.
+
+// ── Dessin du setup sur le coin affiché (mêmes règles que le panneau) ──
+// Renvoie les 3 derniers sweeps : heure du sweep, début de conso, haut/bas de conso, départ du run, % du run, bas de la mèche
+drawD() =>
+    cHi = ta.highest(high, consLen)[1]
+    cLo = ta.lowest(low, consLen)[1]
+    rangePct = cLo > 0 ? (cHi - cLo) / cLo * 100 : na
+    runStart = ta.lowest(low, runLen)[consLen + 1]
+    lb = ta.lowestbars(low, runLen)[consLen + 1]
+    runPct = runStart > 0 ? (cHi / runStart - 1) * 100 : na
+    holds = cLo >= runStart + (cHi - runStart) * (1 - retrMax / 100)
+    isCons = rangePct <= consMax and runPct >= runMin and holds
+    rng = high - low
+    wickOk = rng > 0 and (math.min(open, close) - low) / rng * 100 >= wickMin
+    sweep = isCons and low < cLo and close > cLo and wickOk
+    tCs = time[consLen]
+    tRun = time[math.max(0, consLen + 1 - nz(lb))]
+    [ta.valuewhen(sweep, time, 0)[1], ta.valuewhen(sweep, tCs, 0)[1], ta.valuewhen(sweep, cHi, 0)[1], ta.valuewhen(sweep, cLo, 0)[1], ta.valuewhen(sweep, tRun, 0)[1], ta.valuewhen(sweep, runStart, 0)[1], ta.valuewhen(sweep, runPct, 0)[1], ta.valuewhen(sweep, low, 0)[1],
+     ta.valuewhen(sweep, time, 1)[1], ta.valuewhen(sweep, tCs, 1)[1], ta.valuewhen(sweep, cHi, 1)[1], ta.valuewhen(sweep, cLo, 1)[1], ta.valuewhen(sweep, tRun, 1)[1], ta.valuewhen(sweep, runStart, 1)[1], ta.valuewhen(sweep, runPct, 1)[1], ta.valuewhen(sweep, low, 1)[1],
+     ta.valuewhen(sweep, time, 2)[1], ta.valuewhen(sweep, tCs, 2)[1], ta.valuewhen(sweep, cHi, 2)[1], ta.valuewhen(sweep, cLo, 2)[1], ta.valuewhen(sweep, tRun, 2)[1], ta.valuewhen(sweep, runStart, 2)[1], ta.valuewhen(sweep, runPct, 2)[1], ta.valuewhen(sweep, low, 2)[1],
+     isCons, cHi, cLo, tCs, runStart, tRun, runPct]
 setupD() =>
     cHi = ta.highest(high, consLen)[1]
     cLo = ta.lowest(low, consLen)[1]
@@ -113,6 +136,8 @@ setupD() =>
 [w36, d36, v36, r36, q36, x36, g36, h36, t36] = request.security(sy36, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
 [w37, d37, v37, r37, q37, x37, g37, h37, t37] = request.security(sy37, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
 [w38, d38, v38, r38, q38, x38, g38, h38, t38] = request.security(sy38, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+
+[a0, b0, c0, e0, f0, g0, h0, k0, a1, b1, c1, e1, f1, g1, h1, k1, a2, b2, c2, e2, f2, g2, h2, k2, nowCons, nowHi, nowLo, nowTcs, nowRun, nowTrun, nowRunPct] = request.security(syminfo.tickerid, "D", drawD(), lookahead = barmerge.lookahead_on)
 
 tick(string s) =>
     str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
@@ -180,5 +205,40 @@ if barstate.islast
             msg += name + " (bas de conso " + str.tostring(array.get(vs, i), "#.####") + ", run +" + str.tostring(array.get(rs, i), "#") + "%)  "
     if str.length(msg) > 0
         alert("Sweep run + conso : " + msg, alert.freq_once_per_bar)
+
+// ═══ Dessin sur le coin affiché ═════════════════════════════════════════
+var array<box>   dBoxes  = array.new<box>()
+var array<line>  dLines  = array.new<line>()
+var array<label> dLabels = array.new<label>()
+const int DAY = 86400000
+
+drawSetup(int tSw, int tCs, float hi, float lo, int tRun, float runLow, float runPct, float swLow, bool last) =>
+    array.push(dBoxes, box.new(tCs, hi, tSw, lo, xloc = xloc.bar_time, border_color = color.new(color.orange, 20), bgcolor = color.new(color.orange, 85)))
+    array.push(dLines, line.new(tRun, runLow, tCs, hi, xloc = xloc.bar_time, color = color.new(color.aqua, 20), width = 2, style = line.style_arrow_right))
+    array.push(dLabels, label.new(tRun, runLow, "Run +" + str.tostring(runPct, "#") + "%", xloc = xloc.bar_time, style = label.style_label_up, color = color.new(color.aqua, 25), textcolor = color.black, size = size.small))
+    array.push(dLines, line.new(tCs, lo, tSw + 5 * DAY, lo, xloc = xloc.bar_time, color = color.new(color.lime, 10), style = line.style_dashed, width = 1))
+    array.push(dLabels, label.new(tSw, swLow, (last ? "SWEEP ✔ " : "sweep ") + str.tostring(lo, format.mintick), xloc = xloc.bar_time, style = label.style_label_up, color = color.new(color.lime, last ? 0 : 40), textcolor = color.black, size = last ? size.normal : size.small))
+
+if barstate.islast and showDraw
+    for b in dBoxes
+        box.delete(b)
+    for l in dLines
+        line.delete(l)
+    for lb in dLabels
+        label.delete(lb)
+    array.clear(dBoxes)
+    array.clear(dLines)
+    array.clear(dLabels)
+    if not na(a0)
+        drawSetup(int(a0), int(b0), c0, e0, int(f0), g0, h0, k0, true)
+    if nDraw >= 2 and not na(a1)
+        drawSetup(int(a1), int(b1), c1, e1, int(f1), g1, h1, k1, false)
+    if nDraw >= 3 and not na(a2)
+        drawSetup(int(a2), int(b2), c2, e2, int(f2), g2, h2, k2, false)
+    // consolidation en cours (pas encore sweepée) : zone + niveau à surveiller
+    if nowCons
+        array.push(dBoxes, box.new(int(nowTcs), nowHi, time_close + DAY, nowLo, xloc = xloc.bar_time, border_color = color.new(color.orange, 0), border_style = line.style_dashed, bgcolor = color.new(color.orange, 88)))
+        array.push(dLines, line.new(int(nowTrun), nowRun, int(nowTcs), nowHi, xloc = xloc.bar_time, color = color.new(color.aqua, 40), width = 2, style = line.style_arrow_right))
+        array.push(dLabels, label.new(time_close + DAY, nowLo, "Conso en cours : sweep à guetter sous " + str.tostring(nowLo, format.mintick) + "  (run +" + str.tostring(nowRunPct, "#") + "%)", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(color.orange, 15), textcolor = color.black, size = size.small))
 
 plot(na, "ancre", display = display.none)
