@@ -1,12 +1,13 @@
 // Rafraîchit chaque jour l'univers du panneau « Run + Conso » sur TradingView.
 // À exécuter dans un onglet TradingView ouvert sur le layout « Scanner » (connecté au compte).
-// 1) univers = 30 meilleurs perps Bybit sur 7 jours (volume 24 h ≥ 10 M$) + majors, 38 symboles
+// 1) deux univers de 38 symboles : perfs 7 j (Run + Conso) et plus gros volumes (Trend Tracker)
 // 2) watchlist « Run_Conso_Sweeps » remplacée par cet univers
 // 3) entrées de l'indicateur sur le graphique mises à jour (+ sauvegarde du layout)
 // 4) alertes des deux indicateurs mises à jour avec les mêmes symboles (sinon elles gardent l'ancienne liste)
 // Résultat dans window.__refreshResult (texte).
 (async () => {
-  const PINE_IDS = ['USER;2fdc570c952e45079baa756c5103d16f', 'USER;5baf968696014daea086e599c3750c9c'];   // Run+Conso, Trend Tracker
+  const PINE_RC = 'USER;2fdc570c952e45079baa756c5103d16f';     // Run + Conso : univers = leaders de la semaine
+  const PINE_TT = 'USER;5baf968696014daea086e599c3750c9c';     // Trend Tracker : univers = les plus liquides (stable)
   const WL_NAME = 'Run_Conso_Sweeps';
   const N = 38, TOP = 30, MIN_VOL = 10e6;
   const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'HYPEUSDT', 'DOGEUSDT', 'ZECUSDT', 'BNBUSDT'];
@@ -32,12 +33,17 @@
       }));
     }
     const ranked = cands.filter(t => t.p7 !== undefined).sort((a, b) => b.p7 - a.p7);
-    const uni = ranked.slice(0, TOP).map(t => t.s);
-    for (const m of MAJORS) if (uni.length < N && !uni.includes(m)) uni.push(m);
-    for (const t of ranked.slice(TOP)) if (uni.length < N && !uni.includes(t.s)) uni.push(t.s);
-    if (uni.length < N) throw new Error('univers incomplet : ' + uni.length);
-    const syms = uni.map(s => `BYBIT:${s}.P`);
-    log.push('top 7 j : ' + ranked.slice(0, 8).map(t => t.s.replace('USDT', '') + ' ' + t.p7.toFixed(0) + '%').join(', '));
+    // A. Run + Conso : les 30 meilleures perfs 7 j + les majors
+    const uniRC = ranked.slice(0, TOP).map(t => t.s);
+    for (const m of MAJORS) if (uniRC.length < N && !uniRC.includes(m)) uniRC.push(m);
+    for (const t of ranked.slice(TOP)) if (uniRC.length < N && !uniRC.includes(t.s)) uniRC.push(t.s);
+    // B. Trend Tracker : les plus liquides (liste stable, une tendance ne doit pas disparaître du suivi)
+    const uniTT = cands.slice(0, N).map(t => t.s);
+    if (uniRC.length < N || uniTT.length < N) throw new Error('univers incomplet');
+    const symsRC = uniRC.map(s => `BYBIT:${s}.P`);
+    const symsTT = uniTT.map(s => `BYBIT:${s}.P`);
+    const syms = symsRC;   // watchlist = setups à surveiller
+    log.push('top 7 j : ' + ranked.slice(0, 6).map(t => t.s.replace('USDT', '') + ' ' + t.p7.toFixed(0) + '%').join(', '));
 
     // ── 2. watchlist ────────────────────────────────────────────────────
     const lists = await fetch('/api/v1/symbols_list/custom/', {credentials: 'include'}).then(r => r.json());
@@ -55,8 +61,9 @@
       const iv = study.getInputValues()
         .filter(x => /^in_\d+$/.test(x.id) && typeof x.value === 'string' && x.value.indexOf('BYBIT:') === 0)
         .sort((a, b) => +a.id.slice(3) - +b.id.slice(3));
-      study.setInputValues(iv.map((x, i) => ({id: x.id, value: syms[i]})));
-      log.push(st.name.slice(0, 14) + ' : ' + iv.length + ' symboles');
+      const list = /Trend Tracker/.test(st.name) ? symsTT : symsRC;
+      study.setInputValues(iv.map((x, i) => ({id: x.id, value: list[i]})));
+      log.push(st.name.slice(0, 12) + ' : ' + iv.length + ' symboles');
     }
     if (!studies.length) log.push('indicateurs absents du graphique');
     await sleep(3000);
@@ -67,15 +74,16 @@
     const la = await fetch('https://pricealerts.tradingview.com/list_alerts', {credentials: 'include'}).then(r => r.json());
     const alerts = (la.r || la).filter(a => {
       const c = a.conditions ? a.conditions[0] : a.condition;
-      return c && c.series && c.series[0] && PINE_IDS.includes(c.series[0].pine_id);
+      return c && c.series && c.series[0] && [PINE_RC, PINE_TT].includes(c.series[0].pine_id);
     });
     for (const a of alerts) {
       const conds = JSON.parse(JSON.stringify(a.conditions || [a.condition]));
+      const list = conds[0].series[0].pine_id === PINE_TT ? symsTT : symsRC;
       for (const c of conds) {
         const inp = c.series[0].inputs;
         const keys = Object.keys(inp).filter(k => /^in_\d+$/.test(k) && typeof inp[k] === 'string' && inp[k].indexOf('BYBIT:') === 0)
           .sort((x, y) => +x.slice(3) - +y.slice(3));
-        keys.forEach((k, i) => { inp[k] = syms[i]; });
+        keys.forEach((k, i) => { inp[k] = list[i]; });
         for (const k of ['type', 'series', 'resolution']) if (!(k in c)) delete c[k];
       }
       const payload = {
