@@ -210,6 +210,4 @@ if barstate.islast
         alert((str.length(msgBO) > 0 ? "🚀 Nouvelle tendance " + str.tostring(boLen) + "j : " + msgBO : "") + (str.length(msgEx) > 0 ? " · ⛔ Stop suiveur touché : " + msgEx : ""), alert.freq_once_per_bar)
 
 // ── cassure et stop sur le coin affiché ────────────────────────────────
-plot(showLines ? myBO : na, "Niveau de cassure", color = color.new(color.aqua, 30), style = plot.style_stepline, linewidth = 1)
-plot(showLines and myPos ? myStop : na, "Stop suiveur", color = color.new(color.orange, 0), style = plot.style_stepline, linewidth = 2)
 bgcolor(showLines and myPos ? color.new(color.lime, 94) : na)

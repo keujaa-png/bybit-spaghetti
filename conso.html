@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consolidations · grille</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧩</text></svg>">
+<style>
+  :root { --bg:#0e1117; --panel:#161b22; --line:#262d36; --txt:#d7dde5; --mut:#7f8fa3; --up:#26c281; --down:#ef5350; --warn:#f0a030; --acc:#4aa3ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.4 "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:rgba(14,17,23,.96); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  h1 { font-size:17px; margin:0 8px 0 0; font-weight:600; }
+  .tabs { display:flex; gap:4px; }
+  .tabs button, .ctl select, .ctl button { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
+  .tabs button.on { background:#1f3a5c; border-color:var(--acc); color:#fff; }
+  .ctl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; color:var(--mut); }
+  .status { margin-left:auto; color:var(--mut); font-size:13px; }
+  .note { padding:8px 16px 0; color:var(--mut); font-size:12.5px; }
+  main { padding:12px 16px 40px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(var(--tile, 330px), 1fr)); }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+  .th { display:flex; align-items:baseline; gap:8px; padding:7px 10px 5px; flex-wrap:wrap; }
+  .sym { font-weight:600; font-size:15px; }
+  .sym a { color:inherit; text-decoration:none; }
+  .sym a:hover { color:var(--acc); }
+  .chip { font-size:12px; padding:1px 6px; border-radius:10px; background:#0e1117; border:1px solid var(--line); color:var(--mut); white-space:nowrap; }
+  .chip.up { color:var(--up); } .chip.down { color:var(--down); } .chip.warn { color:var(--warn); border-color:#5a4520; } .chip.acc { color:var(--acc); border-color:#23466b; }
+  .lv { padding:0 10px 6px; font-size:12px; color:var(--mut); }
+  .lv b { color:var(--txt); font-weight:500; }
+  .chart { position:relative; height:var(--tileh, 230px); background:#0e1117; }
+  .chart iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
+  .empty { grid-column:1/-1; color:var(--mut); padding:40px 0; text-align:center; }
+  @media (max-width:560px) { header { padding:8px 12px; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧩 Consolidations</h1>
+  <div class="tabs" id="tabs">
+    <button data-m="crypto" class="on">Crypto</button>
+    <button data-m="us">Actions US</button>
+    <button data-m="macro">Commo &amp; ETF</button>
+  </div>
+  <div class="ctl">
+    <select id="show" title="Quels actifs afficher">
+      <option value="cons">En consolidation</option>
+      <option value="sig">Sweep / breakout récent (≤ 3 j)</option>
+      <option value="both">Les deux</option>
+    </select>
+    <select id="sort" title="Tri">
+      <option value="run">Tri : plus gros run</option>
+      <option value="tight">Tri : conso la plus serrée</option>
+      <option value="perf">Tri : perf 7 j</option>
+    </select>
+    <select id="size" title="Taille des fenêtres">
+      <option value="260">Petites</option>
+      <option value="330" selected>Moyennes</option>
+      <option value="440">Grandes</option>
+    </select>
+    <select id="tf" title="Unité de temps des mini-charts">
+      <option value="D" selected>Daily</option>
+      <option value="240">4h</option>
+      <option value="W">Weekly</option>
+    </select>
+    <button id="reload" title="Recalculer maintenant">↻</button>
+  </div>
+  <div class="status" id="status">chargement…</div>
+</header>
+<div class="note" id="note"></div>
+<main id="grid"></main>
+
+<script>
+// ─── Réglages par marché (mêmes règles que l'indicateur « Run + Conso » sur TradingView) ─────────
+const RULES = {
+  crypto: {runLen: 20, runMin: 30, consLen: 4, consMax: 25, retr: 50, wick: 25, volMult: 1.3},
+  us:     {runMin3M: 20, holdHigh: 0.85, volW: 3.5, perfW: 5},     // approximation via le screener TradingView
+  macro:  {runMin3M: 8,  holdHigh: 0.93, volW: 2.0, perfW: 3}
+};
+const LAYOUT = {crypto: 'LAU9xwF7', us: '2Y1bNVv1', macro: 'eOZhPXzS'};
+const MAX_TILES = 48;
+const $ = id => document.getElementById(id);
+let market = 'crypto', items = [], busy = false;
+try { const s = JSON.parse(localStorage.getItem('conso-grid') || '{}'); if (s.market) market = s.market; ['show','sort','size','tf'].forEach(k => { if (s[k]) $(k).value = s[k]; }); } catch (e) {}
+const save = () => { try { localStorage.setItem('conso-grid', JSON.stringify({market, show: $('show').value, sort: $('sort').value, size: $('size').value, tf: $('tf').value})); } catch (e) {} };
+
+const fmt = (v, d = 1) => (v > 0 ? '+' : '') + v.toFixed(d) + '%';
+const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
+const setStatus = t => $('status').textContent = t;
+
+// ─── Crypto : bougies daily Bybit, règles exactes ────────────────────────
+async function loadCrypto() {
+  const R = RULES.crypto;
+  const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE'.split(' '));
+  const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+  const seen = new Set();
+  const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+    .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
+    .filter(t => t.v >= 10e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v)
+    .filter(t => !seen.has(t.b) && seen.add(t.b));
+  const out = [];
+  let done = 0;
+  for (let i = 0; i < list.length; i += 10) {
+    await Promise.all(list.slice(i, i + 10).map(async t => {
+      try {
+        const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=70`).then(r => r.json())).result.list.reverse();
+        const b = k.map(x => ({o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5]}));
+        const r = evalCrypto(b, R);
+        if (r) out.push({sym: `BYBIT:${t.s}.P`, label: t.s.replace('USDT', ''), ...r});
+      } catch (e) {}
+      done++;
+    }));
+    setStatus(`analyse crypto ${done}/${list.length}…`);
+  }
+  return out;
+}
+// évalue la conso sur la bougie « i » (conso = consLen bougies avant i, run = runLen bougies avant la conso)
+function consoAt(b, i, R) {
+  if (i - R.consLen - R.runLen < 0) return null;
+  let cHi = -Infinity, cLo = Infinity, runLow = Infinity;
+  for (let q = i - R.consLen; q < i; q++) { cHi = Math.max(cHi, b[q].h); cLo = Math.min(cLo, b[q].l); }
+  for (let q = i - R.consLen - R.runLen; q < i - R.consLen; q++) runLow = Math.min(runLow, b[q].l);
+  const range = (cHi - cLo) / cLo * 100, run = (cHi / runLow - 1) * 100;
+  const holds = cLo >= runLow + (cHi - runLow) * (1 - R.retr / 100);
+  return {cHi, cLo, range, run, ok: range <= R.consMax && run >= R.runMin && holds};
+}
+function evalCrypto(b, R) {
+  const n = b.length; if (n < R.runLen + R.consLen + 8) return null;
+  const last = b[n - 1];
+  const now = consoAt(b, n - 1, R);                        // conso = les dernières bougies clôturées
+  let sig = null;                                          // signal sur une des 3 dernières bougies clôturées
+  for (let i = n - 2; i >= n - 4; i--) {
+    const c = consoAt(b, i, R); if (!c || !c.ok) continue;
+    const x = b[i], rng = x.h - x.l, wick = rng > 0 ? (Math.min(x.o, x.c) - x.l) / rng * 100 : 0;
+    let avg = 0; for (let q = i - 20; q < i; q++) avg += b[q].v; avg /= 20;
+    const sweep = x.l < c.cLo && x.c > c.cLo && wick >= R.wick;
+    const brk = x.c > c.cHi && x.v >= R.volMult * avg;
+    if (sweep || brk) { sig = {kind: brk ? (sweep ? 'sweep + breakout' : 'breakout') : 'sweep', ago: n - 1 - i, lvl: brk ? c.cHi : c.cLo, run: c.run}; break; }
+  }
+  const perf7 = (last.c / b[n - 8].c - 1) * 100;
+  if (!now.ok && !sig) return null;
+  const pos = last.c > now.cHi ? 'au-dessus' : last.c < now.cLo ? 'en dessous' : 'dans la conso';
+  return {cons: now.ok, cHi: now.cHi, cLo: now.cLo, range: now.range, run: now.ok ? now.run : sig.run, perf7, price: last.c, pos, sig};
+}
+
+// ─── Actions US / Commo & ETF : screener TradingView (approximation) ─────
+async function scan(mkt, body) {
+  const r = await fetch(`https://scanner.tradingview.com/${mkt}/scan`, {method: 'POST', body: JSON.stringify(body)});
+  return ((await r.json()).data || []).map(x => ({s: x.s, d: x.d}));
+}
+const COLS = ['close', 'Perf.W', 'Perf.1M', 'Perf.3M', 'High.1M', 'Low.1M', 'High.3M', 'Volatility.W', 'BB.upper', 'BB.lower', 'SMA20', 'description'];
+function evalScan(rows, R, prefix) {
+  const out = [];
+  for (const {s, d} of rows) {
+    const [c, pW, p1M, p3M, h1, l1, h3, volW, bbU, bbL, sma20, desc] = d;
+    if ([c, pW, p3M, h3, volW].some(v => v == null)) continue;
+    const bbw = bbU && bbL && sma20 ? (bbU - bbL) / sma20 * 100 : NaN;
+    const ok = p3M >= R.runMin3M && c >= R.holdHigh * h3 && volW <= R.volW && Math.abs(pW) <= R.perfW;
+    if (!ok) continue;
+    const tick = s.split(':')[1];
+    out.push({sym: prefix ? prefix(s) : s, label: tick, desc, cons: true, cHi: h1, cLo: l1, range: isNaN(bbw) ? volW * 3 : bbw,
+              run: p3M, perf7: pW, price: c, pos: c >= 0.98 * h1 ? 'près du haut 1 mois' : 'dans la conso', sig: null, approx: true});
+  }
+  return out;
+}
+const bats = s => 'BATS:' + s.split(':')[1];
+async function loadUS() {
+  setStatus('screener actions US…');
+  const rows = await scan('america', {
+    filter: [{left: 'market_cap_basic', operation: 'greater', right: 1e9}, {left: 'type', operation: 'equal', right: 'stock'},
+             {left: 'exchange', operation: 'in_range', right: ['NASDAQ', 'NYSE', 'AMEX']}, {left: 'close', operation: 'greater', right: 5},
+             {left: 'average_volume_30d_calc', operation: 'greater', right: 300000}],
+    columns: COLS, sort: {sortBy: 'Perf.3M', sortOrder: 'desc'}, range: [0, 600]});
+  return evalScan(rows, RULES.us, bats);
+}
+async function loadMacro() {
+  setStatus('screener ETF + matières premières…');
+  const bad = /\b(2x|3x|leveraged|inverse|ultra|ultrapro|daily|bull|bear|short|option|income|yieldmax|covered|buffer|bitcoin|ether|ethereum|solana|xrp|crypto|staking)\b/i;
+  const etf = (await scan('america', {
+    filter: [{left: 'type', operation: 'equal', right: 'fund'}, {left: 'aum', operation: 'greater', right: 1e9},
+             {left: 'average_volume_30d_calc', operation: 'greater', right: 300000}],
+    columns: COLS, sort: {sortBy: 'Perf.3M', sortOrder: 'desc'}, range: [0, 600]})).filter(x => !bad.test(x.d[11] || ''));
+  const COMMO = ['OANDA:XAUUSD', 'OANDA:XAGUSD', 'OANDA:XPTUSD', 'OANDA:XPDUSD', 'OANDA:XCUUSD', 'OANDA:WTICOUSD', 'OANDA:BCOUSD',
+                 'OANDA:NATGASUSD', 'OANDA:CORNUSD', 'OANDA:WHEATUSD', 'OANDA:SOYBNUSD', 'OANDA:SUGARUSD', 'TVC:GOLD', 'TVC:SILVER', 'TVC:PLATINUM', 'TVC:PALLADIUM'];
+  let cfd = [];
+  try { cfd = await scan('cfd', {symbols: {tickers: COMMO}, columns: COLS}); } catch (e) {}
+  const seenC = new Set();
+  cfd = cfd.filter(x => { const k = (x.d[11] || x.s).slice(0, 12); return !seenC.has(k) && seenC.add(k); });
+  return [...evalScan(cfd, RULES.macro), ...evalScan(etf, RULES.macro, bats)];
+}
+
+// ─── Grille ──────────────────────────────────────────────────────────────
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  const box = e.target; io.unobserve(box);
+  const f = document.createElement('iframe');
+  f.loading = 'lazy';
+  f.src = 'https://s.tradingview.com/widgetembed/?' + new URLSearchParams({
+    symbol: box.dataset.sym, interval: $('tf').value, hidesidetoolbar: 1, hidetoptoolbar: 1, symboledit: 0, saveimage: 0,
+    toolbarbg: '161b22', theme: 'dark', style: 1, timezone: 'Etc/UTC', withdateranges: 0, hideideas: 1, hidevolume: 0, locale: 'fr'}).toString();
+  box.appendChild(f);
+}), {rootMargin: '300px'});
+
+function render() {
+  const show = $('show').value, sort = $('sort').value;
+  document.documentElement.style.setProperty('--tile', $('size').value + 'px');
+  document.documentElement.style.setProperty('--tileh', Math.round(+$('size').value * 0.7) + 'px');
+  let list = items.filter(x => show === 'both' ? true : show === 'cons' ? x.cons : !!x.sig);
+  list.sort((a, b) => sort === 'tight' ? a.range - b.range : sort === 'perf' ? b.perf7 - a.perf7 : b.run - a.run);
+  list = list.slice(0, MAX_TILES);
+  $('note').textContent = market === 'crypto'
+    ? 'Crypto : règles exactes de l’indicateur (run ≥ 30 % sur 20 j, conso de 4 j dans un range ≤ 25 %, qui garde ≥ 50 % du run). Clic sur le nom = ouvrir sur ton layout TradingView.'
+    : (market === 'us' ? 'Actions US > 1 Md$' : 'Matières premières + ETF > 1 Md$') + ' : approximation via le screener TradingView (forte perf 3 mois, prix proche du plus haut 3 mois, semaine calme). Pas de détection sweep/breakout ici. Clic sur le nom = ouvrir sur ton layout.';
+  const grid = $('grid');
+  if (!list.length) { grid.innerHTML = `<div class="empty">Aucun actif ${show === 'sig' ? 'avec un signal récent' : 'en consolidation'} pour l’instant.</div>`; return; }
+  grid.innerHTML = list.map(x => {
+    const url = `https://www.tradingview.com/chart/${LAYOUT[market]}/?symbol=${encodeURIComponent(x.sym)}`;
+    const sig = x.sig ? `<span class="chip acc">${x.sig.kind} ${x.sig.ago === 1 ? 'hier' : 'il y a ' + x.sig.ago + ' j'}</span>` : '';
+    const cons = x.cons ? `<span class="chip warn">conso ${x.range.toFixed(0)}%</span>` : '';
+    const lv = x.approx
+      ? `haut 1 mois <b>${px(x.cHi)}</b> · bas 1 mois <b>${px(x.cLo)}</b> · ${x.pos}`
+      : x.cons ? `breakout &gt; <b>${px(x.cHi)}</b> · sweep &lt; <b>${px(x.cLo)}</b> · prix ${x.pos}` : `niveau du signal <b>${px(x.sig.lvl)}</b>`;
+    return `<div class="tile">
+      <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener" title="${x.desc ? x.desc.replace(/"/g, '') : 'Ouvrir sur TradingView'}">${x.label} ↗</a></span>
+        <span class="chip ${x.perf7 >= 0 ? 'up' : 'down'}">${x.perf7 >= 0 ? '▲' : '▼'} ${fmt(x.perf7)} 7j</span>
+        <span class="chip">run ${fmt(x.run, 0)}</span>${cons}${sig}</div>
+      <div class="lv">${lv}</div>
+      <div class="chart" data-sym="${x.sym}"><div class="ph">chargement du chart…</div></div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.chart').forEach(el => io.observe(el));
+}
+
+async function load() {
+  if (busy) return; busy = true;
+  $('grid').innerHTML = '';
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.m === market));
+  $('show').disabled = market !== 'crypto';
+  if (market !== 'crypto') $('show').value = 'cons';
+  try {
+    items = market === 'crypto' ? await loadCrypto() : market === 'us' ? await loadUS() : await loadMacro();
+    const nC = items.filter(x => x.cons).length, nS = items.filter(x => x.sig).length;
+    setStatus(`${nC} en consolidation${market === 'crypto' ? ` · ${nS} signaux récents` : ''} · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`);
+  } catch (e) { items = []; setStatus('erreur : ' + e.message); }
+  busy = false;
+  render();
+}
+
+$('tabs').addEventListener('click', e => { const m = e.target.dataset && e.target.dataset.m; if (!m || m === market) return; market = m; save(); load(); });
+['show', 'sort', 'size', 'tf'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
+$('reload').addEventListener('click', load);
+load();
+setInterval(() => { if (!document.hidden) load(); }, 30 * 60 * 1000);   // recalcul toutes les 30 min
+</script>
+</body>
+</html>
