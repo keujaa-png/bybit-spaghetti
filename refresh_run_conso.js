@@ -1,5 +1,6 @@
 // Rafraîchit chaque jour les panneaux « Run + Conso » et « Trend Tracker » sur TradingView.
-// À exécuter dans un onglet TradingView ouvert sur l'un des layouts (connecté au compte) :
+// À exécuter dans un onglet TradingView ouvert sur un layout du compte : le script passe lui-même
+// sur les trois layouts (sans recharger la page) puis revient sur celui de départ :
 //   « Scanner »            → crypto (perps Bybit)
 //   « Scanner US »         → actions US > 1 Md$ de capitalisation
 //   « Scanner Commo ETF »  → matières premières (CFD OANDA) + ETF > 1 Md$ d'encours
@@ -10,18 +11,19 @@
 // 4) alertes des indicateurs de ce marché mises à jour (sinon elles gardent l'ancienne liste)
 // Résultat dans window.__refreshResult (texte) et dans localStorage « runconso_last_refresh_<marché> ».
 (async () => {
-  const PINE_RC = 'USER;2fdc570c952e45079baa756c5103d16f';     // Run + Conso : Sweep / Breakout
-  const PINE_TT = 'USER;5baf968696014daea086e599c3750c9c';     // Trend Tracker 55j
-  const N = 38;
-  const MODE = window.__refreshMode
-    || (/Scanner US\s*$/.test(document.title) ? 'us' : /Scanner Commo/.test(document.title) ? 'macro' : 'crypto');
+const PINE_RC = 'USER;2fdc570c952e45079baa756c5103d16f';     // Run + Conso : Sweep / Breakout
+const PINE_TT = 'USER;5baf968696014daea086e599c3750c9c';     // Trend Tracker 55j
+const N = 38;
+const LAYOUTS = {crypto: 'Scanner', us: 'Scanner US', macro: 'Scanner Commo ETF'};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function runMarket(MODE) {
   const CFG = {
     crypto: {wlRC: 'Run_Conso_Sweeps', wlTT: 'Trend_Tracker', alertSym: 'BTCUSDT'},
     us:     {wlRC: 'US_Run_Conso',     wlTT: 'US_Trend_Tracker', alertSym: 'SPY'},
     macro:  {wlRC: 'Macro_Run_Conso',  wlTT: 'Macro_Trend_Tracker', alertSym: 'GLD'}
   }[MODE];
   const log = ['marché : ' + MODE];
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
   const isSym = v => typeof v === 'string' && /^[A-Z0-9_]+:\S+$/.test(v);
   // les alertes TradingView refusent NASDAQ/NYSE/AMEX sans abonnement temps réel : on passe par le flux Cboe gratuit (BATS)
   const bats = s => 'BATS:' + s.split(':')[1];
@@ -30,7 +32,7 @@
     const j = await r.json();
     return (j.data || []).map(x => ({s: x.s, d: x.d}));
   };
-  let symsRC, symsTT, wlRC, wlTT;
+  let symsRC, symsTT, wlRC, wlTT, res;
   try {
     // ── 1. univers + watchlists ─────────────────────────────────────────
     if (MODE === 'crypto') {
@@ -164,8 +166,7 @@
     }
     if (!studies.length) log.push('indicateurs absents du graphique');
     await sleep(3000);
-    const save = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || ''));
-    if (save) save.click();
+    await saveLayout();
 
     // ── 4. alertes de ce marché (repérées par le symbole sur lequel elles sont posées) ──
     const la = await fetch('https://pricealerts.tradingview.com/list_alerts', {credentials: 'include'}).then(r => r.json());
@@ -196,10 +197,53 @@
       log.push(`alerte ${a.alert_id} : ${j.s === 'ok' ? 'ok' : 'échec ' + JSON.stringify(j.err || j).slice(0, 80)}`);
     }
     if (!alerts.length) log.push('aucune alerte pour ce marché');
-    window.__refreshResult = 'OK · ' + log.join(' · ');
+    res = 'OK · ' + log.join(' · ');
   } catch (e) {
-    window.__refreshResult = 'ERREUR · ' + e.message + ' · ' + log.join(' · ');
+    res = 'ERREUR · ' + e.message + ' · ' + log.join(' · ');
   }
   // trace du dernier passage (lisible depuis n'importe quel onglet TradingView)
-  try { localStorage.setItem('runconso_last_refresh_' + MODE, new Date().toISOString() + ' · ' + window.__refreshResult); } catch (e) {}
+  try { localStorage.setItem('runconso_last_refresh_' + MODE, new Date().toISOString() + ' · ' + res); } catch (e) {}
+  return res;
+}
+
+// ─── Pilote : les trois layouts, l'un après l'autre, dans le même onglet ──
+// (on change de layout sans recharger la page, puis on revient sur celui de départ)
+const api = TradingViewApi;
+async function saveLayout() {
+  const b = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || ''));
+  if (b) b.click();
+  for (let i = 0; i < 15; i++) { await sleep(1000); try { if (!api.hasChartChanges()) return; } catch (e) { return; } }
+}
+async function switchTo(rec) {
+  await saveLayout();
+  const p = api.loadChartFromServer(rec);
+  if (p && p.then) await p;
+  for (let i = 0; i < 40; i++) {
+    await sleep(1000);
+    try { if (api.layoutName() === rec.name && api.activeChart().getAllStudies().some(s => /Trend Tracker|Run \+ Conso/.test(s.name))) break; } catch (e) {}
+  }
+  await sleep(4000);                                          // laisse les indicateurs se charger
+}
+const results = [];
+try {
+  const startName = api.layoutName();
+  const recs = await new Promise(res => { try { api.getSavedCharts(x => res(x || [])); } catch (e) { res([]); } setTimeout(() => res([]), 12000); });
+  const order = window.__refreshMarkets || ['crypto', 'us', 'macro'];
+  for (const m of order) {
+    try {
+      if (api.layoutName() !== LAYOUTS[m]) {
+        const rec = recs.find(r => r.name === LAYOUTS[m]);
+        if (!rec) { results.push(`ERREUR ${m} · layout « ${LAYOUTS[m]} » introuvable`); continue; }
+        await switchTo(rec);
+      }
+      results.push(await runMarket(m));
+    } catch (e) { results.push(`ERREUR ${m} · ${e.message}`); }
+  }
+  if (api.layoutName() !== startName) {
+    const rec = recs.find(r => r.name === startName);
+    if (rec) await switchTo(rec);
+  }
+} catch (e) { results.push('ERREUR · ' + e.message); }
+window.__refreshResult = results.join('\n');
+try { localStorage.setItem('runconso_last_refresh', new Date().toISOString() + '\n' + window.__refreshResult); } catch (e) {}
 })();
