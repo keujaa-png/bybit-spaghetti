@@ -147,7 +147,9 @@ drawD() =>
 [a0, b0, c0, e0, f0, g0, h0, l0, u0, k0, a1, b1, c1, e1, f1, g1, h1, l1, u1, k1, a2, b2, c2, e2, f2, g2, h2, l2, u2, k2, nowCons, nowHi, nowLo, nowTcs, nowRun, nowTrun, nowRunPct] = request.security(syminfo.tickerid, "D", drawD(), lookahead = barmerge.lookahead_on)
 
 tick(string s) =>
-    str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
+    parts = str.split(s, ":")
+    t = array.size(parts) > 1 ? array.get(parts, 1) : s
+    str.replace(str.replace(t, ".P", ""), "USDT", "")
 kindTxt(int k) =>
     k == 3 ? "sweep + breakout" : k == 2 ? "🚀 breakout" : "↩ sweep"
 

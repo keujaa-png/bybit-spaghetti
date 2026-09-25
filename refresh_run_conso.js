@@ -1,96 +1,160 @@
-// Rafraîchit chaque jour l'univers du panneau « Run + Conso » sur TradingView.
-// À exécuter dans un onglet TradingView ouvert sur le layout « Scanner » (connecté au compte).
-// 1) deux univers de 38 symboles : perfs 7 j (Run + Conso) et plus gros volumes (Trend Tracker)
-// 2) watchlists « Run_Conso_Sweeps » (top 20 7 j) et « Trend_Tracker » (coins en tendance, triés par gain)
-// 3) entrées de l'indicateur sur le graphique mises à jour (+ sauvegarde du layout)
-// 4) alertes des deux indicateurs mises à jour avec les mêmes symboles (sinon elles gardent l'ancienne liste)
-// Résultat dans window.__refreshResult (texte).
+// Rafraîchit chaque jour les panneaux « Run + Conso » et « Trend Tracker » sur TradingView.
+// À exécuter dans un onglet TradingView ouvert sur l'un des layouts (connecté au compte) :
+//   « Scanner »            → crypto (perps Bybit)
+//   « Scanner US »         → actions US > 1 Md$ de capitalisation
+//   « Scanner Commo ETF »  → matières premières (futures continus) + ETF > 1 Md$ d'encours
+// Pour chaque marché :
+// 1) deux univers de 38 symboles : momentum court (Run + Conso) et tendance (Trend Tracker)
+// 2) deux watchlists cliquables, en sections, dans l'ordre des panneaux
+// 3) entrées des indicateurs du layout ouvert mises à jour (+ sauvegarde du layout)
+// 4) alertes des indicateurs de ce marché mises à jour (sinon elles gardent l'ancienne liste)
+// Résultat dans window.__refreshResult (texte) et dans localStorage « runconso_last_refresh_<marché> ».
 (async () => {
-  const PINE_RC = 'USER;2fdc570c952e45079baa756c5103d16f';     // Run + Conso : univers = leaders de la semaine
-  const PINE_TT = 'USER;5baf968696014daea086e599c3750c9c';     // Trend Tracker : univers = les plus liquides (stable)
-  const WL_NAME = 'Run_Conso_Sweeps';
-  const N = 38, TOP = 30, MIN_VOL = 10e6;
-  const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'HYPEUSDT', 'DOGEUSDT', 'ZECUSDT', 'BNBUSDT'];
-  const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE CONLUSDT'.split(' '));
-  const log = [];
+  const PINE_RC = 'USER;2fdc570c952e45079baa756c5103d16f';     // Run + Conso : Sweep / Breakout
+  const PINE_TT = 'USER;5baf968696014daea086e599c3750c9c';     // Trend Tracker 55j
+  const N = 38;
+  const MODE = window.__refreshMode
+    || (/Scanner US\s*$/.test(document.title) ? 'us' : /Scanner Commo/.test(document.title) ? 'macro' : 'crypto');
+  const CFG = {
+    crypto: {wlRC: 'Run_Conso_Sweeps', wlTT: 'Trend_Tracker', alertSym: 'BTCUSDT'},
+    us:     {wlRC: 'US_Run_Conso',     wlTT: 'US_Trend_Tracker', alertSym: 'SPY'},
+    macro:  {wlRC: 'Macro_Run_Conso',  wlTT: 'Macro_Trend_Tracker', alertSym: 'GLD'}
+  }[MODE];
+  const log = ['marché : ' + MODE];
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const isSym = v => typeof v === 'string' && /^[A-Z0-9_]+:\S+$/.test(v);
+  const scan = async (market, body) => {
+    const r = await fetch(`https://scanner.tradingview.com/${market}/scan`, {method: 'POST', credentials: 'include', body: JSON.stringify(body)});
+    const j = await r.json();
+    return (j.data || []).map(x => ({s: x.s, d: x.d}));
+  };
+  let symsRC, symsTT, wlRC, wlTT;
   try {
-    // ── 1. univers ──────────────────────────────────────────────────────
-    const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
-    const seen = new Set();
-    const cands = tk.result.list
-      .filter(t => t.symbol.endsWith('USDT'))
-      .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
-      .filter(t => t.v >= MIN_VOL && !NON.has(t.b))
-      .sort((a, b) => b.v - a.v)
-      .filter(t => !seen.has(t.b) && seen.add(t.b));
-    for (let i = 0; i < cands.length; i += 8) {
-      await Promise.all(cands.slice(i, i + 8).map(async t => {
-        try {
-          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=8`).then(r => r.json())).result.list;
-          if (k.length >= 8) t.p7 = (+k[0][4] / +k[7][4] - 1) * 100;
-        } catch (e) {}
-      }));
+    // ── 1. univers + watchlists ─────────────────────────────────────────
+    if (MODE === 'crypto') {
+      const MIN_VOL = 10e6, TOP = 30;
+      const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'HYPEUSDT', 'DOGEUSDT', 'ZECUSDT', 'BNBUSDT'];
+      const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE CONLUSDT'.split(' '));
+      const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+      const seen = new Set();
+      const cands = tk.result.list
+        .filter(t => t.symbol.endsWith('USDT'))
+        .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
+        .filter(t => t.v >= MIN_VOL && !NON.has(t.b))
+        .sort((a, b) => b.v - a.v)
+        .filter(t => !seen.has(t.b) && seen.add(t.b));
+      for (let i = 0; i < cands.length; i += 8) {
+        await Promise.all(cands.slice(i, i + 8).map(async t => {
+          try {
+            const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=8`).then(r => r.json())).result.list;
+            if (k.length >= 8) t.p7 = (+k[0][4] / +k[7][4] - 1) * 100;
+          } catch (e) {}
+        }));
+      }
+      const ranked = cands.filter(t => t.p7 !== undefined).sort((a, b) => b.p7 - a.p7);
+      const uniRC = ranked.slice(0, TOP).map(t => t.s);
+      for (const m of MAJORS) if (uniRC.length < N && !uniRC.includes(m)) uniRC.push(m);
+      for (const t of ranked.slice(TOP)) if (uniRC.length < N && !uniRC.includes(t.s)) uniRC.push(t.s);
+      const uniTT = cands.slice(0, N).map(t => t.s);     // les plus liquides : liste stable
+      if (uniRC.length < N || uniTT.length < N) throw new Error('univers incomplet');
+      symsRC = uniRC.map(s => `BYBIT:${s}.P`);
+      symsTT = uniTT.map(s => `BYBIT:${s}.P`);
+      log.push('top 7 j : ' + ranked.slice(0, 6).map(t => t.s.replace('USDT', '') + ' ' + t.p7.toFixed(0) + '%').join(', '));
+      // état de tendance exact (mêmes règles que l'indicateur) pour trier la watchlist
+      const trend = [], flat = [];
+      for (let i = 0; i < uniTT.length; i += 8) {
+        await Promise.all(uniTT.slice(i, i + 8).map(async s => {
+          try {
+            const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${s}&interval=D&limit=400`).then(r => r.json())).result.list.reverse();
+            const b = k.map(x => ({h: +x[2], l: +x[3], c: +x[4]}));
+            const live = b[b.length - 1].c, closed = b.slice(0, -1);
+            let inPos = false, entry = 0;
+            for (let j = 55; j < closed.length; j++) {
+              let hi = -Infinity, lo = Infinity;
+              for (let q = j - 55; q < j; q++) hi = Math.max(hi, closed[q].h);
+              for (let q = j - 20; q < j; q++) lo = Math.min(lo, closed[q].l);
+              if (inPos && closed[j].c < lo) inPos = false;
+              if (!inPos && closed[j].c > hi) { inPos = true; entry = closed[j].c; }
+            }
+            if (inPos) trend.push({s, gain: (live / entry - 1) * 100}); else flat.push(s);
+          } catch (e) { flat.push(s); }
+        }));
+      }
+      trend.sort((a, b) => b.gain - a.gain);
+      wlTT = [`###🚀 Tendance 55j · ${trend.length} coins (tri par gain)`, ...trend.map(t => `BYBIT:${t.s}.P`)];
+      if (flat.length) wlTT.push('###Hors tendance', ...flat.map(s => `BYBIT:${s}.P`));
+      wlRC = ['###Top 20 · perf 7 j', ...symsRC.slice(0, 20), '###Reste de l\'univers', ...symsRC.slice(20)];
+      log.push('en tendance : ' + trend.slice(0, 5).map(t => t.s.replace('USDT', '') + ' +' + t.gain.toFixed(0) + '%').join(', '));
+    } else if (MODE === 'us') {
+      // actions US : capitalisation > 1 Md$, prix > 5 $, volume échangé > 20 M$/jour
+      const rows = await scan('america', {
+        filter: [
+          {left: 'market_cap_basic', operation: 'greater', right: 1e9},
+          {left: 'type', operation: 'equal', right: 'stock'},
+          {left: 'exchange', operation: 'in_range', right: ['NASDAQ', 'NYSE', 'AMEX']},
+          {left: 'close', operation: 'greater', right: 5},
+          {left: 'average_volume_30d_calc', operation: 'greater', right: 200000}
+        ],
+        columns: ['close', 'average_volume_30d_calc', 'Perf.W', 'Perf.3M'],
+        sort: {sortBy: 'market_cap_basic', sortOrder: 'desc'}, range: [0, 2500]
+      });
+      const liq = rows.filter(x => x.d[0] * x.d[1] >= 20e6 && x.d[2] != null && x.d[3] != null)
+        .map(x => ({s: x.s, w: x.d[2], m3: x.d[3]}));
+      const byW = [...liq].sort((a, b) => b.w - a.w), by3M = [...liq].sort((a, b) => b.m3 - a.m3);
+      symsRC = byW.slice(0, N).map(x => x.s);
+      symsTT = by3M.slice(0, N).map(x => x.s);
+      if (symsRC.length < N || symsTT.length < N) throw new Error('univers US incomplet');
+      wlRC = ['###Top 20 · perf semaine', ...symsRC.slice(0, 20), '###Suite', ...symsRC.slice(20)];
+      wlTT = ['###🚀 Plus fortes tendances · perf 3 mois', ...symsTT];
+      log.push(`${liq.length} actions éligibles · top semaine : ` + byW.slice(0, 5).map(x => x.s.split(':')[1] + ' +' + x.w.toFixed(0) + '%').join(', '));
+    } else {
+      // matières premières (futures continus) + ETF > 1 Md$ d'encours (hors levier, inverse, crypto, rendement)
+      const COMMO = ['COMEX:GC1!', 'COMEX:SI1!', 'NYMEX:PL1!', 'NYMEX:PA1!', 'COMEX:HG1!', 'COMEX:ALI1!', 'NYMEX:CL1!', 'ICEEUR:BRN1!',
+                     'NYMEX:NG1!', 'NYMEX:RB1!', 'NYMEX:HO1!', 'CBOT:ZC1!', 'CBOT:ZW1!', 'CBOT:ZS1!', 'ICEUS:KC1!', 'ICEUS:CC1!',
+                     'ICEUS:SB1!', 'ICEUS:CT1!', 'CME:LE1!', 'CME:HE1!'];
+      const fut = await scan('futures', {symbols: {tickers: COMMO}, columns: ['Perf.W', 'Perf.3M']});
+      const fperf = Object.fromEntries(fut.map(x => [x.s, {w: x.d[0] ?? -999, m3: x.d[1] ?? -999}]));
+      const bad = /\b(2x|3x|leveraged|inverse|ultra|ultrapro|daily|bull|bear|short|option|income|yieldmax|covered|buffer|bitcoin|ether|ethereum|solana|xrp|crypto|staking)\b/i;
+      const etfRows = await scan('america', {
+        filter: [
+          {left: 'type', operation: 'equal', right: 'fund'},
+          {left: 'aum', operation: 'greater', right: 1e9},
+          {left: 'average_volume_30d_calc', operation: 'greater', right: 300000}
+        ],
+        columns: ['Perf.W', 'Perf.3M', 'description'],
+        sort: {sortBy: 'aum', sortOrder: 'desc'}, range: [0, 800]
+      });
+      const etf = etfRows.filter(x => !bad.test(x.d[2] || '') && x.d[0] != null && x.d[1] != null).map(x => ({s: x.s, w: x.d[0], m3: x.d[1]}));
+      const k = N - COMMO.length;
+      const etfW = [...etf].sort((a, b) => b.w - a.w).slice(0, k), etf3M = [...etf].sort((a, b) => b.m3 - a.m3).slice(0, k);
+      symsRC = [...COMMO, ...etfW.map(x => x.s)];
+      symsTT = [...COMMO, ...etf3M.map(x => x.s)];
+      const commoW = [...COMMO].sort((a, b) => (fperf[b]?.w ?? -999) - (fperf[a]?.w ?? -999));
+      const commo3M = [...COMMO].sort((a, b) => (fperf[b]?.m3 ?? -999) - (fperf[a]?.m3 ?? -999));
+      wlRC = ['###Matières premières · perf semaine', ...commoW, '###ETF · perf semaine', ...etfW.map(x => x.s)];
+      wlTT = ['###🚀 Matières premières · perf 3 mois', ...commo3M, '###🚀 ETF · perf 3 mois', ...etf3M.map(x => x.s)];
+      log.push(`${etf.length} ETF éligibles · top 3 mois : ` + etf3M.slice(0, 4).map(x => x.s.split(':')[1] + ' +' + x.m3.toFixed(0) + '%').join(', '));
     }
-    const ranked = cands.filter(t => t.p7 !== undefined).sort((a, b) => b.p7 - a.p7);
-    // A. Run + Conso : les 30 meilleures perfs 7 j + les majors
-    const uniRC = ranked.slice(0, TOP).map(t => t.s);
-    for (const m of MAJORS) if (uniRC.length < N && !uniRC.includes(m)) uniRC.push(m);
-    for (const t of ranked.slice(TOP)) if (uniRC.length < N && !uniRC.includes(t.s)) uniRC.push(t.s);
-    // B. Trend Tracker : les plus liquides (liste stable, une tendance ne doit pas disparaître du suivi)
-    const uniTT = cands.slice(0, N).map(t => t.s);
-    if (uniRC.length < N || uniTT.length < N) throw new Error('univers incomplet');
-    const symsRC = uniRC.map(s => `BYBIT:${s}.P`);
-    const symsTT = uniTT.map(s => `BYBIT:${s}.P`);
-    log.push('top 7 j : ' + ranked.slice(0, 6).map(t => t.s.replace('USDT', '') + ' ' + t.p7.toFixed(0) + '%').join(', '));
 
-    // ── 2. watchlists (cliquer un coin = l'ouvrir sur le graphique) ──────
-    // a) état de tendance des coins du Trend Tracker (mêmes règles que l'indicateur :
-    //    entrée = clôture > plus haut 55 j, sortie = clôture < plus bas 20 j, bougies daily clôturées)
-    const trend = [], flat = [];
-    for (let i = 0; i < uniTT.length; i += 8) {
-      await Promise.all(uniTT.slice(i, i + 8).map(async s => {
-        try {
-          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${s}&interval=D&limit=400`).then(r => r.json())).result.list.reverse();
-          const b = k.map(x => ({h: +x[2], l: +x[3], c: +x[4]}));
-          const live = b[b.length - 1].c, closed = b.slice(0, -1);
-          let inPos = false, entry = 0, iEntry = 0;
-          for (let j = 55; j < closed.length; j++) {
-            let hi = -Infinity, lo = Infinity;
-            for (let q = j - 55; q < j; q++) hi = Math.max(hi, closed[q].h);
-            for (let q = j - 20; q < j; q++) lo = Math.min(lo, closed[q].l);
-            if (inPos && closed[j].c < lo) inPos = false;
-            if (!inPos && closed[j].c > hi) { inPos = true; entry = closed[j].c; iEntry = j; }
-          }
-          if (inPos) trend.push({s, gain: (live / entry - 1) * 100, days: closed.length - iEntry});
-          else flat.push(s);
-        } catch (e) { flat.push(s); }
-      }));
-    }
-    trend.sort((a, b) => b.gain - a.gain);
-    const wlTT = [`###🚀 Tendance 55j · ${trend.length} coins (tri par gain)`, ...trend.map(t => `BYBIT:${t.s}.P`)];
-    if (flat.length) wlTT.push('###Hors tendance', ...flat.map(s => `BYBIT:${s}.P`));
-    // b) Run + Conso : top 20 des perfs 7 j d'abord, puis le reste de l'univers
-    const wlRC = ['###Top 20 · perf 7 j', ...symsRC.slice(0, 20), '###Reste de l\'univers', ...symsRC.slice(20)];
+    // watchlists (cliquer une ligne = ouvrir le symbole sur le graphique)
     const lists = await fetch('/api/v1/symbols_list/custom/', {credentials: 'include'}).then(r => r.json());
     const put = async (name, symbols) => {
+      const uniq = symbols.filter((s, i) => s.startsWith('###') || symbols.indexOf(s) === i);   // pas de doublon
       const wl = lists.find(l => l.name === name);
-      let r;
-      if (wl) r = await fetch(`/api/v1/symbols_list/custom/${wl.id}/replace/?unsafe=true`, {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(symbols)});
-      else r = await fetch('/api/v1/symbols_list/custom/', {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, symbols})});
+      const r = wl
+        ? await fetch(`/api/v1/symbols_list/custom/${wl.id}/replace/?unsafe=true`, {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uniq)})
+        : await fetch('/api/v1/symbols_list/custom/', {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, symbols: uniq})});
       log.push(`watchlist ${name} : ` + (r.ok ? 'ok' : 'échec ' + r.status));
     };
-    await put(WL_NAME, wlRC);
-    await put('Trend_Tracker', wlTT);
-    log.push('en tendance : ' + trend.slice(0, 6).map(t => t.s.replace('USDT', '') + ' +' + t.gain.toFixed(0) + '%').join(', '));
+    await put(CFG.wlRC, wlRC);
+    await put(CFG.wlTT, wlTT);
 
-    // ── 3. entrées de l'indicateur sur le graphique ─────────────────────
+    // ── 3. entrées des indicateurs du layout ouvert ─────────────────────
     const ch = TradingViewApi.activeChart();
     const studies = ch.getAllStudies().filter(x => /Run \+ Conso|Trend Tracker/.test(x.name));
     for (const st of studies) {
       const study = ch.getStudyById(st.id);
-      const iv = study.getInputValues()
-        .filter(x => /^in_\d+$/.test(x.id) && typeof x.value === 'string' && x.value.indexOf('BYBIT:') === 0)
+      const iv = study.getInputValues().filter(x => /^in_\d+$/.test(x.id) && isSym(x.value))
         .sort((a, b) => +a.id.slice(3) - +b.id.slice(3));
       const list = /Trend Tracker/.test(st.name) ? symsTT : symsRC;
       study.setInputValues(iv.map((x, i) => ({id: x.id, value: list[i]})));
@@ -101,21 +165,21 @@
     const save = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || ''));
     if (save) save.click();
 
-    // ── 4. alertes de l'indicateur ──────────────────────────────────────
+    // ── 4. alertes de ce marché (repérées par le symbole sur lequel elles sont posées) ──
     const la = await fetch('https://pricealerts.tradingview.com/list_alerts', {credentials: 'include'}).then(r => r.json());
     const alerts = (la.r || la).filter(a => {
       const c = a.conditions ? a.conditions[0] : a.condition;
-      return c && c.series && c.series[0] && [PINE_RC, PINE_TT].includes(c.series[0].pine_id);
+      const sym = String(a.symbol || '') + String(a.pro_symbol || '');
+      return c && c.series && c.series[0] && [PINE_RC, PINE_TT].includes(c.series[0].pine_id)
+        && new RegExp('[:"]' + CFG.alertSym + '[."]|[:"]' + CFG.alertSym + '$').test(sym);
     });
     for (const a of alerts) {
       const conds = JSON.parse(JSON.stringify(a.conditions || [a.condition]));
       const list = conds[0].series[0].pine_id === PINE_TT ? symsTT : symsRC;
       for (const c of conds) {
         const inp = c.series[0].inputs;
-        const keys = Object.keys(inp).filter(k => /^in_\d+$/.test(k) && typeof inp[k] === 'string' && inp[k].indexOf('BYBIT:') === 0)
-          .sort((x, y) => +x.slice(3) - +y.slice(3));
+        const keys = Object.keys(inp).filter(k => /^in_\d+$/.test(k) && isSym(inp[k])).sort((x, y) => +x.slice(3) - +y.slice(3));
         keys.forEach((k, i) => { inp[k] = list[i]; });
-        for (const k of ['type', 'series', 'resolution']) if (!(k in c)) delete c[k];
       }
       const payload = {
         conditions: conds.map(c => ({type: c.type, series: c.series, resolution: c.resolution})),
@@ -129,11 +193,11 @@
       const j = await r.json().catch(() => ({}));
       log.push(`alerte ${a.alert_id} : ${j.s === 'ok' ? 'ok' : 'échec ' + JSON.stringify(j.err || j).slice(0, 80)}`);
     }
-    if (!alerts.length) log.push('aucune alerte trouvée');
+    if (!alerts.length) log.push('aucune alerte pour ce marché');
     window.__refreshResult = 'OK · ' + log.join(' · ');
   } catch (e) {
     window.__refreshResult = 'ERREUR · ' + e.message + ' · ' + log.join(' · ');
   }
   // trace du dernier passage (lisible depuis n'importe quel onglet TradingView)
-  try { localStorage.setItem('runconso_last_refresh', new Date().toISOString() + ' · ' + window.__refreshResult); } catch (e) {}
+  try { localStorage.setItem('runconso_last_refresh_' + MODE, new Date().toISOString() + ' · ' + window.__refreshResult); } catch (e) {}
 })();

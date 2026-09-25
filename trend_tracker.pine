@@ -121,7 +121,9 @@ trackD() =>
 [myPos, myEntry, myTentry, myStop, myBars, myPeak, myNew, myExit, myClose, myTime, myBO] = request.security(syminfo.tickerid, "D", trackD(), lookahead = barmerge.lookahead_on)
 
 tick(string s) =>
-    str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
+    parts = str.split(s, ":")
+    t = array.size(parts) > 1 ? array.get(parts, 1) : s
+    str.replace(str.replace(t, ".P", ""), "USDT", "")
 
 pos = tblPos == "Haut droite" ? position.top_right : tblPos == "Bas droite" ? position.bottom_right : tblPos == "Bas gauche" ? position.bottom_left : position.top_left
 var table tb = table.new(pos, 5, 40, bgcolor = color.new(color.black, 12), border_width = 1)
