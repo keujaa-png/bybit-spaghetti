@@ -93,7 +93,8 @@ setupD() =>
     perf = close[perfDays] > 0 ? (close / close[perfDays] - 1) * 100 : na
     depuis = sigClose[1] > 0 ? (close / sigClose[1] - 1) * 100 : na
     // signal = dernière bougie clôturée ([1]) ; conso en cours = valeurs de la bougie du jour (déjà décalées)
-    [kind[1], since[1], lastKind[1], lvl[1], runAt[1], isCons, cLo, cHi, rangePct, perf, depuis, time[1]]
+    dayChg = close[1] > 0 ? (close / close[1] - 1) * 100 : na     // variation du jour (bougie en cours)
+    [kind[1], since[1], lastKind[1], lvl[1], runAt[1], isCons, cLo, cHi, rangePct, perf, depuis, time[1], dayChg]
 
 drawD() =>
     [cHi, cLo, rangePct, runStart, lb, runPct, isCons, kind] = core()
@@ -105,46 +106,51 @@ drawD() =>
      ta.valuewhen(sig, time, 2)[1], ta.valuewhen(sig, tCs, 2)[1], ta.valuewhen(sig, cHi, 2)[1], ta.valuewhen(sig, cLo, 2)[1], ta.valuewhen(sig, tRun, 2)[1], ta.valuewhen(sig, runStart, 2)[1], ta.valuewhen(sig, runPct, 2)[1], ta.valuewhen(sig, low, 2)[1], ta.valuewhen(sig, high, 2)[1], ta.valuewhen(sig, kind, 2)[1],
      isCons, cHi, cLo, tCs, runStart, tRun, runPct]
 
-[k01, d01, j01, v01, r01, q01, x01, y01, g01, h01, c01, t01] = request.security(sy01, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k02, d02, j02, v02, r02, q02, x02, y02, g02, h02, c02, t02] = request.security(sy02, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k03, d03, j03, v03, r03, q03, x03, y03, g03, h03, c03, t03] = request.security(sy03, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k04, d04, j04, v04, r04, q04, x04, y04, g04, h04, c04, t04] = request.security(sy04, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k05, d05, j05, v05, r05, q05, x05, y05, g05, h05, c05, t05] = request.security(sy05, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k06, d06, j06, v06, r06, q06, x06, y06, g06, h06, c06, t06] = request.security(sy06, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k07, d07, j07, v07, r07, q07, x07, y07, g07, h07, c07, t07] = request.security(sy07, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k08, d08, j08, v08, r08, q08, x08, y08, g08, h08, c08, t08] = request.security(sy08, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k09, d09, j09, v09, r09, q09, x09, y09, g09, h09, c09, t09] = request.security(sy09, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k10, d10, j10, v10, r10, q10, x10, y10, g10, h10, c10, t10] = request.security(sy10, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k11, d11, j11, v11, r11, q11, x11, y11, g11, h11, c11, t11] = request.security(sy11, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k12, d12, j12, v12, r12, q12, x12, y12, g12, h12, c12, t12] = request.security(sy12, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k13, d13, j13, v13, r13, q13, x13, y13, g13, h13, c13, t13] = request.security(sy13, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k14, d14, j14, v14, r14, q14, x14, y14, g14, h14, c14, t14] = request.security(sy14, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k15, d15, j15, v15, r15, q15, x15, y15, g15, h15, c15, t15] = request.security(sy15, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k16, d16, j16, v16, r16, q16, x16, y16, g16, h16, c16, t16] = request.security(sy16, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k17, d17, j17, v17, r17, q17, x17, y17, g17, h17, c17, t17] = request.security(sy17, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k18, d18, j18, v18, r18, q18, x18, y18, g18, h18, c18, t18] = request.security(sy18, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k19, d19, j19, v19, r19, q19, x19, y19, g19, h19, c19, t19] = request.security(sy19, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k20, d20, j20, v20, r20, q20, x20, y20, g20, h20, c20, t20] = request.security(sy20, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k21, d21, j21, v21, r21, q21, x21, y21, g21, h21, c21, t21] = request.security(sy21, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k22, d22, j22, v22, r22, q22, x22, y22, g22, h22, c22, t22] = request.security(sy22, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k23, d23, j23, v23, r23, q23, x23, y23, g23, h23, c23, t23] = request.security(sy23, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k24, d24, j24, v24, r24, q24, x24, y24, g24, h24, c24, t24] = request.security(sy24, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k25, d25, j25, v25, r25, q25, x25, y25, g25, h25, c25, t25] = request.security(sy25, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k26, d26, j26, v26, r26, q26, x26, y26, g26, h26, c26, t26] = request.security(sy26, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k27, d27, j27, v27, r27, q27, x27, y27, g27, h27, c27, t27] = request.security(sy27, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k28, d28, j28, v28, r28, q28, x28, y28, g28, h28, c28, t28] = request.security(sy28, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k29, d29, j29, v29, r29, q29, x29, y29, g29, h29, c29, t29] = request.security(sy29, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k30, d30, j30, v30, r30, q30, x30, y30, g30, h30, c30, t30] = request.security(sy30, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k31, d31, j31, v31, r31, q31, x31, y31, g31, h31, c31, t31] = request.security(sy31, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k32, d32, j32, v32, r32, q32, x32, y32, g32, h32, c32, t32] = request.security(sy32, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k33, d33, j33, v33, r33, q33, x33, y33, g33, h33, c33, t33] = request.security(sy33, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k34, d34, j34, v34, r34, q34, x34, y34, g34, h34, c34, t34] = request.security(sy34, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k35, d35, j35, v35, r35, q35, x35, y35, g35, h35, c35, t35] = request.security(sy35, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k36, d36, j36, v36, r36, q36, x36, y36, g36, h36, c36, t36] = request.security(sy36, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k37, d37, j37, v37, r37, q37, x37, y37, g37, h37, c37, t37] = request.security(sy37, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
-[k38, d38, j38, v38, r38, q38, x38, y38, g38, h38, c38, t38] = request.security(sy38, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k01, d01, j01, v01, r01, q01, x01, y01, g01, h01, c01, t01, dc01] = request.security(sy01, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k02, d02, j02, v02, r02, q02, x02, y02, g02, h02, c02, t02, dc02] = request.security(sy02, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k03, d03, j03, v03, r03, q03, x03, y03, g03, h03, c03, t03, dc03] = request.security(sy03, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k04, d04, j04, v04, r04, q04, x04, y04, g04, h04, c04, t04, dc04] = request.security(sy04, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k05, d05, j05, v05, r05, q05, x05, y05, g05, h05, c05, t05, dc05] = request.security(sy05, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k06, d06, j06, v06, r06, q06, x06, y06, g06, h06, c06, t06, dc06] = request.security(sy06, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k07, d07, j07, v07, r07, q07, x07, y07, g07, h07, c07, t07, dc07] = request.security(sy07, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k08, d08, j08, v08, r08, q08, x08, y08, g08, h08, c08, t08, dc08] = request.security(sy08, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k09, d09, j09, v09, r09, q09, x09, y09, g09, h09, c09, t09, dc09] = request.security(sy09, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k10, d10, j10, v10, r10, q10, x10, y10, g10, h10, c10, t10, dc10] = request.security(sy10, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k11, d11, j11, v11, r11, q11, x11, y11, g11, h11, c11, t11, dc11] = request.security(sy11, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k12, d12, j12, v12, r12, q12, x12, y12, g12, h12, c12, t12, dc12] = request.security(sy12, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k13, d13, j13, v13, r13, q13, x13, y13, g13, h13, c13, t13, dc13] = request.security(sy13, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k14, d14, j14, v14, r14, q14, x14, y14, g14, h14, c14, t14, dc14] = request.security(sy14, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k15, d15, j15, v15, r15, q15, x15, y15, g15, h15, c15, t15, dc15] = request.security(sy15, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k16, d16, j16, v16, r16, q16, x16, y16, g16, h16, c16, t16, dc16] = request.security(sy16, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k17, d17, j17, v17, r17, q17, x17, y17, g17, h17, c17, t17, dc17] = request.security(sy17, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k18, d18, j18, v18, r18, q18, x18, y18, g18, h18, c18, t18, dc18] = request.security(sy18, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k19, d19, j19, v19, r19, q19, x19, y19, g19, h19, c19, t19, dc19] = request.security(sy19, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k20, d20, j20, v20, r20, q20, x20, y20, g20, h20, c20, t20, dc20] = request.security(sy20, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k21, d21, j21, v21, r21, q21, x21, y21, g21, h21, c21, t21, dc21] = request.security(sy21, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k22, d22, j22, v22, r22, q22, x22, y22, g22, h22, c22, t22, dc22] = request.security(sy22, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k23, d23, j23, v23, r23, q23, x23, y23, g23, h23, c23, t23, dc23] = request.security(sy23, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k24, d24, j24, v24, r24, q24, x24, y24, g24, h24, c24, t24, dc24] = request.security(sy24, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k25, d25, j25, v25, r25, q25, x25, y25, g25, h25, c25, t25, dc25] = request.security(sy25, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k26, d26, j26, v26, r26, q26, x26, y26, g26, h26, c26, t26, dc26] = request.security(sy26, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k27, d27, j27, v27, r27, q27, x27, y27, g27, h27, c27, t27, dc27] = request.security(sy27, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k28, d28, j28, v28, r28, q28, x28, y28, g28, h28, c28, t28, dc28] = request.security(sy28, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k29, d29, j29, v29, r29, q29, x29, y29, g29, h29, c29, t29, dc29] = request.security(sy29, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k30, d30, j30, v30, r30, q30, x30, y30, g30, h30, c30, t30, dc30] = request.security(sy30, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k31, d31, j31, v31, r31, q31, x31, y31, g31, h31, c31, t31, dc31] = request.security(sy31, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k32, d32, j32, v32, r32, q32, x32, y32, g32, h32, c32, t32, dc32] = request.security(sy32, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k33, d33, j33, v33, r33, q33, x33, y33, g33, h33, c33, t33, dc33] = request.security(sy33, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k34, d34, j34, v34, r34, q34, x34, y34, g34, h34, c34, t34, dc34] = request.security(sy34, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k35, d35, j35, v35, r35, q35, x35, y35, g35, h35, c35, t35, dc35] = request.security(sy35, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k36, d36, j36, v36, r36, q36, x36, y36, g36, h36, c36, t36, dc36] = request.security(sy36, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k37, d37, j37, v37, r37, q37, x37, y37, g37, h37, c37, t37, dc37] = request.security(sy37, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[k38, d38, j38, v38, r38, q38, x38, y38, g38, h38, c38, t38, dc38] = request.security(sy38, "D", setupD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
 
 [a0, b0, c0, e0, f0, g0, h0, l0, u0, k0, a1, b1, c1, e1, f1, g1, h1, l1, u1, k1, a2, b2, c2, e2, f2, g2, h2, l2, u2, k2, nowCons, nowHi, nowLo, nowTcs, nowRun, nowTrun, nowRunPct] = request.security(syminfo.tickerid, "D", drawD(), lookahead = barmerge.lookahead_on)
+
+arrowTxt(float d) =>
+    na(d) ? "" : (d > 0 ? "▲ +" : d < 0 ? "▼ " : "= ") + str.tostring(d, "#.#") + "%"
+arrowCol(float d) =>
+    na(d) ? color.gray : d > 0 ? color.lime : d < 0 ? color.red : color.silver
 
 tick(string s) =>
     parts = str.split(s, ":")
@@ -154,7 +160,7 @@ kindTxt(int k) =>
     k == 3 ? "sweep + breakout" : k == 2 ? "🚀 breakout" : "↩ sweep"
 
 pos = tblPos == "Haut droite" ? position.top_right : tblPos == "Bas droite" ? position.bottom_right : tblPos == "Bas gauche" ? position.bottom_left : position.top_left
-var table tb = table.new(pos, 6, 34, bgcolor = color.new(color.black, 12), border_width = 1)
+var table tb = table.new(pos, 7, 34, bgcolor = color.new(color.black, 12), border_width = 1)
 newDay = timeframe.change("D")
 
 if barstate.islast
@@ -171,19 +177,21 @@ if barstate.islast
     hs = array.from(h01, h02, h03, h04, h05, h06, h07, h08, h09, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27, h28, h29, h30, h31, h32, h33, h34, h35, h36, h37, h38)
     cs = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32, c33, c34, c35, c36, c37, c38)
     ts = array.from(t01, t02, t03, t04, t05, t06, t07, t08, t09, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31, t32, t33, t34, t35, t36, t37, t38)
+    dcs = array.from(dc01, dc02, dc03, dc04, dc05, dc06, dc07, dc08, dc09, dc10, dc11, dc12, dc13, dc14, dc15, dc16, dc17, dc18, dc19, dc20, dc21, dc22, dc23, dc24, dc25, dc26, dc27, dc28, dc29, dc30, dc31, dc32, dc33, dc34, dc35, dc36, dc37, dc38)
     rank = array.new<float>()
     for i = 0 to 37
         p = array.get(hs, i)
         array.push(rank, na(array.get(ts, i)) or na(p) ? -1e9 : p)
     ordr = array.sort_indices(rank, order.descending)
 
-    table.clear(tb, 0, 0, 5, 33)
+    table.clear(tb, 0, 0, 6, 33)
     table.cell(tb, 0, 0, "Run + conso · top " + str.tostring(topN) + " " + str.tostring(perfDays) + "j", text_color = color.white, text_size = size.small)
-    table.cell(tb, 1, 0, str.tostring(perfDays) + "j %", text_color = color.white, text_size = size.small)
-    table.cell(tb, 2, 0, "Run", text_color = color.white, text_size = size.small)
-    table.cell(tb, 3, 0, "Signal daily", text_color = color.white, text_size = size.small)
-    table.cell(tb, 4, 0, "Depuis", text_color = color.white, text_size = size.small)
-    table.cell(tb, 5, 0, "Niveau", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, "Jour", text_color = color.white, text_size = size.small)
+    table.cell(tb, 2, 0, str.tostring(perfDays) + "j %", text_color = color.white, text_size = size.small)
+    table.cell(tb, 3, 0, "Run", text_color = color.white, text_size = size.small)
+    table.cell(tb, 4, 0, "Signal daily", text_color = color.white, text_size = size.small)
+    table.cell(tb, 5, 0, "Depuis", text_color = color.white, text_size = size.small)
+    table.cell(tb, 6, 0, "Niveau", text_color = color.white, text_size = size.small)
     string msgB = ""
     string msgS = ""
     int row = 1
@@ -200,22 +208,24 @@ if barstate.islast
         p = array.get(hs, i)
         lk = int(array.get(js, i))
         table.cell(tb, 0, row, name, text_color = color.white, text_size = size.small)
-        table.cell(tb, 1, row, str.tostring(p, "#") + "%", text_color = p >= 0 ? color.lime : color.red, text_size = size.small)
+        dcv = array.get(dcs, i)
+        table.cell(tb, 1, row, arrowTxt(dcv), text_color = arrowCol(dcv), text_size = size.small)
+        table.cell(tb, 2, row, str.tostring(p, "#") + "%", text_color = p >= 0 ? color.lime : color.red, text_size = size.small)
         if recent
             dep = array.get(cs, i)
             sigCol = lk == 1 ? color.lime : color.aqua
-            table.cell(tb, 2, row, "+" + str.tostring(array.get(rs, i), "#") + "%", text_color = color.silver, text_size = size.small)
-            table.cell(tb, 3, row, kindTxt(lk) + (d == 0 ? " hier" : " il y a " + str.tostring(d + 1) + " j"), text_color = d == 0 ? sigCol : color.new(sigCol, 35), text_size = size.small)
-            table.cell(tb, 4, row, na(dep) ? "" : (dep >= 0 ? "+" : "") + str.tostring(dep, "#.#") + "%", text_color = na(dep) ? color.gray : dep >= 0 ? color.lime : color.red, text_size = size.small)
-            table.cell(tb, 5, row, str.tostring(array.get(vs, i), "#.####"), text_color = color.silver, text_size = size.small)
+            table.cell(tb, 3, row, "+" + str.tostring(array.get(rs, i), "#") + "%", text_color = color.silver, text_size = size.small)
+            table.cell(tb, 4, row, kindTxt(lk) + (d == 0 ? " hier" : " il y a " + str.tostring(d + 1) + " j"), text_color = d == 0 ? sigCol : color.new(sigCol, 35), text_size = size.small)
+            table.cell(tb, 5, row, na(dep) ? "" : (dep >= 0 ? "+" : "") + str.tostring(dep, "#.#") + "%", text_color = na(dep) ? color.gray : dep >= 0 ? color.lime : color.red, text_size = size.small)
+            table.cell(tb, 6, row, str.tostring(array.get(vs, i), "#.####"), text_color = color.silver, text_size = size.small)
         else if cons
-            table.cell(tb, 2, row, "", text_size = size.small)
-            table.cell(tb, 3, row, "en conso (" + str.tostring(array.get(gs, i), "#") + "%) : guetter", text_color = color.orange, text_size = size.small)
-            table.cell(tb, 4, row, "", text_size = size.small)
-            table.cell(tb, 5, row, str.tostring(array.get(xs, i), "#.####") + " / " + str.tostring(array.get(ys, i), "#.####"), text_color = color.orange, text_size = size.small)
+            table.cell(tb, 3, row, "", text_size = size.small)
+            table.cell(tb, 4, row, "en conso (" + str.tostring(array.get(gs, i), "#") + "%) : guetter", text_color = color.orange, text_size = size.small)
+            table.cell(tb, 5, row, "", text_size = size.small)
+            table.cell(tb, 6, row, str.tostring(array.get(xs, i), "#.####") + " / " + str.tostring(array.get(ys, i), "#.####"), text_color = color.orange, text_size = size.small)
         else
-            for col = 2 to 5
-                table.cell(tb, col, row, col == 3 ? "–" : "", text_color = color.gray, text_size = size.small)
+            for col = 3 to 6
+                table.cell(tb, col, row, col == 4 ? "–" : "", text_color = color.gray, text_size = size.small)
         row += 1
         k = int(array.get(ks, i))
         if newDay and k > 0
