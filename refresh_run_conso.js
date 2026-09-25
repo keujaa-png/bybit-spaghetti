@@ -2,7 +2,7 @@
 // À exécuter dans un onglet TradingView ouvert sur l'un des layouts (connecté au compte) :
 //   « Scanner »            → crypto (perps Bybit)
 //   « Scanner US »         → actions US > 1 Md$ de capitalisation
-//   « Scanner Commo ETF »  → matières premières (futures continus) + ETF > 1 Md$ d'encours
+//   « Scanner Commo ETF »  → matières premières (CFD OANDA) + ETF > 1 Md$ d'encours
 // Pour chaque marché :
 // 1) deux univers de 38 symboles : momentum court (Run + Conso) et tendance (Trend Tracker)
 // 2) deux watchlists cliquables, en sections, dans l'ordre des panneaux
@@ -23,6 +23,8 @@
   const log = ['marché : ' + MODE];
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const isSym = v => typeof v === 'string' && /^[A-Z0-9_]+:\S+$/.test(v);
+  // les alertes TradingView refusent NASDAQ/NYSE/AMEX sans abonnement temps réel : on passe par le flux Cboe gratuit (BATS)
+  const bats = s => 'BATS:' + s.split(':')[1];
   const scan = async (market, body) => {
     const r = await fetch(`https://scanner.tradingview.com/${market}/scan`, {method: 'POST', credentials: 'include', body: JSON.stringify(body)});
     const j = await r.json();
@@ -101,18 +103,18 @@
       const liq = rows.filter(x => x.d[0] * x.d[1] >= 20e6 && x.d[2] != null && x.d[3] != null)
         .map(x => ({s: x.s, w: x.d[2], m3: x.d[3]}));
       const byW = [...liq].sort((a, b) => b.w - a.w), by3M = [...liq].sort((a, b) => b.m3 - a.m3);
-      symsRC = byW.slice(0, N).map(x => x.s);
-      symsTT = by3M.slice(0, N).map(x => x.s);
+      symsRC = byW.slice(0, N).map(x => bats(x.s));
+      symsTT = by3M.slice(0, N).map(x => bats(x.s));
       if (symsRC.length < N || symsTT.length < N) throw new Error('univers US incomplet');
       wlRC = ['###Top 20 · perf semaine', ...symsRC.slice(0, 20), '###Suite', ...symsRC.slice(20)];
       wlTT = ['###🚀 Plus fortes tendances · perf 3 mois', ...symsTT];
       log.push(`${liq.length} actions éligibles · top semaine : ` + byW.slice(0, 5).map(x => x.s.split(':')[1] + ' +' + x.w.toFixed(0) + '%').join(', '));
     } else {
       // matières premières (futures continus) + ETF > 1 Md$ d'encours (hors levier, inverse, crypto, rendement)
-      const COMMO = ['COMEX:GC1!', 'COMEX:SI1!', 'NYMEX:PL1!', 'NYMEX:PA1!', 'COMEX:HG1!', 'COMEX:ALI1!', 'NYMEX:CL1!', 'ICEEUR:BRN1!',
-                     'NYMEX:NG1!', 'NYMEX:RB1!', 'NYMEX:HO1!', 'CBOT:ZC1!', 'CBOT:ZW1!', 'CBOT:ZS1!', 'ICEUS:KC1!', 'ICEUS:CC1!',
-                     'ICEUS:SB1!', 'ICEUS:CT1!', 'CME:LE1!', 'CME:HE1!'];
-      const fut = await scan('futures', {symbols: {tickers: COMMO}, columns: ['Perf.W', 'Perf.3M']});
+      // CFD OANDA : données temps réel gratuites, donc alertes autorisées (les futures CME/ICE exigent un abonnement)
+      const COMMO = ['OANDA:XAUUSD', 'OANDA:XAGUSD', 'OANDA:XPTUSD', 'OANDA:XPDUSD', 'OANDA:XCUUSD', 'OANDA:WTICOUSD',
+                     'OANDA:BCOUSD', 'OANDA:NATGASUSD', 'OANDA:CORNUSD', 'OANDA:WHEATUSD', 'OANDA:SOYBNUSD', 'OANDA:SUGARUSD'];
+      const fut = await scan('cfd', {symbols: {tickers: COMMO}, columns: ['Perf.W', 'Perf.3M']}).catch(() => []);
       const fperf = Object.fromEntries(fut.map(x => [x.s, {w: x.d[0] ?? -999, m3: x.d[1] ?? -999}]));
       const bad = /\b(2x|3x|leveraged|inverse|ultra|ultrapro|daily|bull|bear|short|option|income|yieldmax|covered|buffer|bitcoin|ether|ethereum|solana|xrp|crypto|staking)\b/i;
       const etfRows = await scan('america', {
@@ -127,12 +129,12 @@
       const etf = etfRows.filter(x => !bad.test(x.d[2] || '') && x.d[0] != null && x.d[1] != null).map(x => ({s: x.s, w: x.d[0], m3: x.d[1]}));
       const k = N - COMMO.length;
       const etfW = [...etf].sort((a, b) => b.w - a.w).slice(0, k), etf3M = [...etf].sort((a, b) => b.m3 - a.m3).slice(0, k);
-      symsRC = [...COMMO, ...etfW.map(x => x.s)];
-      symsTT = [...COMMO, ...etf3M.map(x => x.s)];
+      symsRC = [...COMMO, ...etfW.map(x => bats(x.s))];
+      symsTT = [...COMMO, ...etf3M.map(x => bats(x.s))];
       const commoW = [...COMMO].sort((a, b) => (fperf[b]?.w ?? -999) - (fperf[a]?.w ?? -999));
       const commo3M = [...COMMO].sort((a, b) => (fperf[b]?.m3 ?? -999) - (fperf[a]?.m3 ?? -999));
-      wlRC = ['###Matières premières · perf semaine', ...commoW, '###ETF · perf semaine', ...etfW.map(x => x.s)];
-      wlTT = ['###🚀 Matières premières · perf 3 mois', ...commo3M, '###🚀 ETF · perf 3 mois', ...etf3M.map(x => x.s)];
+      wlRC = ['###Matières premières · perf semaine', ...commoW, '###ETF · perf semaine', ...etfW.map(x => bats(x.s))];
+      wlTT = ['###🚀 Matières premières · perf 3 mois', ...commo3M, '###🚀 ETF · perf 3 mois', ...etf3M.map(x => bats(x.s))];
       log.push(`${etf.length} ETF éligibles · top 3 mois : ` + etf3M.slice(0, 4).map(x => x.s.split(':')[1] + ' +' + x.m3.toFixed(0) + '%').join(', '));
     }
 
