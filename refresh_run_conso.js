@@ -1,7 +1,7 @@
 // Rafraîchit chaque jour l'univers du panneau « Run + Conso » sur TradingView.
 // À exécuter dans un onglet TradingView ouvert sur le layout « Scanner » (connecté au compte).
 // 1) deux univers de 38 symboles : perfs 7 j (Run + Conso) et plus gros volumes (Trend Tracker)
-// 2) watchlist « Run_Conso_Sweeps » remplacée par cet univers
+// 2) watchlists « Run_Conso_Sweeps » (top 20 7 j) et « Trend_Tracker » (coins en tendance, triés par gain)
 // 3) entrées de l'indicateur sur le graphique mises à jour (+ sauvegarde du layout)
 // 4) alertes des deux indicateurs mises à jour avec les mêmes symboles (sinon elles gardent l'ancienne liste)
 // Résultat dans window.__refreshResult (texte).
@@ -42,16 +42,47 @@
     if (uniRC.length < N || uniTT.length < N) throw new Error('univers incomplet');
     const symsRC = uniRC.map(s => `BYBIT:${s}.P`);
     const symsTT = uniTT.map(s => `BYBIT:${s}.P`);
-    const syms = symsRC;   // watchlist = setups à surveiller
     log.push('top 7 j : ' + ranked.slice(0, 6).map(t => t.s.replace('USDT', '') + ' ' + t.p7.toFixed(0) + '%').join(', '));
 
-    // ── 2. watchlist ────────────────────────────────────────────────────
+    // ── 2. watchlists (cliquer un coin = l'ouvrir sur le graphique) ──────
+    // a) état de tendance des coins du Trend Tracker (mêmes règles que l'indicateur :
+    //    entrée = clôture > plus haut 55 j, sortie = clôture < plus bas 20 j, bougies daily clôturées)
+    const trend = [], flat = [];
+    for (let i = 0; i < uniTT.length; i += 8) {
+      await Promise.all(uniTT.slice(i, i + 8).map(async s => {
+        try {
+          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${s}&interval=D&limit=400`).then(r => r.json())).result.list.reverse();
+          const b = k.map(x => ({h: +x[2], l: +x[3], c: +x[4]}));
+          const live = b[b.length - 1].c, closed = b.slice(0, -1);
+          let inPos = false, entry = 0, iEntry = 0;
+          for (let j = 55; j < closed.length; j++) {
+            let hi = -Infinity, lo = Infinity;
+            for (let q = j - 55; q < j; q++) hi = Math.max(hi, closed[q].h);
+            for (let q = j - 20; q < j; q++) lo = Math.min(lo, closed[q].l);
+            if (inPos && closed[j].c < lo) inPos = false;
+            if (!inPos && closed[j].c > hi) { inPos = true; entry = closed[j].c; iEntry = j; }
+          }
+          if (inPos) trend.push({s, gain: (live / entry - 1) * 100, days: closed.length - iEntry});
+          else flat.push(s);
+        } catch (e) { flat.push(s); }
+      }));
+    }
+    trend.sort((a, b) => b.gain - a.gain);
+    const wlTT = [`###🚀 Tendance 55j · ${trend.length} coins (tri par gain)`, ...trend.map(t => `BYBIT:${t.s}.P`)];
+    if (flat.length) wlTT.push('###Hors tendance', ...flat.map(s => `BYBIT:${s}.P`));
+    // b) Run + Conso : top 20 des perfs 7 j d'abord, puis le reste de l'univers
+    const wlRC = ['###Top 20 · perf 7 j', ...symsRC.slice(0, 20), '###Reste de l\'univers', ...symsRC.slice(20)];
     const lists = await fetch('/api/v1/symbols_list/custom/', {credentials: 'include'}).then(r => r.json());
-    const wl = lists.find(l => l.name === WL_NAME);
-    if (wl) {
-      const r = await fetch(`/api/v1/symbols_list/custom/${wl.id}/replace/?unsafe=true`, {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(syms)});
-      log.push('watchlist : ' + (r.ok ? 'ok' : 'échec ' + r.status));
-    } else log.push('watchlist introuvable');
+    const put = async (name, symbols) => {
+      const wl = lists.find(l => l.name === name);
+      let r;
+      if (wl) r = await fetch(`/api/v1/symbols_list/custom/${wl.id}/replace/?unsafe=true`, {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(symbols)});
+      else r = await fetch('/api/v1/symbols_list/custom/', {method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, symbols})});
+      log.push(`watchlist ${name} : ` + (r.ok ? 'ok' : 'échec ' + r.status));
+    };
+    await put(WL_NAME, wlRC);
+    await put('Trend_Tracker', wlTT);
+    log.push('en tendance : ' + trend.slice(0, 6).map(t => t.s.replace('USDT', '') + ' +' + t.gain.toFixed(0) + '%').join(', '));
 
     // ── 3. entrées de l'indicateur sur le graphique ─────────────────────
     const ch = TradingViewApi.activeChart();
