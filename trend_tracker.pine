@@ -1,0 +1,203 @@
+//@version=6
+indicator("Trend Tracker 55j (Bybit)", shorttitle="Trend Tracker", overlay=true, max_lines_count=50, max_labels_count=20)
+
+// Suivi de tendance sur plusieurs semaines :
+//   • ENTRÉE : la clôture daily dépasse le plus haut des {boLen} derniers jours
+//   • SORTIE : la clôture daily passe sous le plus bas des {trailLen} derniers jours (stop suiveur, pas d'objectif fixe)
+// Le panneau liste les coins actuellement en tendance, le gain depuis la cassure et le niveau de stop.
+// Tout est calculé sur bougies daily clôturées : pas de repaint.
+
+boLen     = input.int(55, "Cassure : plus haut des N jours", minval=10, maxval=200, group="Règles")
+trailLen  = input.int(20, "Stop suiveur : plus bas des N jours", minval=5, maxval=60, group="Règles", tooltip="Plus le stop est large, plus on garde les grosses tendances. 10 j coupe trop tôt.")
+sortBy    = input.string("Gain", "Trier par", options=["Gain", "Ancienneté", "Nom"], group="Affichage")
+showAll   = input.bool(false, "Afficher aussi les coins hors tendance", group="Affichage")
+tblPos    = input.string("Haut gauche", "Position du panneau", options=["Haut droite", "Haut gauche", "Bas droite", "Bas gauche"], group="Affichage")
+showLines = input.bool(true, "Tracer la cassure et le stop sur le coin affiché", group="Graphique")
+
+sy01 = input.symbol("BYBIT:BRUSDT.P", "#1", group="Univers surveillé (mis à jour chaque jour)")
+sy02 = input.symbol("BYBIT:AIOZUSDT.P", "#2", group="Univers surveillé (mis à jour chaque jour)")
+sy03 = input.symbol("BYBIT:AKEUSDT.P", "#3", group="Univers surveillé (mis à jour chaque jour)")
+sy04 = input.symbol("BYBIT:ZAMAUSDT.P", "#4", group="Univers surveillé (mis à jour chaque jour)")
+sy05 = input.symbol("BYBIT:NEARUSDT.P", "#5", group="Univers surveillé (mis à jour chaque jour)")
+sy06 = input.symbol("BYBIT:NILUSDT.P", "#6", group="Univers surveillé (mis à jour chaque jour)")
+sy07 = input.symbol("BYBIT:MUBARAKUSDT.P", "#7", group="Univers surveillé (mis à jour chaque jour)")
+sy08 = input.symbol("BYBIT:ZETAUSDT.P", "#8", group="Univers surveillé (mis à jour chaque jour)")
+sy09 = input.symbol("BYBIT:SAGAUSDT.P", "#9", group="Univers surveillé (mis à jour chaque jour)")
+sy10 = input.symbol("BYBIT:KERNELUSDT.P", "#10", group="Univers surveillé (mis à jour chaque jour)")
+sy11 = input.symbol("BYBIT:PHAUSDT.P", "#11", group="Univers surveillé (mis à jour chaque jour)")
+sy12 = input.symbol("BYBIT:PIEVERSEUSDT.P", "#12", group="Univers surveillé (mis à jour chaque jour)")
+sy13 = input.symbol("BYBIT:STRKUSDT.P", "#13", group="Univers surveillé (mis à jour chaque jour)")
+sy14 = input.symbol("BYBIT:ENAUSDT.P", "#14", group="Univers surveillé (mis à jour chaque jour)")
+sy15 = input.symbol("BYBIT:1000PEPEUSDT.P", "#15", group="Univers surveillé (mis à jour chaque jour)")
+sy16 = input.symbol("BYBIT:AVAXUSDT.P", "#16", group="Univers surveillé (mis à jour chaque jour)")
+sy17 = input.symbol("BYBIT:VVVUSDT.P", "#17", group="Univers surveillé (mis à jour chaque jour)")
+sy18 = input.symbol("BYBIT:SUIUSDT.P", "#18", group="Univers surveillé (mis à jour chaque jour)")
+sy19 = input.symbol("BYBIT:FARTCOINUSDT.P", "#19", group="Univers surveillé (mis à jour chaque jour)")
+sy20 = input.symbol("BYBIT:PTBUSDT.P", "#20", group="Univers surveillé (mis à jour chaque jour)")
+sy21 = input.symbol("BYBIT:GRASSUSDT.P", "#21", group="Univers surveillé (mis à jour chaque jour)")
+sy22 = input.symbol("BYBIT:TAOUSDT.P", "#22", group="Univers surveillé (mis à jour chaque jour)")
+sy23 = input.symbol("BYBIT:SEIUSDT.P", "#23", group="Univers surveillé (mis à jour chaque jour)")
+sy24 = input.symbol("BYBIT:ARBUSDT.P", "#24", group="Univers surveillé (mis à jour chaque jour)")
+sy25 = input.symbol("BYBIT:RAYDIUMUSDT.P", "#25", group="Univers surveillé (mis à jour chaque jour)")
+sy26 = input.symbol("BYBIT:INJUSDT.P", "#26", group="Univers surveillé (mis à jour chaque jour)")
+sy27 = input.symbol("BYBIT:APTUSDT.P", "#27", group="Univers surveillé (mis à jour chaque jour)")
+sy28 = input.symbol("BYBIT:UNIUSDT.P", "#28", group="Univers surveillé (mis à jour chaque jour)")
+sy29 = input.symbol("BYBIT:WIFUSDT.P", "#29", group="Univers surveillé (mis à jour chaque jour)")
+sy30 = input.symbol("BYBIT:TIAUSDT.P", "#30", group="Univers surveillé (mis à jour chaque jour)")
+sy31 = input.symbol("BYBIT:BTCUSDT.P", "#31", group="Univers surveillé (mis à jour chaque jour)")
+sy32 = input.symbol("BYBIT:ETHUSDT.P", "#32", group="Univers surveillé (mis à jour chaque jour)")
+sy33 = input.symbol("BYBIT:SOLUSDT.P", "#33", group="Univers surveillé (mis à jour chaque jour)")
+sy34 = input.symbol("BYBIT:XRPUSDT.P", "#34", group="Univers surveillé (mis à jour chaque jour)")
+sy35 = input.symbol("BYBIT:HYPEUSDT.P", "#35", group="Univers surveillé (mis à jour chaque jour)")
+sy36 = input.symbol("BYBIT:DOGEUSDT.P", "#36", group="Univers surveillé (mis à jour chaque jour)")
+sy37 = input.symbol("BYBIT:ZECUSDT.P", "#37", group="Univers surveillé (mis à jour chaque jour)")
+sy38 = input.symbol("BYBIT:BNBUSDT.P", "#38", group="Univers surveillé (mis à jour chaque jour)")
+
+trackD() =>
+    hiBO = ta.highest(high, boLen)[1]
+    trail = ta.lowest(low, trailLen)[1]
+    var bool inPos = false
+    var float entry = na
+    var int tEntry = na
+    var float peak = na
+    var int barsIn = 0
+    bool newBO = false
+    bool exited = false
+    if inPos
+        if close < trail
+            inPos := false
+            exited := true
+        else
+            peak := math.max(peak, high)
+            barsIn += 1
+    if not inPos and close > hiBO
+        inPos := true
+        entry := close
+        tEntry := time
+        peak := high
+        barsIn := 0
+        newBO := true
+    [inPos[1], entry[1], tEntry[1], trail, barsIn[1], peak[1], newBO[1], exited[1], close, time[1], hiBO]
+
+[p01, e01, a01, s01, b01, m01, w01, x01, c01, t01, _hi01] = request.security(sy01, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p02, e02, a02, s02, b02, m02, w02, x02, c02, t02, _hi02] = request.security(sy02, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p03, e03, a03, s03, b03, m03, w03, x03, c03, t03, _hi03] = request.security(sy03, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p04, e04, a04, s04, b04, m04, w04, x04, c04, t04, _hi04] = request.security(sy04, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p05, e05, a05, s05, b05, m05, w05, x05, c05, t05, _hi05] = request.security(sy05, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p06, e06, a06, s06, b06, m06, w06, x06, c06, t06, _hi06] = request.security(sy06, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p07, e07, a07, s07, b07, m07, w07, x07, c07, t07, _hi07] = request.security(sy07, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p08, e08, a08, s08, b08, m08, w08, x08, c08, t08, _hi08] = request.security(sy08, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p09, e09, a09, s09, b09, m09, w09, x09, c09, t09, _hi09] = request.security(sy09, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p10, e10, a10, s10, b10, m10, w10, x10, c10, t10, _hi10] = request.security(sy10, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p11, e11, a11, s11, b11, m11, w11, x11, c11, t11, _hi11] = request.security(sy11, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p12, e12, a12, s12, b12, m12, w12, x12, c12, t12, _hi12] = request.security(sy12, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p13, e13, a13, s13, b13, m13, w13, x13, c13, t13, _hi13] = request.security(sy13, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p14, e14, a14, s14, b14, m14, w14, x14, c14, t14, _hi14] = request.security(sy14, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p15, e15, a15, s15, b15, m15, w15, x15, c15, t15, _hi15] = request.security(sy15, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p16, e16, a16, s16, b16, m16, w16, x16, c16, t16, _hi16] = request.security(sy16, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p17, e17, a17, s17, b17, m17, w17, x17, c17, t17, _hi17] = request.security(sy17, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p18, e18, a18, s18, b18, m18, w18, x18, c18, t18, _hi18] = request.security(sy18, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p19, e19, a19, s19, b19, m19, w19, x19, c19, t19, _hi19] = request.security(sy19, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p20, e20, a20, s20, b20, m20, w20, x20, c20, t20, _hi20] = request.security(sy20, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p21, e21, a21, s21, b21, m21, w21, x21, c21, t21, _hi21] = request.security(sy21, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p22, e22, a22, s22, b22, m22, w22, x22, c22, t22, _hi22] = request.security(sy22, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p23, e23, a23, s23, b23, m23, w23, x23, c23, t23, _hi23] = request.security(sy23, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p24, e24, a24, s24, b24, m24, w24, x24, c24, t24, _hi24] = request.security(sy24, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p25, e25, a25, s25, b25, m25, w25, x25, c25, t25, _hi25] = request.security(sy25, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p26, e26, a26, s26, b26, m26, w26, x26, c26, t26, _hi26] = request.security(sy26, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p27, e27, a27, s27, b27, m27, w27, x27, c27, t27, _hi27] = request.security(sy27, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p28, e28, a28, s28, b28, m28, w28, x28, c28, t28, _hi28] = request.security(sy28, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p29, e29, a29, s29, b29, m29, w29, x29, c29, t29, _hi29] = request.security(sy29, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p30, e30, a30, s30, b30, m30, w30, x30, c30, t30, _hi30] = request.security(sy30, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p31, e31, a31, s31, b31, m31, w31, x31, c31, t31, _hi31] = request.security(sy31, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p32, e32, a32, s32, b32, m32, w32, x32, c32, t32, _hi32] = request.security(sy32, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p33, e33, a33, s33, b33, m33, w33, x33, c33, t33, _hi33] = request.security(sy33, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p34, e34, a34, s34, b34, m34, w34, x34, c34, t34, _hi34] = request.security(sy34, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p35, e35, a35, s35, b35, m35, w35, x35, c35, t35, _hi35] = request.security(sy35, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p36, e36, a36, s36, b36, m36, w36, x36, c36, t36, _hi36] = request.security(sy36, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p37, e37, a37, s37, b37, m37, w37, x37, c37, t37, _hi37] = request.security(sy37, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[p38, e38, a38, s38, b38, m38, w38, x38, c38, t38, _hi38] = request.security(sy38, "D", trackD(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+
+[myPos, myEntry, myTentry, myStop, myBars, myPeak, myNew, myExit, myClose, myTime, myBO] = request.security(syminfo.tickerid, "D", trackD(), lookahead = barmerge.lookahead_on)
+
+tick(string s) =>
+    str.replace(str.replace(str.replace(s, "BYBIT:", ""), ".P", ""), "USDT", "")
+
+pos = tblPos == "Haut droite" ? position.top_right : tblPos == "Bas droite" ? position.bottom_right : tblPos == "Bas gauche" ? position.bottom_left : position.top_left
+var table tb = table.new(pos, 5, 40, bgcolor = color.new(color.black, 12), border_width = 1)
+newDay = timeframe.change("D")
+
+if barstate.islast
+    sys = array.from(sy01, sy02, sy03, sy04, sy05, sy06, sy07, sy08, sy09, sy10, sy11, sy12, sy13, sy14, sy15, sy16, sy17, sy18, sy19, sy20, sy21, sy22, sy23, sy24, sy25, sy26, sy27, sy28, sy29, sy30, sy31, sy32, sy33, sy34, sy35, sy36, sy37, sy38)
+    ps = array.from(p01, p02, p03, p04, p05, p06, p07, p08, p09, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36, p37, p38)
+    es = array.from(e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11, e12, e13, e14, e15, e16, e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30, e31, e32, e33, e34, e35, e36, e37, e38)
+    as = array.from(a01, a02, a03, a04, a05, a06, a07, a08, a09, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36, a37, a38)
+    ss = array.from(s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27, s28, s29, s30, s31, s32, s33, s34, s35, s36, s37, s38)
+    bs = array.from(b01, b02, b03, b04, b05, b06, b07, b08, b09, b10, b11, b12, b13, b14, b15, b16, b17, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27, b28, b29, b30, b31, b32, b33, b34, b35, b36, b37, b38)
+    ms = array.from(m01, m02, m03, m04, m05, m06, m07, m08, m09, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29, m30, m31, m32, m33, m34, m35, m36, m37, m38)
+    ws = array.from(w01, w02, w03, w04, w05, w06, w07, w08, w09, w10, w11, w12, w13, w14, w15, w16, w17, w18, w19, w20, w21, w22, w23, w24, w25, w26, w27, w28, w29, w30, w31, w32, w33, w34, w35, w36, w37, w38)
+    xs = array.from(x01, x02, x03, x04, x05, x06, x07, x08, x09, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29, x30, x31, x32, x33, x34, x35, x36, x37, x38)
+    cs = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32, c33, c34, c35, c36, c37, c38)
+    ts = array.from(t01, t02, t03, t04, t05, t06, t07, t08, t09, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31, t32, t33, t34, t35, t36, t37, t38)
+    // classement
+    key = array.new<float>()
+    for i = 0 to 37
+        gain = array.get(ps, i) and array.get(es, i) > 0 ? (array.get(cs, i) / array.get(es, i) - 1) * 100 : na
+        v = sortBy == "Gain" ? (na(gain) ? -1e9 : gain) : sortBy == "Ancienneté" ? (array.get(ps, i) ? float(array.get(bs, i)) : -1e9) : float(-i)
+        array.push(key, na(array.get(ts, i)) ? -1e9 : v)
+    ordr = array.sort_indices(key, order.descending)
+
+    table.clear(tb, 0, 0, 4, 39)
+    nPos = 0
+    for i = 0 to 37
+        if array.get(ps, i)
+            nPos += 1
+    table.cell(tb, 0, 0, "Tendance " + str.tostring(boLen) + "j · " + str.tostring(nPos) + " coins", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, "Depuis", text_color = color.white, text_size = size.small)
+    table.cell(tb, 2, 0, "Gain", text_color = color.white, text_size = size.small)
+    table.cell(tb, 3, 0, "Stop suiveur", text_color = color.white, text_size = size.small)
+    table.cell(tb, 4, 0, "Marge", text_color = color.white, text_size = size.small)
+    string msgBO = ""
+    string msgEx = ""
+    int row = 1
+    for r = 0 to array.size(ordr) - 1
+        i = array.get(ordr, r)
+        if na(array.get(ts, i))
+            continue
+        name = tick(array.get(sys, i))
+        inpos = array.get(ps, i)
+        if not inpos and not showAll
+            continue
+        if row > 38
+            break
+        px = array.get(cs, i)
+        stop = array.get(ss, i)
+        if inpos
+            entry = array.get(es, i)
+            gain = entry > 0 ? (px / entry - 1) * 100 : na
+            marge = stop > 0 and px > 0 ? (px / stop - 1) * 100 : na
+            fresh = array.get(ws, i)
+            table.cell(tb, 0, row, name + (fresh ? " 🆕" : ""), text_color = fresh ? color.aqua : color.white, text_size = size.small)
+            table.cell(tb, 1, row, str.tostring(array.get(bs, i) + 1) + " j", text_color = color.silver, text_size = size.small)
+            table.cell(tb, 2, row, (gain >= 0 ? "+" : "") + str.tostring(gain, "#") + "%", text_color = gain >= 0 ? color.lime : color.red, text_size = size.small)
+            table.cell(tb, 3, row, str.tostring(stop, format.mintick), text_color = color.orange, text_size = size.small)
+            table.cell(tb, 4, row, str.tostring(marge, "#") + "%", text_color = marge < 5 ? color.red : color.silver, text_size = size.small)
+        else
+            table.cell(tb, 0, row, name, text_color = color.gray, text_size = size.small)
+            table.cell(tb, 1, row, "–", text_color = color.gray, text_size = size.small)
+            table.cell(tb, 2, row, "", text_size = size.small)
+            table.cell(tb, 3, row, "", text_size = size.small)
+            table.cell(tb, 4, row, "", text_size = size.small)
+        row += 1
+        if newDay
+            if array.get(ws, i)
+                msgBO += name + " (stop " + str.tostring(stop, format.mintick) + ")  "
+            if array.get(xs, i)
+                msgEx += name + "  "
+    if str.length(msgBO) > 0 or str.length(msgEx) > 0
+        alert((str.length(msgBO) > 0 ? "🚀 Nouvelle tendance " + str.tostring(boLen) + "j : " + msgBO : "") + (str.length(msgEx) > 0 ? " · ⛔ Stop suiveur touché : " + msgEx : ""), alert.freq_once_per_bar)
+
+// ── cassure et stop sur le coin affiché ────────────────────────────────
+plot(showLines ? myBO : na, "Niveau de cassure", color = color.new(color.aqua, 30), style = plot.style_stepline, linewidth = 1)
+plot(showLines and myPos ? myStop : na, "Stop suiveur", color = color.new(color.orange, 0), style = plot.style_stepline, linewidth = 2)
+bgcolor(showLines and myPos ? color.new(color.lime, 94) : na)
