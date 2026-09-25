@@ -3,10 +3,10 @@
 // 1) univers = 30 meilleurs perps Bybit sur 7 jours (volume 24 h ≥ 10 M$) + majors, 38 symboles
 // 2) watchlist « Run_Conso_Sweeps » remplacée par cet univers
 // 3) entrées de l'indicateur sur le graphique mises à jour (+ sauvegarde du layout)
-// 4) alerte(s) de l'indicateur mises à jour avec les mêmes symboles (sinon elles gardent l'ancienne liste)
+// 4) alertes des deux indicateurs mises à jour avec les mêmes symboles (sinon elles gardent l'ancienne liste)
 // Résultat dans window.__refreshResult (texte).
 (async () => {
-  const PINE_ID = 'USER;2fdc570c952e45079baa756c5103d16f';
+  const PINE_IDS = ['USER;2fdc570c952e45079baa756c5103d16f', 'USER;5baf968696014daea086e599c3750c9c'];   // Run+Conso, Trend Tracker
   const WL_NAME = 'Run_Conso_Sweeps';
   const N = 38, TOP = 30, MIN_VOL = 10e6;
   const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'HYPEUSDT', 'DOGEUSDT', 'ZECUSDT', 'BNBUSDT'];
@@ -49,24 +49,25 @@
 
     // ── 3. entrées de l'indicateur sur le graphique ─────────────────────
     const ch = TradingViewApi.activeChart();
-    const st = ch.getAllStudies().find(x => /Run \+ Conso/.test(x.name));
-    if (st) {
+    const studies = ch.getAllStudies().filter(x => /Run \+ Conso|Trend Tracker/.test(x.name));
+    for (const st of studies) {
       const study = ch.getStudyById(st.id);
       const iv = study.getInputValues()
         .filter(x => /^in_\d+$/.test(x.id) && typeof x.value === 'string' && x.value.indexOf('BYBIT:') === 0)
         .sort((a, b) => +a.id.slice(3) - +b.id.slice(3));
       study.setInputValues(iv.map((x, i) => ({id: x.id, value: syms[i]})));
-      log.push('indicateur : ' + iv.length + ' symboles');
-      await sleep(3000);
-      const save = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || ''));
-      if (save) save.click();
-    } else log.push('indicateur absent du graphique');
+      log.push(st.name.slice(0, 14) + ' : ' + iv.length + ' symboles');
+    }
+    if (!studies.length) log.push('indicateurs absents du graphique');
+    await sleep(3000);
+    const save = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || ''));
+    if (save) save.click();
 
     // ── 4. alertes de l'indicateur ──────────────────────────────────────
     const la = await fetch('https://pricealerts.tradingview.com/list_alerts', {credentials: 'include'}).then(r => r.json());
     const alerts = (la.r || la).filter(a => {
       const c = a.conditions ? a.conditions[0] : a.condition;
-      return c && c.series && c.series[0] && c.series[0].pine_id === PINE_ID;
+      return c && c.series && c.series[0] && PINE_IDS.includes(c.series[0].pine_id);
     });
     for (const a of alerts) {
       const conds = JSON.parse(JSON.stringify(a.conditions || [a.condition]));
