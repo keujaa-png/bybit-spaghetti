@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T3-CCI bull div</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📐</text></svg>">
+<style>
+  :root { --bg:#0e1117; --panel:#161b22; --line:#262d36; --txt:#d7dde5; --mut:#7f8fa3; --up:#26c281; --down:#ef5350; --acc:#4aa3ff; --warn:#f0a030; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.4 "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:rgba(14,17,23,.96); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  h1 { font-size:17px; margin:0 8px 0 0; font-weight:600; }
+  a { color:var(--acc); }
+  .ctl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; color:var(--mut); font-size:13px; }
+  .ctl select, .ctl button, .ctl input { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; font-size:14px; }
+  .ctl input { width:62px; }
+  .ctl button { cursor:pointer; }
+  .menu { display:flex; gap:12px; flex-wrap:wrap; font-size:13px; }
+  .status { margin-left:auto; color:var(--mut); font-size:13px; }
+  .note { padding:8px 16px 0; color:var(--mut); font-size:12.5px; }
+  main { padding:12px 16px 40px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(var(--tile, 360px), 1fr)); }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+  .th { display:flex; align-items:baseline; gap:6px; padding:7px 10px 4px; flex-wrap:wrap; }
+  .sym { font-weight:600; font-size:15px; } .sym a { color:inherit; text-decoration:none; } .sym a:hover { color:var(--acc); }
+  .chip { font-size:12px; padding:1px 6px; border-radius:10px; background:#0e1117; border:1px solid var(--line); color:var(--mut); white-space:nowrap; }
+  .chip.up { color:var(--up); } .chip.down { color:var(--down); } .chip.acc { color:var(--acc); border-color:#23466b; } .chip.warn { color:var(--warn); border-color:#5a4520; }
+  .lv { padding:0 10px 6px; font-size:12px; color:var(--mut); }
+  .lv b { color:var(--txt); font-weight:500; }
+  .chart { position:relative; height:var(--tileh, 280px); background:#0e1117; }
+  .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
+  .empty { grid-column:1/-1; color:var(--mut); padding:40px 0; text-align:center; }
+  @media (max-width:560px) { header { padding:8px 12px; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } .note { padding:8px 12px 0; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+<header>
+  <h1>📐 T3-CCI bull div</h1>
+  <div class="ctl">
+    <select id="tf" title="Unité de temps">
+      <option value="60">1h</option>
+      <option value="240" selected>4h</option>
+      <option value="D">Daily</option>
+    </select>
+    <select id="drives" title="Nombre minimum de drives">
+      <option value="3" selected>≥ 3 drives</option>
+      <option value="4">≥ 4 drives</option>
+    </select>
+    <select id="fresh" title="Âge maximum du dernier drive">
+      <option value="6">dernier drive ≤ 6 bougies</option>
+      <option value="12" selected>dernier drive ≤ 12 bougies</option>
+      <option value="24">dernier drive ≤ 24 bougies</option>
+    </select>
+    <label title="Le 1er drive doit être en survente (T3-CCI &lt; −100)"><input type="checkbox" id="os" checked style="width:auto"> 1er drive &lt; −100</label>
+    CCI <input id="cciLen" type="number" min="5" max="50" value="14" title="Longueur du CCI">
+    T3 <input id="t3Len" type="number" min="2" max="20" value="5" title="Longueur du lissage T3">
+    <input id="t3v" type="number" min="0.1" max="1" step="0.05" value="0.618" title="Facteur de volume du T3" style="width:70px">
+    <button id="reload" title="Rescanner">↻</button>
+  </div>
+  <nav class="menu">
+    <a href="conso.html">🧩 Consolidations</a>
+    <a href="reveil.html">⚡ Réveils & narratives</a>
+    <a href="winners.html">🏆 Winners</a>
+  </nav>
+  <div class="status" id="status">chargement…</div>
+</header>
+<div class="note">Perps Bybit ≥ 5 M$ de volume 24 h. Divergence haussière en plusieurs drives : le prix fait des plus bas de plus en plus bas (pivots de bas), pendant que le CCI lissé T3 fait des plus bas de plus en plus hauts. Invalidé si le prix repasse sous le dernier drive. Clic sur le nom = ouvrir sur ton layout TradingView.</div>
+<main id="grid"></main>
+
+<script>
+const $ = id => document.getElementById(id);
+const LAYOUT = 'LAU9xwF7';
+const PIV_L = 4, PIV_R = 2, MAX_GAP = 40;             // pivot de bas : 4 bougies avant, 2 après ; 40 bougies max entre deux drives
+const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE SAMSUNG'.split(' '));
+let RAW = [], items = [], busy = false;
+const keys = ['tf', 'drives', 'fresh', 'cciLen', 't3Len', 't3v'];
+try { const s = JSON.parse(localStorage.getItem('t3cci-page') || '{}'); keys.forEach(k => { if (s[k]) $(k).value = s[k]; }); if (s.os === false) $('os').checked = false; } catch (e) {}
+const save = () => { try { const o = {os: $('os').checked}; keys.forEach(k => o[k] = $(k).value); localStorage.setItem('t3cci-page', JSON.stringify(o)); } catch (e) {} };
+const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
+const fmt = (v, d = 1) => (v > 0 ? '+' : '') + v.toFixed(d) + '%';
+
+// ─── Indicateur : CCI (hlc3) lissé par un T3 de Tillson ─────────────────
+function cci(b, len) {
+  const tp = b.map(x => (x.h + x.l + x.c) / 3), out = new Array(b.length).fill(NaN);
+  for (let i = len - 1; i < b.length; i++) {
+    let m = 0; for (let j = i - len + 1; j <= i; j++) m += tp[j]; m /= len;
+    let d = 0; for (let j = i - len + 1; j <= i; j++) d += Math.abs(tp[j] - m); d /= len;
+    out[i] = d ? (tp[i] - m) / (0.015 * d) : 0;
+  }
+  return out;
+}
+function t3(src, len, v) {
+  const k = 2 / (len + 1), e = [0, 0, 0, 0, 0, 0], out = new Array(src.length).fill(NaN);
+  let init = false;
+  const c1 = -v * v * v, c2 = 3 * v * v + 3 * v * v * v, c3 = -6 * v * v - 3 * v - 3 * v * v * v, c4 = 1 + 3 * v + v * v * v + 3 * v * v;
+  for (let i = 0; i < src.length; i++) {
+    const x = src[i]; if (isNaN(x)) continue;
+    if (!init) { e.fill(x); init = true; }
+    let p = x;
+    for (let q = 0; q < 6; q++) { e[q] = e[q] + k * (p - e[q]); p = e[q]; }
+    out[i] = c1 * e[5] + c2 * e[4] + c3 * e[3] + c4 * e[2];
+  }
+  return out;
+}
+
+// ─── Détection : chaîne de drives (plus bas plus bas + T3-CCI plus haut) ──
+function detect(b, P) {
+  const n = b.length, ind = t3(cci(b, P.cciLen), P.t3Len, P.t3v);
+  const warm = P.cciLen + P.t3Len * 6;
+  const piv = [];
+  for (let i = Math.max(PIV_L, warm); i < n - PIV_R; i++) {
+    let ok = true;
+    for (let j = i - PIV_L; j < i && ok; j++) if (b[j].l <= b[i].l) ok = false;
+    for (let j = i + 1; j <= i + PIV_R && ok; j++) if (b[j].l < b[i].l) ok = false;
+    if (ok && !isNaN(ind[i])) piv.push(i);
+  }
+  if (!piv.length) return null;
+  const last = piv[piv.length - 1];
+  if (n - 1 - last > P.fresh) return null;
+  for (let j = last + 1; j < n; j++) if (b[j].l < b[last].l) return null;      // cassé sous le dernier drive : invalidé
+  // on remonte les pivots : chaque drive précédent doit avoir un bas plus haut et un T3-CCI plus bas
+  const chain = [last];
+  for (let k = piv.length - 2; k >= 0; k--) {
+    const cur = chain[chain.length - 1], p = piv[k];
+    if (cur - p > MAX_GAP) break;
+    if (b[p].l <= b[cur].l) break;                       // un bas plus bas entre deux : la série s'arrête
+    if (ind[p] < ind[cur]) chain.push(p); else break;
+  }
+  if (chain.length < P.drives) return null;
+  chain.reverse();
+  if (P.os && ind[chain[0]] > -100) return null;
+  const first = chain[0], lastD = chain[chain.length - 1];
+  return {drives: chain, ind, n: chain.length, ago: n - 1 - lastD, low: b[lastD].l,
+          drop: (b[lastD].l / b[first].l - 1) * 100, cciGain: ind[lastD] - ind[first], cciNow: ind[n - 1],
+          bounce: (b[n - 1].c / b[lastD].l - 1) * 100};
+}
+
+async function load() {
+  if (busy) return; busy = true;
+  $('grid').innerHTML = '';
+  try {
+    const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+    const seen = new Set();
+    const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+      .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h, p24: +t.price24hPcnt * 100}))
+      .filter(t => t.v >= 5e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v).filter(t => !seen.has(t.b) && seen.add(t.b));
+    const tf = $('tf').value, out = []; let done = 0;
+    for (let i = 0; i < list.length; i += 15) {
+      await Promise.all(list.slice(i, i + 15).map(async t => {
+        try {
+          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=${tf}&limit=300`).then(r => r.json())).result.list.reverse();
+          out.push({...t, bars: k.map(x => ({t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4]}))});
+        } catch (e) {}
+        done++;
+      }));
+      $('status').textContent = `scan ${done}/${list.length}…`;
+    }
+    RAW = out;
+    $('status').dataset.n = out.length;
+  } catch (e) { $('status').textContent = 'erreur : ' + e.message; }
+  busy = false;
+  scan();
+}
+
+function params() {
+  return {cciLen: Math.max(5, +$('cciLen').value || 14), t3Len: Math.max(2, +$('t3Len').value || 5), t3v: Math.min(1, Math.max(0.1, +$('t3v').value || 0.618)),
+          drives: +$('drives').value, fresh: +$('fresh').value + PIV_R, os: $('os').checked};
+}
+function scan() {
+  const P = params();
+  items = RAW.map(c => { const d = detect(c.bars, P); return d ? {...c, d} : null; }).filter(Boolean)
+    .sort((a, b) => b.d.n - a.d.n || a.d.ago - b.d.ago || b.d.cciGain - a.d.cciGain);
+  $('status').textContent = `${items.length} divergence${items.length > 1 ? 's' : ''} sur ${RAW.length} perps · ${$('tf').selectedOptions[0].text} · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`;
+  render();
+}
+
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  io.unobserve(e.target); draw(e.target, items[+e.target.dataset.i]);
+}), {rootMargin: '300px'});
+
+function draw(box, x) {
+  if (!window.LightweightCharts || !x) return;
+  box.innerHTML = '';
+  const ch = LightweightCharts.createChart(box, {autoSize: true, layout: {background: {color: '#0e1117'}, textColor: '#7f8fa3', fontSize: 11},
+    grid: {vertLines: {color: '#1a2029'}, horzLines: {color: '#1a2029'}}, rightPriceScale: {borderColor: '#262d36', scaleMargins: {top: 0.05, bottom: 0.34}},
+    timeScale: {borderColor: '#262d36', timeVisible: $('tf').value !== 'D'}, crosshair: {mode: 0}, handleScroll: false, handleScale: false});
+  const T = t => Math.floor(t / 1000), N = 90, bars = x.bars.slice(-N), off = x.bars.length - bars.length;
+  const s = ch.addCandlestickSeries({upColor: '#26c281', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26c281', wickDownColor: '#ef5350'});
+  s.setData(bars.map(b => ({time: T(b.t), open: b.o, high: b.h, low: b.l, close: b.c})));
+  // T3-CCI dans le bas du chart
+  const c = ch.addLineSeries({priceScaleId: 'cci', color: '#b388ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+  ch.priceScale('cci').applyOptions({scaleMargins: {top: 0.72, bottom: 0.02}, borderColor: '#262d36'});
+  c.setData(bars.map((b, i) => ({time: T(b.t), value: x.d.ind[off + i]})).filter(p => !isNaN(p.value)));
+  [-100, 0, 100].forEach(v => c.createPriceLine({price: v, color: v ? '#3a3f4a' : '#2a2f38', lineStyle: 2, lineWidth: 1, axisLabelVisible: false}));
+  // lignes de divergence : prix (bas de plus en plus bas) et T3-CCI (bas de plus en plus hauts)
+  const dv = x.d.drives.filter(i => i >= off);
+  const pl = ch.addLineSeries({color: '#26c281', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+  pl.setData(dv.map(i => ({time: T(x.bars[i].t), value: x.bars[i].l})));
+  const cl = ch.addLineSeries({priceScaleId: 'cci', color: '#26c281', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+  cl.setData(dv.map(i => ({time: T(x.bars[i].t), value: x.d.ind[i]})));
+  s.setMarkers(dv.map((i, k) => ({time: T(x.bars[i].t), position: 'belowBar', color: '#26c281', shape: 'arrowUp', text: String(k + 1 + (x.d.drives.length - dv.length))})));
+  ch.timeScale().fitContent();
+}
+
+function render() {
+  const g = $('grid');
+  if (!items.length) { g.innerHTML = `<div class="empty">${busy ? 'scan en cours…' : 'Aucune divergence T3-CCI en ' + $('drives').value + '+ drives pour l’instant. Essaie une autre unité de temps ou un dernier drive plus ancien.'}</div>`; return; }
+  const tfTV = {60: '60', 240: '240', D: 'D'}[$('tf').value];
+  g.innerHTML = items.map((x, i) => {
+    const url = `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(`BYBIT:${x.s}.P`)}&interval=${tfTV}`;
+    return `<div class="tile">
+      <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener">${x.b} ↗</a></span>
+        <span class="chip acc">${x.d.n} drives</span>
+        <span class="chip">dernier drive ${x.d.ago === 0 ? 'en cours' : 'il y a ' + x.d.ago + ' bougie' + (x.d.ago > 1 ? 's' : '')}</span>
+        <span class="chip ${x.d.bounce >= 0 ? 'up' : 'down'}">${fmt(x.d.bounce)} depuis</span></div>
+      <div class="lv">prix <b>${fmt(x.d.drop)}</b> entre le 1er et le dernier drive · T3-CCI <b>+${x.d.cciGain.toFixed(0)}</b> pts · invalidation sous <b>${px(x.d.low)}</b> · 24 h ${fmt(x.p24)}</div>
+      <div class="chart" data-i="${i}"><div class="ph">chargement du chart…</div></div>
+    </div>`;
+  }).join('');
+  g.querySelectorAll('.chart').forEach(el => io.observe(el));
+}
+
+['drives', 'fresh', 'os', 'cciLen', 't3Len', 't3v'].forEach(id => $(id).addEventListener('change', () => { save(); scan(); }));
+$('tf').addEventListener('change', () => { save(); load(); });
+$('reload').addEventListener('click', load);
+// dans marketscanner.co : les liens du menu changent de page du site
+try { if (window.top !== window) document.querySelectorAll('.menu a').forEach(a => { a.target = '_top'; a.href = 'https://marketscanner.co/' + {'conso.html': 'consolidations', 'reveil.html': 'reveil', 'winners.html': 'winners'}[a.getAttribute('href')]; }); } catch (e) {}
+load();
+setInterval(() => { if (!document.hidden) load(); }, 15 * 60 * 1000);
+</script>
+</body>
+</html>
