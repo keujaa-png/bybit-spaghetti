@@ -99,8 +99,11 @@ async function loadCrypto() {
   const R = RULES.crypto;
   const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE'.split(' '));
   const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+  // on écarte les perps d'actions, ETF, matières premières et forex (Bybit TradFi) : que des coins
+  const inst = await fetch('https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000').then(r => r.json()).catch(() => null);
+  const TRADFI = new Set(((inst && inst.result && inst.result.list) || []).filter(o => ['stock', 'ETF', 'commodity', 'forex'].includes(o.symbolType)).map(o => o.symbol));
   const seen = new Set();
-  const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+  const list = tk.result.list.filter(t => t.symbol.endsWith('USDT') && !TRADFI.has(t.symbol))
     .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
     .filter(t => t.v >= 5e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v)
     .filter(t => !seen.has(t.b) && seen.add(t.b));

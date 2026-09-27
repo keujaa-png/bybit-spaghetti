@@ -71,7 +71,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const LAYOUT = 'LAU9xwF7';
-const PIV_L = 4, PIV_R = 2, MAX_GAP = 40;             // pivot de bas : 4 bougies avant, 2 après ; 40 bougies max entre deux drives
+const PIV_L = 4, PIV_R = 2, MAX_GAP = 60;             // pivot de bas : 4 bougies avant, 2 après ; 60 bougies max entre deux drives
 const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE SAMSUNG'.split(' '));
 let RAW = [], items = [], busy = false;
 const keys = ['tf', 'drives', 'fresh', 'cciLen', 't3Len', 't3v'];
@@ -105,6 +105,9 @@ function t3(src, len, v) {
 }
 
 // ─── Détection : chaîne de drives (plus bas plus bas + T3-CCI plus haut) ──
+// Dernier drive = un pivot de bas récent que le prix n'a pas cassé depuis. On remonte ensuite de drive en drive :
+// le drive précédent est le plus bas pivot avant lui (dans MAX_GAP bougies, sans bas plus bas entre les deux),
+// et son T3-CCI doit être plus bas. On garde la plus longue série.
 function detect(b, P) {
   const n = b.length, ind = t3(cci(b, P.cciLen), P.t3Len, P.t3v);
   const warm = P.cciLen + P.t3Len * 6;
@@ -115,20 +118,30 @@ function detect(b, P) {
     for (let j = i + 1; j <= i + PIV_R && ok; j++) if (b[j].l < b[i].l) ok = false;
     if (ok && !isNaN(ind[i])) piv.push(i);
   }
-  if (!piv.length) return null;
-  const last = piv[piv.length - 1];
-  if (n - 1 - last > P.fresh) return null;
-  for (let j = last + 1; j < n; j++) if (b[j].l < b[last].l) return null;      // cassé sous le dernier drive : invalidé
-  // on remonte les pivots : chaque drive précédent doit avoir un bas plus haut et un T3-CCI plus bas
-  const chain = [last];
-  for (let k = piv.length - 2; k >= 0; k--) {
-    const cur = chain[chain.length - 1], p = piv[k];
-    if (cur - p > MAX_GAP) break;
-    if (b[p].l <= b[cur].l) break;                       // un bas plus bas entre deux : la série s'arrête
-    if (ind[p] < ind[cur]) chain.push(p); else break;
+  let best = null;
+  for (let s = piv.length - 1; s >= 0; s--) {
+    const last = piv[s];
+    if (n - 1 - last > P.fresh) break;
+    let broken = false;
+    for (let j = last + 1; j < n && !broken; j++) if (b[j].l < b[last].l) broken = true;    // cassé sous ce drive : invalidé
+    if (broken) continue;
+    const chain = [last];
+    let k = s - 1;
+    while (k >= 0) {
+      const cur = chain[chain.length - 1];
+      let bi = -1;
+      for (let q = k; q >= 0; q--) {
+        const p = piv[q];
+        if (cur - p > MAX_GAP || b[p].l <= b[cur].l) break;
+        if (bi < 0 || b[p].l < b[piv[bi]].l) bi = q;
+      }
+      if (bi < 0 || !(ind[piv[bi]] < ind[cur])) break;
+      chain.push(piv[bi]); k = bi - 1;
+    }
+    if (!best || chain.length > best.length) best = chain;
   }
-  if (chain.length < P.drives) return null;
-  chain.reverse();
+  if (!best || best.length < P.drives) return null;
+  const chain = best.reverse();
   if (P.os && ind[chain[0]] > -100) return null;
   const first = chain[0], lastD = chain[chain.length - 1];
   return {drives: chain, ind, n: chain.length, ago: n - 1 - lastD, low: b[lastD].l,
@@ -141,8 +154,11 @@ async function load() {
   $('grid').innerHTML = '';
   try {
     const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+    // on écarte les perps d'actions, ETF, matières premières et forex (Bybit TradFi) : que des coins
+    const inst = await fetch('https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000').then(r => r.json()).catch(() => null);
+    const TRADFI = new Set(((inst && inst.result && inst.result.list) || []).filter(o => ['stock', 'ETF', 'commodity', 'forex'].includes(o.symbolType)).map(o => o.symbol));
     const seen = new Set();
-    const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+    const list = tk.result.list.filter(t => t.symbol.endsWith('USDT') && !TRADFI.has(t.symbol))
       .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h, p24: +t.price24hPcnt * 100}))
       .filter(t => t.v >= 5e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v).filter(t => !seen.has(t.b) && seen.add(t.b));
     const tf = $('tf').value, out = []; let done = 0;
