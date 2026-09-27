@@ -52,15 +52,31 @@
   .chip.go { color:#fff; background:#1f6e43; border-color:#26c281; }
   .chip.near { color:var(--warn); border-color:#5a4520; }
   #alertBtn.on { background:#1f6e43; border-color:var(--up); color:#fff; }
+  #tuto { margin:12px 16px 0; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+  #tuto summary { cursor:pointer; padding:10px 14px; font-weight:600; list-style:none; }
+  #tuto summary::-webkit-details-marker { display:none; }
+  #tuto summary::after { content:' ▾'; color:var(--mut); }
+  #tuto[open] summary::after { content:' ▴'; }
+  .tuto { padding:0 14px 12px; display:grid; gap:10px 24px; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); font-size:13px; }
+  .tuto h3 { font-size:13.5px; margin:0 0 4px; }
+  .tuto p, .tuto ul { margin:0; color:var(--txt); }
+  .tuto ul { padding-left:18px; }
+  .tuto li { margin:2px 0; }
+  .tuto .mut { font-size:12.5px; }
+  body.v-conso .only-rv, body.v-rv .only-cs { display:none !important; }
+  .cat td:last-child { white-space:normal; min-width:320px; }
+  .cat a { color:var(--txt); text-decoration:none; } .cat a:hover { color:var(--acc); }
+  .src { color:var(--mut); font-size:12px; }
+  a.chip { text-decoration:none; }
   .empty { grid-column:1/-1; color:var(--mut); padding:30px 0; text-align:center; }
   @media (max-width:560px) { header { padding:8px 12px; } .sec { padding:12px 12px 0; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>⚡ Réveils & narratives</h1>
+  <h1 id="h1">⚡ Réveils & narratives</h1>
   <div class="ctl">
-    <a href="conso.html" style="font-size:13px">🧩 Consolidations</a>
+    <a id="otherView" href="#" style="font-size:13px"></a>
     <select id="size" title="Taille des fenêtres">
       <option value="260">Petites</option>
       <option value="330" selected>Moyennes</option>
@@ -72,6 +88,7 @@
       <option value="W">Weekly</option>
     </select>
     <button id="reload" title="Recalculer maintenant">↻</button>
+    <button id="tutoBtn" title="Afficher le mode d’emploi">📘 Mode d’emploi</button>
     <select id="near" title="Distance au breakout qui déclenche l’alerte « proche »">
       <option value="2">Proche = 2 %</option>
       <option value="3" selected>Proche = 3 %</option>
@@ -82,7 +99,41 @@
   <div class="status" id="status">chargement…</div>
 </header>
 
-<section class="sec">
+<details id="tuto">
+  <summary>📘 Mode d’emploi — 5 minutes par jour</summary>
+  <div class="tuto">
+    <div class="only-rv"><h3>Repérer les narratives qui chauffent</h3>
+      <p>Dans le tableau, regarde la <b>Chaleur</b> et surtout la colonne <b>Cassures 20 j</b>. Une vraie narrative, c’est plusieurs coins du même secteur qui cassent en même temps (≥ 50 %). Si un seul coin monte, c’est plutôt une news isolée.</p></div>
+    <div class="only-rv"><h3>Ouvrir la narrative</h3>
+      <p>Clique sur la ligne : tu vois les charts de tous ses coins, triés par perf 7 j. Le leader a déjà fait son mouvement. Cherche ceux qui sont <b>encore en base</b> près de leur cassure : ce sont eux qui peuvent suivre (la 2<sup>e</sup> vague).</p></div>
+    <div class="only-rv"><h3>Lire les Réveils ⚡</h3>
+      <p>Un coin qui casse son plus haut 55 jours avec un volume au moins 2,5× la normale, après 20 jours calmes (range ≤ 30 %). C’est le signal qui avait sorti QNT le 22/09. Entrée sur la cassure ou sur le retest du niveau, stop sous la base.</p></div>
+    <div class="only-cs"><h3>Lire les consolidations 🧩</h3>
+      <ul><li><b>à x %</b> : distance jusqu’au niveau de cassure.</li>
+        <li><b>🔔</b> = tout proche : prépare l’ordre. <b>🚀</b> = cassé.</li>
+        <li><b>breakout &gt;</b> = niveau d’entrée, <b>bas</b> = où mettre le stop.</li>
+        <li><b>run + conso</b> = pause après une hausse ≥ 30 % ; <b>base calme</b> = range serré sous le plus haut 55 j.</li></ul></div>
+    <div><h3>Vérifier le « pourquoi ? 𝕏 »</h3>
+      <p>Ouvre les tweets récents sur le coin (≥ 10 likes). Un catalyseur concret (partenariat, listing, produit, chiffres) rend le mouvement plus solide. S’il n’y a rien, ou que de l’appel au pump, prudence.</p></div>
+    <div class="only-cs"><h3>Activer les alertes Chrome 🔔</h3>
+      <ul><li>Ouvre la page directe : <a href="https://keujaa-png.github.io/bybit-spaghetti/reveil.html?vue=conso" target="_blank" rel="noopener">keujaa-png.github.io/…/reveil.html?vue=conso</a>.</li>
+        <li>Clique <b>🔔 Alertes Chrome</b> puis <b>Autoriser</b>.</li>
+        <li>Règle le seuil avec <b>Proche = 2 / 3 / 5 %</b>.</li>
+        <li>Laisse l’onglet ouvert (en arrière-plan, c’est bon). Une alerte par coin et par jour ; clic sur la notification = chart TradingView.</li></ul></div>
+    <div><h3>Catalyseurs 📰</h3>
+      <p>Le tableau relie les actus des grands médias crypto et les annonces Bybit aux coins cités, et ne garde que les vrais catalyseurs : banques/tokenisation, listing, ETF, partenariat, régulation, rachat, lancement. <b>Réaction ✅</b> = le prix suit déjà (≥ +5 % sur 24 h ou volume ≥ 2×) : c’est ce cas-là qui déclenche l’alerte Chrome. ⚠️ = risque (hack, unlock, delisting).</p></div>
+    <div><h3>Passer sur TradingView</h3>
+      <p>Clic sur le nom d’un coin = ton layout « Scanner » avec les panneaux Run + Conso et Trend Tracker. La watchlist <b>Reveils_Narratives</b> reprend les réveils et les 3 narratives chaudes, mise à jour chaque matin.</p></div>
+    <div><h3>Gestion du risque</h3>
+      <ul><li>0,5 à 1 % du capital risqué par trade (distance entrée → stop).</li>
+        <li>2–3 coins par narrative plutôt qu’un seul pari.</li>
+        <li>Ne pas courir après un coin déjà à +100 % : attendre sa conso.</li>
+        <li>Sortie : stop suiveur sous le plus bas 20 j, ou quand les cassures de la narrative retombent.</li></ul>
+      <p class="mut">Outil d’aide à la décision, pas un conseil financier.</p></div>
+  </div>
+</details>
+
+<section class="sec only-rv">
   <div class="sech"><h2>🔥 Narratives</h2>
     <span class="hint">Perps Bybit regroupés par secteur. Chaleur = perf 7 j médiane + part des coins qui cassent leur plus haut 20 j + réveils. Clic sur une ligne = voir ses charts.</span></div>
   <div class="tw"><table>
@@ -92,17 +143,27 @@
 </section>
 
 <section class="sec">
+  <div class="sech"><h2 id="catTitle">📰 Catalyseurs</h2>
+    <span class="hint">Actus crypto des 3 derniers jours (CoinDesk, Cointelegraph, The Block, Decrypt…) + annonces Bybit, reliées aux coins cités. On ne garde que les vrais catalyseurs (banques, listing, ETF, partenariat, régulation, rachat…) ; <b>réaction</b> = le coin bouge (≥ +5 % sur 24 h ou volume ≥ 2×). Alerte Chrome sur chaque catalyseur avec réaction.</span></div>
+  <div class="tw"><table class="cat">
+    <thead><tr><th>Quand</th><th>Coin</th><th>24 h</th><th>Réaction</th><th>Type</th><th>Titre</th></tr></thead>
+    <tbody id="catRows"><tr><td colspan="6" class="mut" style="text-align:center">chargement des actus…</td></tr></tbody>
+  </table></div>
+</section>
+
+<section class="sec only-rv">
   <div class="sech"><h2 id="gridTitle">⚡ Réveils</h2>
     <span class="flt" id="flt"><span class="chip acc" id="fltName"></span><span class="chip btn" id="fltClear">✕ tous les réveils</span></span>
     <span class="hint" id="gridHint"></span></div>
 </section>
-<main id="grid"></main>
+<main id="grid" class="only-rv"></main>
 
-<section class="sec">
+<section class="sec only-cs">
   <div class="sech"><h2 id="consTitle">🧩 Consolidations</h2>
-    <span class="hint">Coins en conso, triés par distance à la cassure : run ≥ 30 % puis conso de 4 j (règles du panneau Run + Conso), ou base calme de 20 j (range ≤ 30 %) sous le plus haut 55 j. Les alertes Chrome surveillent cette liste.</span></div>
+    <span class="flt" id="cflt"><span class="chip acc" id="cfltName"></span><span class="chip btn" id="cfltClear">✕ toutes les narratives</span></span>
+    <span class="hint">Coins en conso, triés par distance à la cassure : run ≥ 30 % puis conso de 4 j (règles du panneau Run + Conso), ou base calme de 20 j (range ≤ 30 %) sous le plus haut 55 j. Les alertes Chrome surveillent cette liste. Clic sur une narrative = filtrer.</span></div>
 </section>
-<main id="cgrid"></main>
+<main id="cgrid" class="only-cs"></main>
 
 <script>
 // ─── Règles ──────────────────────────────────────────────────────────────
@@ -114,6 +175,9 @@ const RC = {runLen: 20, runMin: 30, consLen: 4, consMax: 25, retr: 50};   // mê
 const WATCH_MAX = 6;                                                          // coins affichés : jusqu'à 6 % du niveau
 const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE'.split(' '));
 const $ = id => document.getElementById(id);
+// deux vues sur la même page : ?vue=conso → consolidations + alertes ; sinon → narratives + réveils
+const VIEW = new URLSearchParams(location.search).get('vue') === 'conso' ? 'conso' : 'rv';
+document.body.classList.add(VIEW === 'conso' ? 'v-conso' : 'v-rv');
 let coins = [], nars = [], NAR = null, selected = null, busy = false, alertsOn = false;
 try { const s = JSON.parse(localStorage.getItem('reveil-page') || '{}'); ['size', 'tf', 'near'].forEach(k => { if (s[k]) $(k).value = s[k]; }); alertsOn = !!s.alerts; } catch (e) {}
 const save = () => { try { localStorage.setItem('reveil-page', JSON.stringify({size: $('size').value, tf: $('tf').value, near: $('near').value, alerts: alertsOn})); } catch (e) {} };
@@ -192,6 +256,7 @@ async function load() {
   busy = false;
   render();
   pollAlerts();
+  loadCatalysts();
 }
 
 function buildNarratives() {
@@ -271,7 +336,7 @@ function render() {
         <span class="chip ${cls(c.perf1)}">${c.perf1 >= 0 ? '▲' : '▼'} ${fmt(c.perf1)} 24h</span>
         <span class="chip ${cls(c.perf7)}">${fmt(c.perf7, 0)} 7j</span>${rev}</div>
       <div class="lv">${lv} · <a href="${news}" target="_blank" rel="noopener" title="Tweets récents sur $${c.b} (≥ 10 likes)">pourquoi ? 𝕏</a></div>
-      <div class="lv">${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
+      <div class="lv">${catChip(c)}${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
       <div class="chart" data-sym="${c.sym}"><div class="ph">chargement du chart…</div></div>
     </div>`;
   }).join('');
@@ -282,7 +347,9 @@ function watchList() {
   return coins.filter(c => c.watch && c.watch.dist <= WATCH_MAX && c.watch.dist >= -15).sort((a, b) => a.watch.dist - b.watch.dist);
 }
 function renderCons() {
-  const list = watchList(), nearPct = +$('near').value;
+  const selN = VIEW === 'conso' && selected && narById(selected);
+  const list = watchList().filter(c => !selN || c.nar.includes(selN.id)), nearPct = +$('near').value;
+  $('cflt').classList.toggle('on', !!selN); if (selN) $('cfltName').textContent = selN.label;
   $('consTitle').textContent = `🧩 Consolidations (${list.length})`;
   const g = $('cgrid');
   if (!list.length) { g.innerHTML = `<div class="empty">${busy ? 'analyse en cours…' : 'Aucun coin en conso près de sa cassure.'}</div>`; return; }
@@ -292,7 +359,7 @@ function renderCons() {
       <div class="th"><span class="sym"><a href="${tvUrl(c)}" target="_blank" rel="noopener" title="${c.name.replace(/"/g, '')} · ouvrir sur TradingView">${c.b} ↗</a></span>
         <span class="chip ${cls(c.perf1)}">${c.perf1 >= 0 ? '▲' : '▼'} ${fmt(c.perf1)} 24h</span>${st}</div>
       <div class="lv">${w.type}${w.run ? ` (run ${fmt(w.run, 0)})` : ''} · range <b>${w.range.toFixed(0)} %</b> · breakout &gt; <b>${px(w.lvl)}</b> · bas <b>${px(w.low)}</b> · <a href="${xUrl(c)}" target="_blank" rel="noopener">pourquoi ? 𝕏</a></div>
-      <div class="lv">${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
+      <div class="lv">${catChip(c)}${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
       <div class="chart" data-sym="${c.sym}"><div class="ph">chargement du chart…</div></div>
     </div>`;
   }).join('');
@@ -318,8 +385,8 @@ function notified(key) {
   try { const m = JSON.parse(localStorage.getItem('reveil-notified') || '{}'); if (m[key] === day) return true; m[key] = day; localStorage.setItem('reveil-notified', JSON.stringify(m)); } catch (e) {}
   return false;
 }
-function notify(c, title, body) {
-  const url = tvUrl(c), tag = 'reveil-' + c.s + title.slice(0, 2);
+function notify(c, title, body, link) {
+  const url = link || tvUrl(c), tag = 'reveil-' + c.s + title.slice(0, 2);
   if (inFrame) { window.parent.postMessage({type: 'spaghetti-alert', title, body, tag, url}, '*'); return; }
   try {
     const n = new Notification(title, {body, tag, requireInteraction: title.startsWith('🚀')});
@@ -363,12 +430,122 @@ if (inFrame) { window.parent.postMessage({type: 'spaghetti-perm-query'}, '*'); s
 alertBtn();
 setInterval(pollAlerts, 60 * 1000);
 
-const pick = id => { selected = selected === id ? null : id; render(); if (selected) $('gridTitle').scrollIntoView({behavior: 'smooth', block: 'start'}); };
+// ─── Catalyseurs : flux RSS des médias crypto (via rss2json) + annonces Bybit ──────────────
+const FEEDS = ['https://www.coindesk.com/arc/outboundfeeds/rss/', 'https://cointelegraph.com/rss', 'https://www.theblock.co/rss.xml',
+  'https://decrypt.co/feed', 'https://cryptoslate.com/feed/', 'https://coinpedia.org/feed/', 'https://cryptopotato.com/feed/',
+  'https://u.today/rss', 'https://crypto.news/feed/', 'https://bitcoinethereumnews.com/feed/'];
+const CAT_RULES = [
+  ['⚠️ Risque', /\b(hack(ed|ers?)?|exploit(ed)?|drain(ed)?|token unlock|unlocks?|delist(s|ed|ing)?|sued|lawsuit against|breach|outage|rug)\b/i],
+  ['🏦 Banques / tokenisation', /\b(banks?|banking|clearing house|tokeni[sz](ed|ation|ing)|deposit tokens?|JPMorgan|SWIFT|DTCC|BlackRock|Fidelity|Franklin Templeton|asset managers?|RWA)\b/i],
+  ['📈 ETF', /\b(ETFs?|ETPs?|spot fund)\b/],
+  ['🏷️ Listing', /\b(lists?|listing|listed|to list|adds? support|Coinbase|Binance|Upbit|Bithumb|Robinhood|Kraken|OKX)\b/i],
+  ['🏛️ Régulation', /\b(SEC|CFTC|approv(al|es|ed)|regulators?|licen[cs]e[ds]?|legislation|bill passes|court rules|dismiss(es|ed))\b/],
+  ['🤝 Partenariat', /\b(partners?(hip)?|partnered|integrat(es|ion|ed)|collaborat(es|ion)|teams up|selects|adopts|deal with|joins forces)\b/i],
+  ['💰 Rachat / treasury', /\b(treasury|buybacks?|burns?|acquires?|acquisition|raises|funding round|invests?)\b/i],
+  ['🚀 Lancement', /\b(mainnet|launch(es|ed)?|upgrade|hard fork|goes live|roll(s|ed)? out)\b/i]
+];
+const STOPT = new Set('THE ONE NOW ALL CAT DOG BIG NEW TOP KEY GAS RED SUN MOVE OPEN HOME SAFE BANK MEME REAL LINK DATA BEST FREE GOOD HIGH FAST PEOPLE TRUMP MORE BAND PUMP GAME COOK HYPE BOME ACE ID IO IP ZK US ME AI OM T S W C Q A B X G BTC ETH'.split(' '));
+const STOPN = new Set('Quant Near Flow Magic Story Movement Blast Render Curve Maker Compound Theta Gala Kaito Zora Cosmos Stellar Solana Polygon Optimism Celo Mask Core Echo Wave Pixel Mode Life Venus Saga Space Ethena Gold Moon Hype Pump Pepe Echelon Plume Sonic Aura Neiro Bank Nexus Orca'.split(' '));
+let CAT = [];
+const catKey = 'reveil-news';
+function catMatch(text) {
+  const tags = CAT_RULES.filter(([, re]) => re.test(text)).map(([t]) => t);
+  return tags.length ? tags.slice(0, 2) : null;
+}
+function coinRegexes() {
+  return coins.filter(c => !['BTC', 'ETH'].includes(c.b)).map(c => {
+    const res = [];
+    if (c.b.length >= 3 && !STOPT.has(c.b)) res.push(new RegExp('(^|[^A-Za-z0-9])\\$?' + c.b + '(?![A-Za-z0-9])'));
+    if (c.name && c.name.length >= 4 && c.name !== c.b && !/^[a-z]/.test(c.name)) res.push(new RegExp('\\b' + c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b'));
+    // les noms trop courants (Quant, Bitcoin…) ne comptent que s'ils sont accompagnés du ticker ou du mot « token/crypto »
+    return {c, res, strictName: STOPN.has(c.name)};
+  });
+}
+async function loadCatalysts() {
+  let store = {};
+  try { store = JSON.parse(localStorage.getItem(catKey) || '{}'); } catch (e) {}
+  const now = Date.now();
+  const add = (id, it) => { if (!store[id]) store[id] = it; };
+  await Promise.all(FEEDS.map(async f => {
+    try {
+      const j = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(f)).then(r => r.json());
+      const src = (j.feed && j.feed.title || '').split(/[:|–-]/)[0].trim().slice(0, 22);
+      for (const x of j.items || []) {
+        const t = Date.parse((x.pubDate || '').replace(' ', 'T') + 'Z');
+        add(x.link, {t: isNaN(t) ? now : t, title: x.title || '', desc: (x.description || '').replace(/<[^>]+>/g, ' ').slice(0, 400), link: x.link, src});
+      }
+    } catch (e) {}
+  }));
+  try {   // annonces Bybit (nouveaux listings, produits, delistings)
+    const j = await fetch('https://api.bybit.com/v5/announcements/index?locale=en-US&limit=20').then(r => r.json());
+    for (const x of (j.result && j.result.list) || []) add(x.url, {t: +x.dateTimestamp || +x.publishTime || now, title: x.title, desc: x.description || '', link: x.url, src: 'Bybit', bybit: (x.type && x.type.key) || ''});
+  } catch (e) {}
+  for (const k of Object.keys(store)) if (now - store[k].t > 3 * 864e5) delete store[k];      // on garde 3 jours
+  try { localStorage.setItem(catKey, JSON.stringify(store)); } catch (e) {}
+  const rx = coinRegexes(), out = [];
+  for (const it of Object.values(store)) {
+    const text = it.title + ' ' + it.desc;
+    let tags = catMatch(text);
+    if (it.bybit === 'new_crypto') tags = ['🏷️ Listing'];
+    if (it.bybit === 'delistings') tags = ['⚠️ Risque'];
+    if (!tags) continue;
+    for (const {c, res, strictName} of rx) {
+      const inTitle = res.some(r => r.test(it.title)), inText = inTitle || res.some(r => r.test(it.desc));
+      if (!inText) continue;
+      if (strictName && !new RegExp('(^|[^A-Za-z0-9])\\$?' + c.b + '(?![A-Za-z0-9])').test(text) && !new RegExp(c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' ?(\\(|token|crypto|network|price|coin)', 'i').test(text)) continue;
+      const vm = c.avgTurn ? c.turn / c.avgTurn : 0;
+      const react = !tags[0].startsWith('⚠️') && (c.perf1 >= 5 || vm >= 2);
+      out.push({...it, c, tags, inTitle, react, vm});
+    }
+  }
+  // un coin cité dans le titre compte plus qu'une simple mention ; on garde la meilleure actu par coin
+  const best = {};
+  for (const x of out.sort((a, b) => (b.inTitle - a.inTitle) || (b.t - a.t))) if (!best[x.c.s]) best[x.c.s] = x;
+  CAT = Object.values(best).sort((a, b) => (b.react - a.react) || (b.c.perf1 - a.c.perf1));
+  coins.forEach(c => c.cat = best[c.s] || null);
+  renderCatalysts();
+  render();
+  // alertes : chaque catalyseur avec réaction, une fois par coin et par actu
+  if (alertsOn && perm() === 'granted') for (const x of CAT.filter(x => x.react)) {
+    if (notified('cat:' + x.c.s + ':' + x.link)) continue;
+    notify(x.c, `📰 ${x.c.b} ${fmt(x.c.perf1)} · ${x.tags[0].replace(/^\S+\s/, '')}`, `${x.title} — ${x.src}`, x.link);
+  }
+}
+const since = t => { const m = Math.round((Date.now() - t) / 6e4); return m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} j`; };
+function renderCatalysts() {
+  $('catTitle').textContent = `📰 Catalyseurs (${CAT.filter(x => x.react).length} avec réaction / ${CAT.length})`;
+  $('catRows').innerHTML = CAT.slice(0, 25).map(x => `<tr>
+    <td class="mut">${since(x.t)}</td>
+    <td><a href="${tvUrl(x.c)}" target="_blank" rel="noopener"><b>${x.c.b}</b></a></td>
+    <td class="${cls(x.c.perf1)}">${fmt(x.c.perf1)}</td>
+    <td>${x.react ? '✅' + (x.vm >= 2 ? ` vol ×${x.vm.toFixed(1)}` : '') : '<span class="mut">–</span>'}</td>
+    <td>${x.tags.join(' ')}</td>
+    <td><a href="${x.link}" target="_blank" rel="noopener">${x.title.replace(/</g, '&lt;')}</a> <span class="src">${x.src}</span> · <a class="src" href="${xUrl(x.c)}" target="_blank" rel="noopener">𝕏</a></td></tr>`).join('')
+    || '<tr><td colspan="6" class="mut" style="text-align:center">aucun catalyseur relié à un coin pour l’instant</td></tr>';
+}
+const catChip = c => c.cat ? `<a class="chip ${c.cat.react ? 'hot' : ''}" href="${c.cat.link}" target="_blank" rel="noopener" title="${c.cat.title.replace(/"/g, '')} — ${c.cat.src}">📰 ${c.cat.tags[0]}</a>` : '';
+setInterval(() => { if (coins.length) loadCatalysts(); }, 15 * 60 * 1000);
+
+const pick = id => { selected = selected === id ? null : id; render(); if (selected) $(VIEW === 'conso' ? 'consTitle' : 'gridTitle').scrollIntoView({behavior: 'smooth', block: 'start'}); };
+$('cgrid').addEventListener('click', e => { const ch = e.target.closest('[data-nar]'); if (ch) pick(ch.dataset.nar); });
+$('cfltClear').addEventListener('click', () => { selected = null; render(); });
 $('nar').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) pick(tr.dataset.id); });
 $('grid').addEventListener('click', e => { const ch = e.target.closest('[data-nar]'); if (ch) pick(ch.dataset.nar); });
 $('fltClear').addEventListener('click', () => { selected = null; render(); });
 ['size', 'tf', 'near'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
 $('reload').addEventListener('click', load);
+// titre + lien vers l'autre vue (dans marketscanner.co : on change de page du site)
+{
+  const other = VIEW === 'conso' ? {txt: '⚡ Réveils & narratives', page: 'reveil', q: ''} : {txt: '🧩 Consolidations + alertes', page: 'consolidations', q: '?vue=conso'};
+  $('otherView').textContent = other.txt;
+  if (inFrame) { $('otherView').href = 'https://marketscanner.co/' + other.page; $('otherView').target = '_top'; }
+  else $('otherView').href = 'reveil.html' + other.q;
+  if (VIEW === 'conso') { document.title = 'Consolidations & alertes'; $('h1').textContent = '🧩 Consolidations & alertes'; }
+}
+// mode d'emploi : ouvert à la première visite, puis on retient le choix
+try { const t = localStorage.getItem('reveil-tuto-' + VIEW); $('tuto').open = t === null ? true : t === '1'; } catch (e) { $('tuto').open = true; }
+$('tuto').addEventListener('toggle', () => { try { localStorage.setItem('reveil-tuto-' + VIEW, $('tuto').open ? '1' : '0'); } catch (e) {} });
+$('tutoBtn').addEventListener('click', () => { $('tuto').open = true; $('tuto').scrollIntoView({behavior: 'smooth', block: 'start'}); });
 load();
 setInterval(() => { if (!document.hidden || alertsOn) load(); }, 30 * 60 * 1000);   // alertes actives : on recalcule même en arrière-plan
 </script>
