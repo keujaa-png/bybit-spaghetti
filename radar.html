@@ -84,6 +84,7 @@
     <div class="card"><div class="mut">Pumps signalés à temps (il restait ≥ +15 %)</div><div class="big">91 %</div><div class="mut">413 / 452 · ratés : 16 pumps en une seule bougie, 17 où cassure et volume ne tombent pas sur la même heure, 4 montées lentes sans cassure</div></div>
     <div class="card"><div class="mut">Mais beaucoup de faux départs</div><div class="big">≈ 23 signaux / jour</div><div class="mut">17 % atteignent +15 % avant −8 % (13,6 % au hasard). Gain moyen +0,72 %/trade contre +0,42 % en entrant au hasard.</div></div>
     <div class="card"><div class="mut">Ça dépend du marché (walk-forward, 2 mois chacun)</div><div class="mut" style="margin-top:4px">avr–mai : règle +0,74 %/trade · IA top 40 % <b class="up">+1,14 %</b> · hasard +0,40 %<br>juin–juil : règle <b class="down">−0,62 %</b> · IA <b class="down">−0,53 %</b> · hasard −0,12 %<br>août–sept : règle +2,01 % · IA top 40 % <b class="up">+2,80 %</b> · top 20 % <b class="up">+4,03 %</b> · hasard +0,96 %</div></div>
+    <div class="card" id="autoCard" style="grid-column:1/-1"></div>
     <div class="card"><div class="mut">Ce qui a changé dans le radar</div><div class="mut" style="margin-top:4px">• cassure 24 h avec volume ≥ 2× (au lieu de 2,5×), sur bougie clôturée<br>• score IA sur chaque cassure : notification seulement pour le top 40 % (⭐), ⭐⭐ = top 20 %<br>• T3-CCI 1h gardé pour info, sans notification (aucun avantage mesuré)</div></div>
   </div>
 </section>
@@ -178,8 +179,10 @@ function t3div(b, P) {
 }
 
 // ─── Modèle IA (gradient boosting entraîné sur 6 mois de backtest, fichier radar_model.json) ──
-let MODEL = null;
-const loadModel = () => fetch('radar_model.json?x=' + Math.floor(Date.now() / 36e5)).then(r => r.json()).then(m => { MODEL = m; }).catch(() => {});
+let MODEL = null, AUTO = null;
+try { AUTO = JSON.parse(localStorage.getItem('radar-auto') || 'null'); } catch (e) {}
+// modèle réentraîné automatiquement (localStorage) prioritaire sur le modèle livré avec la page
+const loadModel = () => fetch('radar_model.json?x=' + Math.floor(Date.now() / 36e5)).then(r => r.json()).then(m => { MODEL = AUTO && AUTO.trees ? AUTO : m; }).catch(() => { if (AUTO && AUTO.trees) MODEL = AUTO; });
 // features du modèle, mêmes calculs que le backtest, sur la bougie 1h clôturée i
 function feats(h, i, o4, btc) {
   let av = 0, atr = 0, mx24 = 0, mx720 = 0, mx480 = 0, mn480 = Infinity;
@@ -214,7 +217,8 @@ function intraday(t, h, o4, btc) {
   // 3. plus haut 24 h cassé avec volume, noté par le modèle (notification seulement pour le top 40 %)
   if (F.d24 > 0 && F.vm >= S.hiVol) {
     const p = score(F);
-    out.push({type: 'hi', key: k12, score: p, notify: !MODEL || p >= MODEL.q60,
+    const th = !MODEL ? 0 : MODEL.regime === 'défavorable' ? MODEL.q80 : (MODEL.notifyTh || MODEL.q60);   // marché défavorable : seulement les ⭐⭐
+    out.push({type: 'hi', key: k12, score: p, notify: !MODEL || p >= th,
       detail: `score IA ${isNaN(p) ? '–' : Math.round(p * 100)}${stars(p)} · au-dessus de ${px(F.mx24)} (plus haut 24 h) · volume ×${F.vm.toFixed(1)} · 24 h ${fmt(t.p24)}`});
   }
   // divergence T3-CCI 1h : notée pour info, sans notification (pas d'avantage mesuré au backtest)
@@ -379,6 +383,76 @@ function renderBilan(L) {
   }
 }
 
+// ─── Auto-apprentissage : une fois par jour, le radar se réentraîne tout seul ────────────
+// 1. télécharge 4 mois de bougies 1h + OI des perps ≥ 5 M$ (moteur de backtest bt_data.js / bt_feat.js)
+// 2. entraîne le modèle sur les 3 premiers mois, le teste sur les 30 derniers jours (jamais vus)
+// 3. choisit le seuil de notification qui a le mieux marché, et détecte si le marché est défavorable aux cassures
+// 4. réentraîne sur toute la période et remplace le modèle utilisé pour les scores
+let training = false, autoMsg = '';
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src + '?x=' + Math.floor(Date.now() / 864e5); s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+function renderAuto() {
+  const c = $('autoCard'); if (!c) return;
+  const A = AUTO && AUTO.trees ? AUTO : null;
+  const pct = v => v == null || isNaN(v) ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(2) + ' %';
+  c.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div class="mut">🧠 Auto-apprentissage (chaque jour, sur les 4 derniers mois)</div>
+    <button id="retrain" style="background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer">${training ? '⏳ en cours' : '↻ réentraîner maintenant'}</button></div>` +
+    (training ? `<div class="mut" style="margin-top:6px">${autoMsg}</div>` : '') +
+    (A ? `<div style="margin-top:6px">Dernier entraînement : <b>${hhmm(A.t)}</b> · ${A.nTrain} cassures · marché <b class="${A.regime === 'favorable' ? 'up' : 'down'}">${A.regime}</b>${A.regime === 'favorable' ? '' : ' → notifications limitées aux ⭐⭐'}</div>
+      <div class="mut" style="margin-top:4px">Test sur les 30 derniers jours (gain moyen par trade) : hasard ${pct(A.rand)} · ${A.val.map(v => `${v.k} ${pct(v.avg)} (${v.n})`).join(' · ')}</div>
+      <div class="mut">Seuil de notification retenu : <b>${A.notifyK}</b></div>`
+       : `<div class="mut" style="margin-top:6px">${training ? '' : 'Pas encore entraîné sur ce navigateur : le premier entraînement démarre quelques minutes après l’ouverture de la page (≈ 3 min).'}</div>`);
+  const b = $('retrain'); if (b) b.onclick = () => autoTrain(true);
+}
+async function autoTrain(force) {
+  if (training) return;
+  if (!force && AUTO && Date.now() - AUTO.t < 24 * 36e5) return;
+  training = true; autoMsg = 'téléchargement des données…'; renderAuto();
+  const tick = setInterval(() => { if (window.BT && BT.status) { autoMsg = BT.status; renderAuto(); } }, 3000);
+  try {
+    if (!window.BT || !BT.load) await loadScript('bt_data.js');
+    if (!BT.prep) await loadScript('bt_feat.js');
+    await BT.load(5e6, 120);
+    clearInterval(tick); autoMsg = 'calcul des features…'; renderAuto(); await BT.sleep(50);
+    BT.prep(BT.coins, BT.evalStart);
+    const cand = (F, i) => F.d24[i] > 0 && F.vm[i] >= S.hiVol;
+    const ret = (d, i) => { const c = d.c[i]; for (let j = i + 1; j <= i + 72; j++) { if (d.l[j] <= c * 0.92) return -0.08; if (d.h[j] >= c * 1.15) return 0.15; } return d.c[i + 72] / c - 1; };
+    const FE = BT.FEATS.filter(f => f !== 'd1320'), valStart = BT.end - 30 * 864e5;
+    const rows = [], rnd = [];
+    for (const d of BT.D) {
+      let last = -1e9;
+      for (let i = d.i0; i < d.n - 72; i++) {
+        if (i % 7 === 0) rnd.push({t: d.t[i], r: ret(d, i) - 0.0012});
+        if (i - last < 24 || !cand(d.F, i)) continue;                        // un signal par coin et par 24 h, comme le radar
+        last = i; rows.push({x: FE.map(f => d.F[f][i]), r: ret(d, i) - 0.0012, t: d.t[i]});
+      }
+    }
+    const tr = rows.filter(r => r.t < valStart - 3 * 864e5), va = rows.filter(r => r.t >= valStart);
+    const avg = a => a.length ? a.reduce((s, r) => s + r.r, 0) / a.length : NaN;
+    autoMsg = `entraînement sur ${tr.length} cassures…`; renderAuto(); await BT.sleep(50);
+    const m1 = BT.gbm(tr.map(r => r.x), tr.map(r => r.r > 0.03 ? 1 : 0), {trees: 150, lr: 0.08, minLeaf: 60});
+    const ptr = tr.map(r => m1.predict(r.x)).sort((a, b) => a - b), qt = f => ptr[Math.floor(f * ptr.length)];
+    va.forEach(r => { r.p = m1.predict(r.x); });
+    const tiers = [{k: 'toutes les cassures', f: 0}, {k: 'top 60 %', f: 0.4}, {k: 'top 40 %', f: 0.6}, {k: 'top 20 %', f: 0.8}];
+    const val = tiers.map(t => { const s = va.filter(r => r.p >= (t.f ? qt(t.f) : -1)); return {k: t.k, f: t.f, n: s.length, avg: avg(s)}; });
+    const rand = avg(rnd.filter(r => r.t >= valStart));
+    const ok = val.filter(v => v.f > 0 && v.n >= 20);
+    const best = ok.length ? ok.reduce((a, b) => b.avg > a.avg ? b : a) : {k: 'top 40 %', f: 0.6};
+    const regime = val[0].avg > rand && val[0].avg > 0 ? 'favorable' : 'défavorable';
+    // modèle final : réentraîné sur toute la période, seuils recalculés
+    autoMsg = 'modèle final…'; renderAuto(); await BT.sleep(50);
+    const m = BT.gbm(rows.map(r => r.x), rows.map(r => r.r > 0.03 ? 1 : 0), {trees: 150, lr: 0.08, minLeaf: 60});
+    const pall = rows.map(r => m.predict(r.x)).sort((a, b) => a - b), qa = f => pall[Math.floor(f * pall.length)];
+    const round = x => +(+x).toPrecision(5);
+    AUTO = {t: Date.now(), feats: FE, F0: round(m.F0), trees: m.trees.map(t => [t.f, t.s, round(t.wl), round(t.wr)]), edges: m.edges.map(e => e.map(round)),
+            q60: round(qa(0.6)), q80: round(qa(0.8)), notifyTh: round(qa(Math.max(0.4, best.f))), notifyK: best.f >= 0.8 ? 'top 20 % (⭐⭐)' : best.f >= 0.6 ? 'top 40 % (⭐)' : 'top 60 %',
+            regime, val: val.map(v => ({k: v.k, n: v.n, avg: v.avg})), rand, nTrain: rows.length};
+    try { localStorage.setItem('radar-auto', JSON.stringify(AUTO)); } catch (e) {}
+    MODEL = AUTO;
+    BT.coins = []; BT.D = []; BT.EP = [];                                          // libère la mémoire
+  } catch (e) { autoMsg = 'erreur : ' + e.message; }
+  clearInterval(tick); training = false; renderAuto();
+}
+
 // ─── Démarrage ───────────────────────────────────────────────────────────
 $('alertBtn').addEventListener('click', async () => {
   const st = perm();
@@ -401,8 +475,11 @@ alertBtn();
 $('minVol').addEventListener('change', () => { save(); scan(); });
 $('reload').addEventListener('click', () => { lastDaily = 0; scan(); });
 render();
+renderAuto();
 scan();
 setInterval(scan, 5 * 60 * 1000);                  // toutes les 5 min, même onglet en arrière-plan
+setTimeout(() => autoTrain(false), 90 * 1000);     // auto-apprentissage : 1 fois par jour
+setInterval(() => autoTrain(false), 60 * 60 * 1000);
 </script>
 </body>
 </html>
