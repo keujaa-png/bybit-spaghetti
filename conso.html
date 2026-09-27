@@ -100,7 +100,7 @@ async function loadCrypto() {
   const seen = new Set();
   const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
     .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
-    .filter(t => t.v >= 10e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v)
+    .filter(t => t.v >= 5e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v)
     .filter(t => !seen.has(t.b) && seen.add(t.b));
   const out = [];
   let done = 0;
@@ -239,7 +239,7 @@ function render() {
   list.sort((a, b) => sort === 'tight' ? a.range - b.range : sort === 'perf' ? b.perf7 - a.perf7 : b.run - a.run);
   list = list.slice(0, MAX_TILES);
   $('note').textContent = market === 'crypto'
-    ? 'Crypto : règles exactes de l’indicateur (run ≥ 30 % sur 20 j, conso de 4 j dans un range ≤ 25 %, qui garde ≥ 50 % du run). Clic sur le nom = ouvrir sur ton layout TradingView.'
+    ? 'Crypto : tous les perps Bybit ≥ 5 M$ de volume 24 h, règles exactes de l’indicateur (run ≥ 30 % sur 20 j, conso de 4 j dans un range ≤ 25 %, qui garde ≥ 50 % du run). Clic sur le nom = ouvrir sur ton layout TradingView.'
     : (market === 'us' ? 'Actions US > 1 Md$' : 'Matières premières + ETF > 1 Md$') + ' : approximation via le screener TradingView (forte perf 3 mois, prix proche du plus haut 3 mois, semaine calme). Pas de détection sweep/breakout ici. Clic sur le nom = ouvrir sur ton layout.';
   const grid = $('grid');
   if (!list.length) { grid.innerHTML = `<div class="empty">Aucun actif ${show === 'sweep' ? 'avec un sweep récent après run + conso' : show === 'sig' ? 'avec un signal récent' : 'en consolidation'} pour l’instant.</div>`; return; }
