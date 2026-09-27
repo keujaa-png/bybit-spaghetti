@@ -19,7 +19,7 @@
   .menu { display:flex; gap:12px; flex-wrap:wrap; font-size:13px; }
   .status { margin-left:auto; color:var(--mut); font-size:13px; }
   .note { padding:8px 16px 0; color:var(--mut); font-size:12.5px; }
-  main { padding:12px 16px 40px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(var(--tile, 360px), 1fr)); }
+  main { padding:12px 16px 40px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(var(--tile, 440px), 1fr)); }
   .tile { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
   .th { display:flex; align-items:baseline; gap:6px; padding:7px 10px 4px; flex-wrap:wrap; }
   .sym { font-weight:600; font-size:15px; } .sym a { color:inherit; text-decoration:none; } .sym a:hover { color:var(--acc); }
@@ -27,12 +27,14 @@
   .chip.up { color:var(--up); } .chip.down { color:var(--down); } .chip.acc { color:var(--acc); border-color:#23466b; } .chip.warn { color:var(--warn); border-color:#5a4520; }
   .lv { padding:0 10px 6px; font-size:12px; color:var(--mut); }
   .lv b { color:var(--txt); font-weight:500; }
-  .chart { position:relative; height:var(--tileh, 280px); background:#0e1117; }
+  .chart { position:relative; height:var(--tileh, 380px); background:#0e1117; border-top:1px solid var(--line); }
+  .chart .leg { position:absolute; left:10px; bottom:calc(34% - 2px); z-index:3; font-size:11px; color:#2962ff; pointer-events:none; }
+  .chart .leg span { color:var(--mut); margin:0 4px; } .chart .leg b { font-weight:600; }
   .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
   .empty { grid-column:1/-1; color:var(--mut); padding:40px 0; text-align:center; }
   @media (max-width:560px) { header { padding:8px 12px; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } .note { padding:8px 12px 0; } }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 <header>
@@ -197,27 +199,39 @@ const io = new IntersectionObserver(es => es.forEach(e => {
 }), {rootMargin: '300px'});
 
 function draw(box, x) {
-  if (!window.LightweightCharts || !x) return;
-  box.innerHTML = '';
-  const ch = LightweightCharts.createChart(box, {autoSize: true, layout: {background: {color: '#0e1117'}, textColor: '#7f8fa3', fontSize: 11},
-    grid: {vertLines: {color: '#1a2029'}, horzLines: {color: '#1a2029'}}, rightPriceScale: {borderColor: '#262d36', scaleMargins: {top: 0.05, bottom: 0.34}},
-    timeScale: {borderColor: '#262d36', timeVisible: $('tf').value !== 'D'}, crosshair: {mode: 0}, handleScroll: false, handleScale: false});
-  const T = t => Math.floor(t / 1000), N = 90, bars = x.bars.slice(-N), off = x.bars.length - bars.length;
-  const s = ch.addCandlestickSeries({upColor: '#26c281', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26c281', wickDownColor: '#ef5350'});
+  const LC = window.LightweightCharts;
+  if (!LC || !x) return;
+  box.innerHTML = '<div class="leg">T3-CCI <span>FX Sniper · 14 · 5 · 0,618</span> <b></b></div>';
+  const ch = LC.createChart(box, {autoSize: true,
+    layout: {background: {color: '#0e1117'}, textColor: '#8b95a5', fontSize: 11, attributionLogo: false,
+             panes: {separatorColor: '#2a313c', separatorHoverColor: '#2a313c', enableResize: false}},
+    grid: {vertLines: {visible: false}, horzLines: {color: '#161c24'}},
+    rightPriceScale: {borderVisible: false}, timeScale: {borderVisible: false, timeVisible: $('tf').value !== 'D', rightOffset: 3},
+    crosshair: {mode: 0, vertLine: {color: '#3a4250', labelBackgroundColor: '#2a313c'}, horzLine: {color: '#3a4250', labelBackgroundColor: '#2a313c'}},
+    handleScroll: false, handleScale: false});
+  const T = t => Math.floor(t / 1000), N = 100, bars = x.bars.slice(-N), off = x.bars.length - bars.length;
+  // prix
+  const s = ch.addSeries(LC.CandlestickSeries, {upColor: '#089981', downColor: '#f23645', borderVisible: false, wickUpColor: '#089981', wickDownColor: '#f23645', priceLineVisible: false});
   s.setData(bars.map(b => ({time: T(b.t), open: b.o, high: b.h, low: b.l, close: b.c})));
-  // T3-CCI dans le bas du chart
-  const c = ch.addLineSeries({priceScaleId: 'cci', color: '#b388ff', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
-  ch.priceScale('cci').applyOptions({scaleMargins: {top: 0.72, bottom: 0.02}, borderColor: '#262d36'});
-  c.setData(bars.map((b, i) => ({time: T(b.t), value: x.d.ind[off + i]})).filter(p => !isNaN(p.value)));
-  [-100, 0, 100].forEach(v => c.createPriceLine({price: v, color: v ? '#3a3f4a' : '#2a2f38', lineStyle: 2, lineWidth: 1, axisLabelVisible: false}));
-  // lignes de divergence : prix (bas de plus en plus bas) et T3-CCI (bas de plus en plus hauts)
-  const dv = x.d.drives.filter(i => i >= off);
-  const pl = ch.addLineSeries({color: '#26c281', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+  // panneau T3-CCI, comme l'indicateur : histogramme vert / rouge + ligne bleue, zéro violet
+  const pts = bars.map((b, i) => ({time: T(b.t), v: x.d.ind[off + i]})).filter(p => !isNaN(p.v));
+  const hist = ch.addSeries(LC.HistogramSeries, {priceLineVisible: false, lastValueVisible: false, priceFormat: {type: 'price', precision: 0, minMove: 1}}, 1);
+  hist.setData(pts.map(p => ({time: p.time, value: p.v, color: p.v >= 0 ? 'rgba(8,153,129,.45)' : 'rgba(242,54,69,.45)'})));
+  const line = ch.addSeries(LC.LineSeries, {color: '#2962ff', lineWidth: 2, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, priceFormat: {type: 'price', precision: 0, minMove: 1}}, 1);
+  line.setData(pts.map(p => ({time: p.time, value: p.v})));
+  line.createPriceLine({price: 0, color: '#9c27b0', lineWidth: 1, lineStyle: 0, axisLabelVisible: false});
+  [-100, 100].forEach(v => line.createPriceLine({price: v, color: '#39414d', lineWidth: 1, lineStyle: 2, axisLabelVisible: false}));
+  // divergence : bas de plus en plus bas sur le prix, de plus en plus hauts sur le T3-CCI
+  const dv = x.d.drives.filter(i => i >= off), first = x.d.drives.length - dv.length;
+  const pl = ch.addSeries(LC.LineSeries, {color: '#00e676', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3});
   pl.setData(dv.map(i => ({time: T(x.bars[i].t), value: x.bars[i].l})));
-  const cl = ch.addLineSeries({priceScaleId: 'cci', color: '#26c281', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+  const cl = ch.addSeries(LC.LineSeries, {color: '#00e676', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3}, 1);
   cl.setData(dv.map(i => ({time: T(x.bars[i].t), value: x.d.ind[i]})));
-  s.setMarkers(dv.map((i, k) => ({time: T(x.bars[i].t), position: 'belowBar', color: '#26c281', shape: 'arrowUp', text: String(k + 1 + (x.d.drives.length - dv.length))})));
+  LC.createSeriesMarkers(s, dv.map((i, k) => ({time: T(x.bars[i].t), position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: String(first + k + 1)})));
+  try { ch.panes()[1].setHeight(Math.round(box.clientHeight * 0.34)); } catch (e) {}
   ch.timeScale().fitContent();
+  const last = pts[pts.length - 1];
+  if (last) { const lb = box.querySelector('.leg b'); lb.textContent = last.v.toFixed(0); lb.style.color = last.v >= 0 ? '#089981' : '#f23645'; }
 }
 
 function render() {
