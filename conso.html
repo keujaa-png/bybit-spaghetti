@@ -47,6 +47,7 @@
       <option value="cons">En consolidation</option>
       <option value="sig">Sweep / breakout récent (≤ 3 j)</option>
       <option value="both">Les deux</option>
+      <option value="sweep">Sweeps récents après run + conso (≤ 5 j)</option>
     </select>
     <select id="sort" title="Tri">
       <option value="run">Tri : plus gros run</option>
@@ -138,10 +139,17 @@ function evalCrypto(b, R) {
     const brk = x.c > c.cHi && x.v >= R.volMult * avg;
     if (sweep || brk) { sig = {kind: brk ? (sweep ? 'sweep + breakout' : 'breakout') : 'sweep', ago: n - 1 - i, lvl: brk ? c.cHi : c.cLo, run: c.run}; break; }
   }
+  // sweep récent (≤ 5 bougies clôturées) sous le bas d'une conso valide : mèche sous la conso, clôture revenue dedans
+  let sweep = null;
+  for (let i = n - 2; i >= n - 6; i--) {
+    const c = consoAt(b, i, R); if (!c || !c.ok) continue;
+    const x = b[i], rng = x.h - x.l, wick = rng > 0 ? (Math.min(x.o, x.c) - x.l) / rng * 100 : 0;
+    if (x.l < c.cLo && x.c > c.cLo && wick >= R.wick) { sweep = {ago: n - 1 - i, low: x.l, lvl: c.cLo, hi: c.cHi, run: c.run, since: (last.c / x.c - 1) * 100}; break; }
+  }
   const perf7 = (last.c / b[n - 8].c - 1) * 100;
-  if (!now.ok && !sig) return null;
+  if (!now.ok && !sig && !sweep) return null;
   const pos = last.c > now.cHi ? 'au-dessus' : last.c < now.cLo ? 'en dessous' : 'dans la conso';
-  return {cons: now.ok, cHi: now.cHi, cLo: now.cLo, range: now.range, run: now.ok ? now.run : sig.run, perf7, price: last.c, pos, sig};
+  return {cons: now.ok, cHi: now.cHi, cLo: now.cLo, range: now.range, run: now.ok ? now.run : sig ? sig.run : sweep.run, perf7, price: last.c, pos, sig, sweep};
 }
 
 // ─── Actions US / Commo & ETF : screener TradingView (approximation) ─────
@@ -206,25 +214,28 @@ function render() {
   const show = $('show').value, sort = $('sort').value;
   document.documentElement.style.setProperty('--tile', $('size').value + 'px');
   document.documentElement.style.setProperty('--tileh', Math.round(+$('size').value * 0.7) + 'px');
-  let list = items.filter(x => show === 'both' ? true : show === 'cons' ? x.cons : !!x.sig);
+  let list = items.filter(x => show === 'sweep' ? !!x.sweep : show === 'both' ? (x.cons || !!x.sig) : show === 'cons' ? x.cons : !!x.sig);
   list.sort((a, b) => sort === 'tight' ? a.range - b.range : sort === 'perf' ? b.perf7 - a.perf7 : b.run - a.run);
   list = list.slice(0, MAX_TILES);
   $('note').textContent = market === 'crypto'
     ? 'Crypto : règles exactes de l’indicateur (run ≥ 30 % sur 20 j, conso de 4 j dans un range ≤ 25 %, qui garde ≥ 50 % du run). Clic sur le nom = ouvrir sur ton layout TradingView.'
     : (market === 'us' ? 'Actions US > 1 Md$' : 'Matières premières + ETF > 1 Md$') + ' : approximation via le screener TradingView (forte perf 3 mois, prix proche du plus haut 3 mois, semaine calme). Pas de détection sweep/breakout ici. Clic sur le nom = ouvrir sur ton layout.';
   const grid = $('grid');
-  if (!list.length) { grid.innerHTML = `<div class="empty">Aucun actif ${show === 'sig' ? 'avec un signal récent' : 'en consolidation'} pour l’instant.</div>`; return; }
+  if (!list.length) { grid.innerHTML = `<div class="empty">Aucun actif ${show === 'sweep' ? 'avec un sweep récent après run + conso' : show === 'sig' ? 'avec un signal récent' : 'en consolidation'} pour l’instant.</div>`; return; }
   grid.innerHTML = list.map(x => {
     const url = `https://www.tradingview.com/chart/${LAYOUT[market]}/?symbol=${encodeURIComponent(x.sym)}`;
     const sig = x.sig ? `<span class="chip acc">${x.sig.kind} ${x.sig.ago === 1 ? 'hier' : 'il y a ' + x.sig.ago + ' j'}</span>` : '';
     const cons = x.cons ? `<span class="chip warn">conso ${x.range.toFixed(0)}%</span>` : '';
-    const lv = x.approx
+    const swc = x.sweep ? `<span class="chip up">🧹 sweep ${x.sweep.ago === 1 ? 'hier' : 'il y a ' + x.sweep.ago + ' j'} · ${fmt(x.sweep.since, 0)} depuis</span>` : '';
+    const lv = show === 'sweep' && x.sweep
+      ? `mèche du sweep <b>${px(x.sweep.low)}</b> (stop) · bas conso <b>${px(x.sweep.lvl)}</b> · haut conso <b>${px(x.sweep.hi)}</b> (breakout) · prix <b>${px(x.price)}</b>`
+      : x.approx
       ? `haut 1 mois <b>${px(x.cHi)}</b> · bas 1 mois <b>${px(x.cLo)}</b> · ${x.pos}`
       : x.cons ? `breakout &gt; <b>${px(x.cHi)}</b> · sweep &lt; <b>${px(x.cLo)}</b> · prix ${x.pos}` : `niveau du signal <b>${px(x.sig.lvl)}</b>`;
     return `<div class="tile">
       <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener" title="${x.desc ? x.desc.replace(/"/g, '') : 'Ouvrir sur TradingView'}">${x.label} ↗</a></span>
         <span class="chip ${x.perf7 >= 0 ? 'up' : 'down'}">${x.perf7 >= 0 ? '▲' : '▼'} ${fmt(x.perf7)} 7j</span>
-        <span class="chip">run ${fmt(x.run, 0)}</span>${cons}${sig}</div>
+        <span class="chip">run ${fmt(x.run, 0)}</span>${cons}${sig}${swc}</div>
       <div class="lv">${lv}</div>
       <div class="chart" data-sym="${x.sym}"><div class="ph">chargement du chart…</div></div>
     </div>`;
@@ -240,8 +251,8 @@ async function load() {
   if (market !== 'crypto') $('show').value = 'cons';
   try {
     items = market === 'crypto' ? await loadCrypto() : market === 'us' ? await loadUS() : await loadMacro();
-    const nC = items.filter(x => x.cons).length, nS = items.filter(x => x.sig).length;
-    setStatus(`${nC} en consolidation${market === 'crypto' ? ` · ${nS} signaux récents` : ''} · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`);
+    const nC = items.filter(x => x.cons).length, nS = items.filter(x => x.sig).length, nW = items.filter(x => x.sweep).length;
+    setStatus(`${nC} en consolidation${market === 'crypto' ? ` · ${nS} signaux récents · ${nW} sweeps` : ''} · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`);
   } catch (e) { items = []; setStatus('erreur : ' + e.message); }
   busy = false;
   render();
