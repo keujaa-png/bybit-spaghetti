@@ -125,8 +125,6 @@
         <li>Laisse l’onglet ouvert (en arrière-plan, c’est bon). Une alerte par coin et par jour ; clic sur la notification = chart TradingView.</li></ul></div>
     <div><h3>Catalyseurs 📰</h3>
       <p>Le tableau relie les actus des grands médias crypto et les annonces Bybit aux coins cités, et ne garde que les vrais catalyseurs : banques/tokenisation, listing, ETF, partenariat, régulation, rachat, lancement. <b>Réaction ✅</b> = le prix suit déjà (≥ +5 % sur 24 h ou volume ≥ 2×) : c’est ce cas-là qui déclenche l’alerte Chrome. ⚠️ = risque (hack, unlock, delisting).</p></div>
-    <div><h3>Tickets d’ordre 🎫</h3>
-      <p>Renseigne ton capital et ton risque par trade (1 % conseillé). Pour chaque setup des 5 narratives les plus chaudes, la page calcule l’entrée (juste au-dessus de la cassure), le stop (bas de la base), la taille et les objectifs 2R / 4R. <b>Bybit ↗</b> ouvre la paire, <b>📋</b> copie le ticket. Plan type : ordre stop conditionnel à l’entrée, stop-loss au bas de la base, moitié prise à 2R puis stop remonté au prix d’entrée. Je ne passe jamais d’ordre à ta place.</p></div>
     <div><h3>Passer sur TradingView</h3>
       <p>Clic sur le nom d’un coin = ton layout « Scanner » avec les panneaux Run + Conso et Trend Tracker. La watchlist <b>Reveils_Narratives</b> reprend les réveils et les 3 narratives chaudes, mise à jour chaque matin.</p></div>
     <div><h3>Gestion du risque</h3>
@@ -156,7 +154,7 @@
   </table></div>
 </section>
 
-<section class="sec">
+<section class="sec" hidden>   <!-- tickets d'ordre retirés à la demande -->
   <div class="sech"><h2 id="tkTitle">🎫 Tickets d’ordre — narratives 🔥</h2>
     <span class="ctl">Capital <input id="cap" type="number" min="0" step="100" placeholder="ex. 5000"> USDT · risque <select id="risk"><option value="0.5">0,5 %</option><option value="1" selected>1 %</option><option value="2">2 %</option></select> par trade</span>
     <span class="hint">Setups des 5 narratives les plus chaudes : conso proche de sa cassure (≤ 2× le seuil « proche »), cassure toute fraîche, ou réveil d’hier / d’aujourd’hui. Entrée = cassure, stop = bas de la base, taille = risque ÷ (entrée − stop), objectifs à 2R et 4R. Tu passes l’ordre toi-même sur Bybit.</span></div>
