@@ -243,19 +243,31 @@ async function panels(d) {
 // ─── Pilote : les trois layouts, l'un après l'autre, dans le même onglet ──
 // (on change de layout sans recharger la page, puis on revient sur celui de départ)
 const api = TradingViewApi;
+// hasChartChanges() renvoie une valeur observable ({value()}), pas un booléen
+const changed = () => { try { const v = api.hasChartChanges(); return v && typeof v.value === 'function' ? !!v.value() : !!v; } catch (e) { return false; } };
+// boîte « Save layout before switching? » : on choisit toujours « Save »
+const clickSaveDialog = () => {
+  const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Save'
+    && /Save layout before switching/.test((x.closest('[role=dialog], [class*=dialog], [class*=popup]') || {}).textContent || ''));
+  if (b) { b.click(); return true; }
+  return false;
+};
 async function saveLayout() {
-  const b = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || ''));
+  if (!changed()) return;
+  const b = [...document.querySelectorAll('button')].find(e => /Save all charts/.test(e.getAttribute('aria-label') || '') && e.offsetParent);
   if (b) b.click();
-  for (let i = 0; i < 15; i++) { await sleep(1000); try { if (!api.hasChartChanges()) return; } catch (e) { return; } }
+  for (let i = 0; i < 12 && changed(); i++) await sleep(1000);
 }
 async function switchTo(rec) {
   await saveLayout();
-  const p = api.loadChartFromServer(rec);
-  if (p && p.then) await p;
-  for (let i = 0; i < 40; i++) {
+  let done = false;
+  const p = Promise.resolve(api.loadChartFromServer(rec)).catch(() => {}).then(() => { done = true; });
+  for (let i = 0; i < 45; i++) {
     await sleep(1000);
+    clickSaveDialog();
     try { if (api.layoutName() === rec.name && api.activeChart().getAllStudies().some(s => /Trend Tracker|Run \+ Conso/.test(s.name))) break; } catch (e) {}
   }
+  if (!done) await Promise.race([p, sleep(5000)]);
   await sleep(4000);                                          // laisse les indicateurs se charger
 }
 // 1) tout ce qui passe par les API (univers, watchlists, alertes) pour les trois marchés : rapide, sans changer de layout
