@@ -79,6 +79,16 @@
 </section>
 
 <section class="sec">
+  <div class="sech"><h2>🧪 Backtest 6 mois (102 perps Bybit ≥ 5 M$, avril → septembre 2026)</h2><span class="hint">Pump = +30 % en 72 h max (452 pumps). Trade test : entrée à la clôture 1h, objectif +15 %, stop −8 %, sortie à 72 h, frais inclus.</span></div>
+  <div class="grid4">
+    <div class="card"><div class="mut">Pumps signalés à temps (il restait ≥ +15 %)</div><div class="big">91 %</div><div class="mut">413 / 452 · ratés : 16 pumps en une seule bougie, 17 où cassure et volume ne tombent pas sur la même heure, 4 montées lentes sans cassure</div></div>
+    <div class="card"><div class="mut">Mais beaucoup de faux départs</div><div class="big">≈ 23 signaux / jour</div><div class="mut">17 % atteignent +15 % avant −8 % (13,6 % au hasard). Gain moyen +0,72 %/trade contre +0,42 % en entrant au hasard.</div></div>
+    <div class="card"><div class="mut">Ça dépend du marché (walk-forward, 2 mois chacun)</div><div class="mut" style="margin-top:4px">avr–mai : règle +0,74 %/trade · IA top 40 % <b class="up">+1,14 %</b> · hasard +0,40 %<br>juin–juil : règle <b class="down">−0,62 %</b> · IA <b class="down">−0,53 %</b> · hasard −0,12 %<br>août–sept : règle +2,01 % · IA top 40 % <b class="up">+2,80 %</b> · top 20 % <b class="up">+4,03 %</b> · hasard +0,96 %</div></div>
+    <div class="card"><div class="mut">Ce qui a changé dans le radar</div><div class="mut" style="margin-top:4px">• cassure 24 h avec volume ≥ 2× (au lieu de 2,5×), sur bougie clôturée<br>• score IA sur chaque cassure : notification seulement pour le top 40 % (⭐), ⭐⭐ = top 20 %<br>• T3-CCI 1h gardé pour info, sans notification (aucun avantage mesuré)</div></div>
+  </div>
+</section>
+
+<section class="sec">
   <div class="sech"><h2>🧾 Bilan : les plus gros pumps vs le radar</h2><span class="hint">Top 10 des hausses sur 24 h (perps Bybit ≥ 2 M$) : le radar les avait-il signalés, quand, et quelle part du mouvement restait à prendre ? Le bilan ne voit que les heures où cette page était ouverte.</span></div>
   <div class="grid4" style="margin-bottom:10px" id="score"></div>
   <div class="tw"><table>
@@ -97,13 +107,13 @@ const $ = id => document.getElementById(id);
 const LAYOUT = 'LAU9xwF7';
 // ─── Réglages des signaux ────────────────────────────────────────────────
 const S = {
-  oiPct: 15, oiHours: 4, oiVol: 2, oiPrice: 2,          // 1. OI +15 % sur 4 h, volume de la dernière heure ≥ 2× la moyenne 24 h, prix ≥ +2 % sur 4 h
-  hiVol: 2.5,                                            // 3. clôture au-dessus du plus haut des 24 h précédentes avec un volume ≥ 2,5×
+  oiPct: 15, oiHours: 4, oiVol: 2, oiPrice: 2,          // 1. OI +15 % sur 4 h, volume de l'heure ≥ 2× la moyenne 24 h, prix ≥ +2 % sur 4 h
+  hiVol: 2,                                              // 3. clôture au-dessus du plus haut des 24 h précédentes avec un volume ≥ 2× (réglage du backtest)
   t3: {cciLen: 14, t3Len: 5, t3v: 0.618, drives: 3, fresh: 3 + 3, os: true},   // divergence T3-CCI 1h (dernier creux ≤ 3 bougies)
   rv: {hiLen: 55, volMult: 2.5, baseLen: 20, baseMax: 30},                     // réveil daily
   rc: {runLen: 20, runMin: 30, consLen: 4, consMax: 25, retr: 50, wick: 25}    // sweep après run + conso daily
 };
-const TYPES = {oi: ['📈 OI + volume', 't-oi'], hi: ['🚀 Plus haut 24 h cassé', 't-hi'], t3: ['📐 Bull div T3-CCI 1h', 't-t3'],
+const TYPES = {oi: ['📈 OI + volume', 't-oi'], hi: ['🚀 Plus haut 24 h cassé', 't-hi'], t3: ['📐 Bull div T3-CCI 1h (info)', 't-t3'],
                rv: ['⚡ Réveil daily', 't-rv'], sw: ['🧹 Sweep après run + conso', 't-sw']};
 const NON = new Set('USDC USDE XAUT PAXG'.split(' '));
 let busy = false, silent = !localStorage.getItem('radar-log'), alertsOn = false, lastDaily = 0, CUR = {}, PRICES = {}, TICK = [];
@@ -167,26 +177,49 @@ function t3div(b, P) {
   return {n: chain.length, low: last.low, t: b[last.i].t};
 }
 
-// ─── Signaux intraday (bougies 1h + open interest) ───────────────────────
-function intraday(t, h, oi) {
-  const out = [], n = h.length; if (n < 30) return out;
-  const cur = h[n - 1], frac = Math.max(0.2, Math.min(1, (Date.now() - cur.t) / 36e5));
-  let av = 0; for (let i = n - 25; i < n - 1; i++) av += h[i].v; av /= 24;
-  const vm = Math.max(cur.v / frac, h[n - 2].v) / (av || 1);                 // volume de l'heure en cours (extrapolé) ou de la précédente
-  const p4 = (cur.c / h[n - 1 - S.oiHours].c - 1) * 100;
-  // 1. OI + volume
-  if (oi && oi.length > S.oiHours) {
-    const o0 = oi[S.oiHours], o1 = oi[0], dOi = (o1 / o0 - 1) * 100;
-    if (dOi >= S.oiPct && vm >= S.oiVol && p4 >= S.oiPrice)
-      out.push({type: 'oi', key: Math.floor(Date.now() / (12 * 36e5)), detail: `OI ${fmt(dOi, 0)} en ${S.oiHours} h · volume ×${vm.toFixed(1)} · prix ${fmt(p4)} en ${S.oiHours} h`});
+// ─── Modèle IA (gradient boosting entraîné sur 6 mois de backtest, fichier radar_model.json) ──
+let MODEL = null;
+const loadModel = () => fetch('radar_model.json?x=' + Math.floor(Date.now() / 36e5)).then(r => r.json()).then(m => { MODEL = m; }).catch(() => {});
+// features du modèle, mêmes calculs que le backtest, sur la bougie 1h clôturée i
+function feats(h, i, o4, btc) {
+  let av = 0, atr = 0, mx24 = 0, mx720 = 0, mx480 = 0, mn480 = Infinity;
+  for (let j = i - 24; j < i; j++) { av += h[j].v; atr += (h[j].h - h[j].l) / h[j].c; mx24 = Math.max(mx24, h[j].h); }
+  for (let j = Math.max(0, i - 720); j < i; j++) mx720 = Math.max(mx720, h[j].h);
+  for (let j = Math.max(0, i - 480); j < i; j++) { mx480 = Math.max(mx480, h[j].h); mn480 = Math.min(mn480, h[j].l); }
+  av /= 24; atr /= 24;
+  const c = h[i].c, b = btc.get(h[i].t);
+  return {mx24, vm: h[i].v / av, r1: c / h[i - 1].c - 1, r4: c / h[i - 4].c - 1, r24: c / h[i - 24].c - 1, r72: c / h[i - 72].c - 1, r168: c / h[i - 168].c - 1,
+    d24: c / mx24 - 1, d720: i >= 720 ? c / mx720 - 1 : NaN, rng480: i >= 480 ? mx480 / mn480 - 1 : NaN, atr24: atr, liq: Math.log10(av * 24 + 1),
+    oi4: o4 && o4.length > 1 ? o4[0] / o4[1] - 1 : NaN, oi24: o4 && o4.length > 6 ? o4[0] / o4[6] - 1 : NaN, btc24: b === undefined ? NaN : b};
+}
+function score(F) {
+  if (!MODEL) return NaN;
+  let s = MODEL.F0;
+  for (const [f, sp, wl, wr] of MODEL.trees) {
+    const x = F[MODEL.feats[f]]; let bin = 0;
+    if (x !== undefined && !isNaN(x)) { const e = MODEL.edges[f]; let lo = 0, hi = e.length; while (lo < hi) { const m = (lo + hi) >> 1; if (x <= e[m]) hi = m; else lo = m + 1; } bin = lo + 1; }
+    s += bin <= sp ? wl : wr;
   }
-  // 3. plus haut des 24 h précédentes cassé avec du volume
-  let hi = 0; for (let i = n - 25; i < n - 1; i++) hi = Math.max(hi, h[i].h);
-  if (cur.c > hi && vm >= S.hiVol)
-    out.push({type: 'hi', key: Math.floor(Date.now() / (12 * 36e5)), detail: `au-dessus de ${px(hi)} (plus haut 24 h) · volume ×${vm.toFixed(1)} · 24 h ${fmt(t.p24)}`});
-  // divergence T3-CCI 1h, 3 drives ou plus
+  return 1 / (1 + Math.exp(-s));
+}
+const stars = p => isNaN(p) || !MODEL ? '' : p >= MODEL.q80 ? ' ⭐⭐' : p >= MODEL.q60 ? ' ⭐' : '';
+
+// ─── Signaux intraday, sur la dernière bougie 1h clôturée (comme le backtest) ─────────
+function intraday(t, h, o4, btc) {
+  const out = [], n = h.length; if (n < 200) return out;
+  const i = n - 2, F = feats(h, i, o4, btc), k12 = Math.floor(h[i].t / (12 * 36e5));
+  // 1. OI + volume
+  if (F.oi4 >= S.oiPct / 100 && F.vm >= S.oiVol && F.r4 >= S.oiPrice / 100)
+    out.push({type: 'oi', key: k12, detail: `OI ${fmt(F.oi4 * 100, 0)} en 4 h · volume ×${F.vm.toFixed(1)} · prix ${fmt(F.r4 * 100)} en 4 h`});
+  // 3. plus haut 24 h cassé avec volume, noté par le modèle (notification seulement pour le top 40 %)
+  if (F.d24 > 0 && F.vm >= S.hiVol) {
+    const p = score(F);
+    out.push({type: 'hi', key: k12, score: p, notify: !MODEL || p >= MODEL.q60,
+      detail: `score IA ${isNaN(p) ? '–' : Math.round(p * 100)}${stars(p)} · au-dessus de ${px(F.mx24)} (plus haut 24 h) · volume ×${F.vm.toFixed(1)} · 24 h ${fmt(t.p24)}`});
+  }
+  // divergence T3-CCI 1h : notée pour info, sans notification (pas d'avantage mesuré au backtest)
   const d = t3div(h, S.t3);
-  if (d) out.push({type: 't3', key: d.t, detail: `${d.n} drives · invalidation sous ${px(d.low)}`});
+  if (d) out.push({type: 't3', key: d.t, notify: false, detail: `${d.n} drives · invalidation sous ${px(d.low)}`});
   return out;
 }
 // ─── Signaux daily (réveil, sweep après run + conso) ─────────────────────
@@ -243,9 +276,9 @@ function record(t, sigs) {
   for (const g of sigs) {
     const id = `${g.type}:${t.s}:${g.key}`;
     if (L.some(e => e.id === id)) continue;
-    L.unshift({id, t: Date.now(), s: t.s, b: t.b, type: g.type, detail: g.detail, price: t.last});
+    L.unshift({id, t: Date.now(), s: t.s, b: t.b, type: g.type, detail: g.detail, price: t.last, score: g.score});
     const iv = g.type === 'rv' || g.type === 'sw' ? 'D' : '60';
-    if (!silent) notify(`${TYPES[g.type][0]} · ${t.b}`, `${g.detail} · prix ${px(t.last)}`, tvUrl(t.s, iv), 'radar-' + id);
+    if (!silent && g.notify !== false) notify(`${TYPES[g.type][0]} · ${t.b}`, `${g.detail} · prix ${px(t.last)}`, tvUrl(t.s, iv), 'radar-' + id);
   }
   writeLog(L.filter(e => Date.now() - e.t < 3 * 864e5));
 }
@@ -255,6 +288,7 @@ let TRADFI = null;
 async function scan() {
   if (busy) return; busy = true;
   try {
+    if (!MODEL) await loadModel();
     if (!TRADFI) {
       const inst = await getJ('https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000').catch(() => null);
       TRADFI = new Set(((inst && inst.result && inst.result.list) || []).filter(o => ['stock', 'ETF', 'commodity', 'forex'].includes(o.symbolType)).map(o => o.symbol));
@@ -267,20 +301,23 @@ async function scan() {
     TICK.forEach(t => PRICES[t.s] = t.last);
     const minV = +$('minVol').value * 1e6, list = TICK.filter(t => t.v >= minV);
     const doDaily = Date.now() - lastDaily > 30 * 60 * 1000;
+    const bk = await getJ('https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=200');
+    const bc = bk.result.list.reverse(), BTC24 = new Map();
+    for (let j = 24; j < bc.length; j++) BTC24.set(+bc[j][0], +bc[j][4] / +bc[j - 24][4] - 1);
     const now = {oi: [], hi: [], t3: [], rv: doDaily ? [] : (CUR.rv || []), sw: doDaily ? [] : (CUR.sw || [])};
     let done = 0;
     await pool(list, 20, async t => {
       const [k, o] = await Promise.all([
-        getJ(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=60&limit=300`),
-        getJ(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${t.s}&intervalTime=1h&limit=6`).catch(() => null)]);
+        getJ(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=60&limit=1000`),
+        getJ(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${t.s}&intervalTime=4h&limit=8`).catch(() => null)]);
       const h = k.result.list.reverse().map(x => ({t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[6]}));
       const oi = o && o.result && o.result.list ? o.result.list.map(x => +x.openInterest) : null;     // plus récent en premier
-      const sigs = intraday(t, h, oi);
+      const sigs = intraday(t, h, oi, BTC24);
       if (doDaily) {
         const kd = await getJ(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=80`);
         sigs.push(...daily(kd.result.list.reverse().map(x => ({t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[6]}))));
       }
-      sigs.forEach(g => now[g.type].push({...t, detail: g.detail}));
+      sigs.forEach(g => now[g.type].push({...t, detail: g.detail, score: g.score}));
       record(t, sigs);
       done++;
       if (done % 20 === 0) $('status').textContent = `scan ${done}/${list.length}…`;
@@ -297,9 +334,9 @@ async function scan() {
 // ─── Affichage ───────────────────────────────────────────────────────────
 function render() {
   $('now').innerHTML = Object.entries(TYPES).map(([k, [lab, c]]) => {
-    const L = (CUR[k] || []).sort((a, b) => b.p24 - a.p24);
+    const L = (CUR[k] || []).sort((a, b) => k === 'hi' ? (b.score || 0) - (a.score || 0) : b.p24 - a.p24);
     return `<div class="card"><h3><span class="chip ${c}">${lab}</span><span class="mut">${L.length}</span></h3>` +
-      (L.length ? L.slice(0, 12).map(x => `<div class="row"><a href="${tvUrl(x.s, k === 'rv' || k === 'sw' ? 'D' : '60')}" target="_blank" rel="noopener" title="${x.detail}">${x.b}</a><span class="${cls(x.p24)}">${fmt(x.p24)}</span></div>`).join('')
+      (L.length ? L.slice(0, 12).map(x => `<div class="row"><a href="${tvUrl(x.s, k === 'rv' || k === 'sw' ? 'D' : '60')}" target="_blank" rel="noopener" title="${x.detail}">${x.b}${k === 'hi' ? stars(x.score) : ''}</a><span class="${cls(x.p24)}">${fmt(x.p24)}</span></div>`).join('')
                 : '<div class="none">rien en ce moment</div>') + '</div>';
   }).join('');
   const L = readLog();
