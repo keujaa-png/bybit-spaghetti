@@ -68,6 +68,9 @@
   .cat a { color:var(--txt); text-decoration:none; } .cat a:hover { color:var(--acc); }
   .src { color:var(--mut); font-size:12px; }
   a.chip { text-decoration:none; }
+  .sech .ctl input { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:4px 6px; font:inherit; width:96px; }
+  .sech .ctl select { padding:4px 6px; }
+  .tk td:nth-child(2) { text-align:left; } .tk .btn { cursor:pointer; }
   .empty { grid-column:1/-1; color:var(--mut); padding:30px 0; text-align:center; }
   @media (max-width:560px) { header { padding:8px 12px; } .sec { padding:12px 12px 0; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
 </style>
@@ -122,6 +125,8 @@
         <li>Laisse l’onglet ouvert (en arrière-plan, c’est bon). Une alerte par coin et par jour ; clic sur la notification = chart TradingView.</li></ul></div>
     <div><h3>Catalyseurs 📰</h3>
       <p>Le tableau relie les actus des grands médias crypto et les annonces Bybit aux coins cités, et ne garde que les vrais catalyseurs : banques/tokenisation, listing, ETF, partenariat, régulation, rachat, lancement. <b>Réaction ✅</b> = le prix suit déjà (≥ +5 % sur 24 h ou volume ≥ 2×) : c’est ce cas-là qui déclenche l’alerte Chrome. ⚠️ = risque (hack, unlock, delisting).</p></div>
+    <div><h3>Tickets d’ordre 🎫</h3>
+      <p>Renseigne ton capital et ton risque par trade (1 % conseillé). Pour chaque setup des 5 narratives les plus chaudes, la page calcule l’entrée (juste au-dessus de la cassure), le stop (bas de la base), la taille et les objectifs 2R / 4R. <b>Bybit ↗</b> ouvre la paire, <b>📋</b> copie le ticket. Plan type : ordre stop conditionnel à l’entrée, stop-loss au bas de la base, moitié prise à 2R puis stop remonté au prix d’entrée. Je ne passe jamais d’ordre à ta place.</p></div>
     <div><h3>Passer sur TradingView</h3>
       <p>Clic sur le nom d’un coin = ton layout « Scanner » avec les panneaux Run + Conso et Trend Tracker. La watchlist <b>Reveils_Narratives</b> reprend les réveils et les 3 narratives chaudes, mise à jour chaque matin.</p></div>
     <div><h3>Gestion du risque</h3>
@@ -148,6 +153,16 @@
   <div class="tw"><table class="cat">
     <thead><tr><th>Quand</th><th>Coin</th><th>24 h</th><th>Réaction</th><th>Type</th><th>Titre</th></tr></thead>
     <tbody id="catRows"><tr><td colspan="6" class="mut" style="text-align:center">chargement des actus…</td></tr></tbody>
+  </table></div>
+</section>
+
+<section class="sec">
+  <div class="sech"><h2 id="tkTitle">🎫 Tickets d’ordre — narratives 🔥</h2>
+    <span class="ctl">Capital <input id="cap" type="number" min="0" step="100" placeholder="ex. 5000"> USDT · risque <select id="risk"><option value="0.5">0,5 %</option><option value="1" selected>1 %</option><option value="2">2 %</option></select> par trade</span>
+    <span class="hint">Setups des 5 narratives les plus chaudes : conso proche de sa cassure (≤ 2× le seuil « proche »), cassure toute fraîche, ou réveil d’hier / d’aujourd’hui. Entrée = cassure, stop = bas de la base, taille = risque ÷ (entrée − stop), objectifs à 2R et 4R. Tu passes l’ordre toi-même sur Bybit.</span></div>
+  <div class="tw"><table class="tk">
+    <thead><tr><th>Coin</th><th>Setup</th><th>Entrée</th><th>Stop</th><th>Risque / coin</th><th>Taille</th><th>Notionnel</th><th>Objectif 2R</th><th>Objectif 4R</th><th></th></tr></thead>
+    <tbody id="tkRows"></tbody>
   </table></div>
 </section>
 
@@ -179,8 +194,8 @@ const $ = id => document.getElementById(id);
 const VIEW = new URLSearchParams(location.search).get('vue') === 'conso' ? 'conso' : 'rv';
 document.body.classList.add(VIEW === 'conso' ? 'v-conso' : 'v-rv');
 let coins = [], nars = [], NAR = null, selected = null, busy = false, alertsOn = false;
-try { const s = JSON.parse(localStorage.getItem('reveil-page') || '{}'); ['size', 'tf', 'near'].forEach(k => { if (s[k]) $(k).value = s[k]; }); alertsOn = !!s.alerts; } catch (e) {}
-const save = () => { try { localStorage.setItem('reveil-page', JSON.stringify({size: $('size').value, tf: $('tf').value, near: $('near').value, alerts: alertsOn})); } catch (e) {} };
+try { const s = JSON.parse(localStorage.getItem('reveil-page') || '{}'); ['size', 'tf', 'near', 'cap', 'risk'].forEach(k => { if (s[k]) $(k).value = s[k]; }); alertsOn = !!s.alerts; } catch (e) {}
+const save = () => { try { localStorage.setItem('reveil-page', JSON.stringify({size: $('size').value, tf: $('tf').value, near: $('near').value, cap: $('cap').value, risk: $('risk').value, alerts: alertsOn})); } catch (e) {} };
 const fmt = (v, d = 1) => v == null || isNaN(v) ? '–' : (v > 0 ? '+' : '') + v.toFixed(d) + '%';
 const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'mut';
 const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
@@ -205,7 +220,7 @@ function analyse(b) {
     const frac = i === n - 1 ? Math.max(0.25, (Date.now() - x.t0) / 864e5) : 1;
     const vm = x.t / frac / av, base = (hi20 / lo20 - 1) * 100;
     if (!out.rev && x.c > hi55 && vm >= RV.volMult && base <= RV.baseMax)
-      out.rev = {ago: n - 1 - i, lvl: hi55, vm, base, since: (last.c / hi55 - 1) * 100};
+      out.rev = {ago: n - 1 - i, lvl: hi55, low: lo20, vm, base, since: (last.c / hi55 - 1) * 100};
   }
   // consolidation sur les bougies clôturées (la bougie du jour sert de prix live)
   const i = n - 1;
@@ -302,11 +317,56 @@ function narChips(c) {
     .map(x => `<span class="chip btn ${x.rank < 5 ? 'hot' : ''}" data-nar="${x.id}">${x.rank < 5 ? '🔥 ' : ''}${x.label}</span>`).join('');
 }
 
+// ─── Tickets d'ordre (calcul seulement : l'ordre se passe à la main sur Bybit) ─────────────
+function ticketOf(c) {
+  const w = c.watch, near = +$('near').value;
+  let entry, stop, setup, kind;
+  if (c.rev && c.rev.ago <= 1) { setup = 'réveil ' + agoTxt(c.rev.ago); kind = 'au marché ou sur retest'; entry = Math.max(c.price, c.rev.lvl); stop = c.rev.low; }
+  else if (w && w.dist >= 0 && w.dist <= 2 * near) { setup = w.type + ` · à ${w.dist.toFixed(1)} %`; kind = 'ordre stop (conditionnel) au-dessus'; entry = w.lvl * 1.002; stop = w.low; }
+  else if (w && w.dist < 0 && w.dist >= -3) { setup = w.type + ' · vient de casser'; kind = 'au marché ou sur retest'; entry = c.price; stop = w.low; }
+  else return null;
+  if (!(stop > 0) || stop >= entry) return null;
+  const cap = +$('cap').value || 0, riskPct = +$('risk').value, r = entry - stop, qty = cap ? cap * riskPct / 100 / r : 0;
+  return {setup, kind, entry, stop, r, rPct: r / entry * 100, qty, notional: qty * entry, lev: cap ? qty * entry / cap : 0, tp1: entry + 2 * r, tp2: entry + 4 * r, riskUsd: cap * riskPct / 100};
+}
+const qtyTxt = q => q >= 1000 ? Math.round(q).toLocaleString('fr-FR') : q >= 10 ? q.toFixed(1) : q.toPrecision(3);
+let TK = [];
+function renderTickets() {
+  const hot = nars.slice(0, 5).map(x => x.id);
+  TK = coins.filter(c => c.nar.some(id => hot.includes(id))).map(c => ({c, t: ticketOf(c)})).filter(x => x.t)
+    .sort((a, b) => (a.c.rev ? -1 : 0) - (b.c.rev ? -1 : 0) || (a.c.watch ? a.c.watch.dist : 0) - (b.c.watch ? b.c.watch.dist : 0));
+  const cap = +$('cap').value;
+  $('tkTitle').textContent = `🎫 Tickets d’ordre — narratives 🔥 (${TK.length})`;
+  $('tkRows').innerHTML = TK.slice(0, 20).map(({c, t}, i) => {
+    const nar = c.nar.map(narById).filter(x => x && x.rank < 5).map(x => x.label).slice(0, 2).join(', ');
+    return `<tr>
+      <td><a href="${tvUrl(c)}" target="_blank" rel="noopener"><b>${c.b}</b></a> <span class="${cls(c.perf1)}">${fmt(c.perf1)}</span></td>
+      <td>${t.setup} <span class="mut">· ${t.kind}</span><br><span class="mut">🔥 ${nar}</span> ${catChip(c)}</td>
+      <td><b>${px(t.entry)}</b></td>
+      <td>${px(t.stop)} <span class="down">(−${t.rPct.toFixed(1)} %)</span>${t.rPct > 15 ? ' ⚠️ stop large' : ''}</td>
+      <td>${px(t.r)}</td>
+      <td>${cap ? `<b>${qtyTxt(t.qty)}</b> ${c.b}` : '<span class="mut">capital ?</span>'}</td>
+      <td>${cap ? `${Math.round(t.notional).toLocaleString('fr-FR')} $ <span class="mut">(×${t.lev.toFixed(1)})</span>` : '–'}</td>
+      <td class="up">${px(t.tp1)}</td><td class="up">${px(t.tp2)}</td>
+      <td><a class="chip acc" href="https://www.bybit.com/trade/usdt/${c.s}" target="_blank" rel="noopener">Bybit ↗</a> <span class="chip btn" data-copy="${i}" title="Copier le ticket">📋</span></td></tr>`;
+  }).join('') || `<tr><td colspan="10" class="mut" style="text-align:center">${busy ? 'analyse en cours…' : 'Aucun setup propre sur les narratives chaudes pour l’instant.'}</td></tr>`;
+}
+$('tkRows').addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  const {c, t} = TK[+b.dataset.copy];
+  const txt = `${c.b}USDT LONG · ${t.setup}\nEntrée ${px(t.entry)} (${t.kind})\nStop ${px(t.stop)} (−${t.rPct.toFixed(1)} %)\n` +
+    (t.qty ? `Taille ${qtyTxt(t.qty)} ${c.b} ≈ ${Math.round(t.notional)} $ · risque ${Math.round(t.riskUsd)} $\n` : '') +
+    `Objectifs : ${px(t.tp1)} (2R, prendre la moitié puis stop au prix d’entrée) · ${px(t.tp2)} (4R)`;
+  try { await navigator.clipboard.writeText(txt); b.textContent = '✓'; } catch (err) { prompt('Ticket à copier :', txt); }
+  setTimeout(() => { b.textContent = '📋'; }, 1500);
+});
+
 function render() {
   document.documentElement.style.setProperty('--tile', $('size').value + 'px');
   document.documentElement.style.setProperty('--tileh', Math.round(+$('size').value * 0.7) + 'px');
   renderTable();
   renderCons();
+  renderTickets();
   const sel = selected && narById(selected);
   let list;
   if (sel) {
@@ -534,7 +594,7 @@ $('cfltClear').addEventListener('click', () => { selected = null; render(); });
 $('nar').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) pick(tr.dataset.id); });
 $('grid').addEventListener('click', e => { const ch = e.target.closest('[data-nar]'); if (ch) pick(ch.dataset.nar); });
 $('fltClear').addEventListener('click', () => { selected = null; render(); });
-['size', 'tf', 'near'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
+['size', 'tf', 'near', 'cap', 'risk'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
 $('reload').addEventListener('click', load);
 // titre + lien vers l'autre vue (dans marketscanner.co : on change de page du site)
 {
