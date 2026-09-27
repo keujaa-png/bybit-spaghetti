@@ -31,6 +31,8 @@
   .chart .leg { position:absolute; left:10px; bottom:calc(34% - 2px); z-index:3; font-size:11px; color:#2962ff; pointer-events:none; }
   .chart .leg span { color:var(--mut); margin:0 4px; } .chart .leg b { font-weight:600; }
   .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
+  #alertBtn.on { background:#1f6e43; border-color:var(--up); color:#fff; }
+  .old { grid-column:1/-1; color:var(--warn); font-size:12.5px; }
   .empty { grid-column:1/-1; color:var(--mut); padding:40px 0; text-align:center; }
   @media (max-width:560px) { header { padding:8px 12px; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } .note { padding:8px 12px 0; } }
 </style>
@@ -59,6 +61,7 @@
     T3 <input id="t3Len" type="number" min="2" max="20" value="5" title="Longueur du lissage T3">
     <input id="t3v" type="number" min="0.1" max="1" step="0.05" value="0.618" title="Facteur de volume du T3" style="width:70px">
     <button id="reload" title="Rescanner">↻</button>
+    <button id="alertBtn" title="Notification Chrome à chaque nouvelle divergence détectée">🔔 Alertes</button>
   </div>
   <nav class="menu">
     <a href="conso.html">🧩 Consolidations</a>
@@ -75,10 +78,10 @@ const $ = id => document.getElementById(id);
 const LAYOUT = 'LAU9xwF7';
 const OSC_L = 5, OSC_R = 3, RANGE_MIN = 5, RANGE_MAX = 60;   // creux du T3-CCI : 5 bougies avant, 3 après ; 5 à 60 bougies entre deux creux
 const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE SAMSUNG'.split(' '));
-let RAW = [], items = [], busy = false;
+let RAW = [], items = [], busy = false, alertsOn = false, lastLoad = 0;
 const keys = ['tf', 'drives', 'fresh', 'cciLen', 't3Len', 't3v'];
-try { const s = JSON.parse(localStorage.getItem('t3cci-page') || '{}'); keys.forEach(k => { if (s[k]) $(k).value = s[k]; }); if (s.os === false) $('os').checked = false; } catch (e) {}
-const save = () => { try { const o = {os: $('os').checked}; keys.forEach(k => o[k] = $(k).value); localStorage.setItem('t3cci-page', JSON.stringify(o)); } catch (e) {} };
+try { const s = JSON.parse(localStorage.getItem('t3cci-page') || '{}'); keys.forEach(k => { if (s[k]) $(k).value = s[k]; }); if (s.os === false) $('os').checked = false; alertsOn = !!s.alerts; } catch (e) {}
+const save = () => { try { const o = {os: $('os').checked, alerts: alertsOn}; keys.forEach(k => o[k] = $(k).value); localStorage.setItem('t3cci-page', JSON.stringify(o)); } catch (e) {} };
 const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
 const fmt = (v, d = 1) => (v > 0 ? '+' : '') + v.toFixed(d) + '%';
 
@@ -144,7 +147,7 @@ function detect(b, P) {
 }
 
 async function load() {
-  if (busy) return; busy = true;
+  if (busy) return; busy = true; lastLoad = Date.now();
   $('grid').innerHTML = '';
   try {
     const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
@@ -179,16 +182,69 @@ function params() {
 }
 function scan() {
   const P = params();
-  items = RAW.map(c => { const d = detect(c.bars, P); return d ? {...c, d} : null; }).filter(Boolean)
+  const find = Q => RAW.map(c => { const d = detect(c.bars, Q); return d ? {...c, d} : null; }).filter(Boolean)
     .sort((a, b) => b.d.n - a.d.n || a.d.ago - b.d.ago || b.d.cciGain - a.d.cciGain);
-  $('status').textContent = `${items.length} divergence${items.length > 1 ? 's' : ''} sur ${RAW.length} perps · ${$('tf').selectedOptions[0].text} · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`;
+  items = find(P);
+  const nNew = items.length;
+  // rien de récent : on montre quand même les dernières divergences des 60 dernières bougies (signalées « anciennes »)
+  if (!nNew) items = find({...P, fresh: 60 + OSC_R}).map(x => ({...x, old: true}));
+  $('status').textContent = `${nNew} divergence${nNew > 1 ? 's' : ''} récente${nNew > 1 ? 's' : ''} sur ${RAW.length} perps · ${$('tf').selectedOptions[0].text} · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`;
   render();
+  alertNew();
 }
 
-const io = new IntersectionObserver(es => es.forEach(e => {
-  if (!e.isIntersecting) return;
-  io.unobserve(e.target); draw(e.target, items[+e.target.dataset.i]);
-}), {rootMargin: '300px'});
+const tvUrl = x => `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(`BYBIT:${x.s}.P`)}&interval=${{60: '60', 240: '240', D: 'D'}[$('tf').value]}`;
+
+// ─── Alertes Chrome : une notification par nouvelle divergence (clé = coin + unité de temps + dernier creux) ──
+// Page intégrée dans marketscanner.co : Chrome bloque les notifications dans un cadre, on passe par la page parente.
+const inFrame = (() => { try { return window.top !== window; } catch (e) { return true; } })();
+let parentPerm = 'unknown';
+const perm = () => inFrame ? parentPerm : ('Notification' in window ? Notification.permission : 'unsupported');
+function alertBtn() {
+  const b = $('alertBtn'), st = perm(), on = alertsOn && st === 'granted';
+  b.classList.toggle('on', on);
+  b.textContent = on ? '🔔 Alertes actives' : st === 'denied' ? '🔕 Alertes bloquées' : '🔔 Alertes';
+  b.title = st === 'denied' ? 'Notifications bloquées : autorise-les pour ce site dans Chrome (icône à gauche de l’adresse)' : 'Notification Chrome à chaque nouvelle divergence détectée (scan toutes les 5 min, laisse l’onglet ouvert)';
+}
+function notify(title, body, url, tag) {
+  if (inFrame) { window.parent.postMessage({type: 'spaghetti-alert', title, body, tag, url}, '*'); return; }
+  try {
+    const n = new Notification(title, {body, tag, requireInteraction: false});
+    n.onclick = () => { window.open(url, '_blank'); n.close(); };
+    setTimeout(() => n.close(), 20000);                                   // disparaît toute seule
+  } catch (e) {}
+}
+function alertNew() {
+  if (!alertsOn || perm() !== 'granted') return;
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem('t3cci-notified') || '{}'); } catch (e) {}
+  const tf = $('tf').value, tfTxt = $('tf').selectedOptions[0].text;
+  for (const x of items) {
+    if (x.old) continue;
+    const key = `${x.s}:${tf}:${x.bars[x.d.osc[x.d.osc.length - 1]].t}`;
+    if (seen[key]) continue;
+    seen[key] = Date.now();
+    notify(`📐 ${x.b} · bull div T3-CCI ${x.d.n} drives (${tfTxt})`,
+           `Creux T3-CCI de plus en plus hauts, prix ${fmt(x.d.drop)} · invalidation sous ${px(x.d.low)} · ${fmt(x.d.bounce)} depuis le dernier drive`,
+           tvUrl(x), 't3cci-' + x.s + tf);
+  }
+  for (const k of Object.keys(seen)) if (Date.now() - seen[k] > 7 * 864e5) delete seen[k];
+  try { localStorage.setItem('t3cci-notified', JSON.stringify(seen)); } catch (e) {}
+}
+$('alertBtn').addEventListener('click', async () => {
+  const st = perm();
+  if (st === 'unsupported') { window.open(location.href, '_blank'); return; }
+  if (alertsOn && st === 'granted') { alertsOn = false; save(); alertBtn(); return; }
+  alertsOn = true; save();
+  if (st !== 'granted') {
+    if (inFrame) { window.parent.postMessage({type: 'spaghetti-perm-request'}, '*'); return; }   // réponse via « message »
+    try { await Notification.requestPermission(); } catch (e) {}
+  }
+  alertBtn(); alertNew();
+});
+window.addEventListener('message', e => { if (e.data && e.data.type === 'spaghetti-perm') { parentPerm = e.data.state; alertBtn(); alertNew(); } });
+if (inFrame) { window.parent.postMessage({type: 'spaghetti-perm-query'}, '*'); setTimeout(() => { if (parentPerm === 'unknown') { parentPerm = 'unsupported'; alertBtn(); } }, 4000); }
+alertBtn();
 
 function draw(box, x) {
   const LC = window.LightweightCharts;
@@ -230,8 +286,8 @@ function render() {
   const g = $('grid');
   if (!items.length) { g.innerHTML = `<div class="empty">${busy ? 'scan en cours…' : 'Aucune divergence T3-CCI en ' + $('drives').value + '+ drives pour l’instant. Essaie une autre unité de temps ou un dernier drive plus ancien.'}</div>`; return; }
   const tfTV = {60: '60', 240: '240', D: 'D'}[$('tf').value];
-  g.innerHTML = items.map((x, i) => {
-    const url = `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(`BYBIT:${x.s}.P`)}&interval=${tfTV}`;
+  g.innerHTML = (items[0].old ? `<div class="old">Aucune divergence avec un dernier drive récent. Voici les dernières trouvées sur les 60 dernières bougies :</div>` : '') + items.map((x, i) => {
+    const url = tvUrl(x);
     return `<div class="tile">
       <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener">${x.b} ↗</a></span>
         <span class="chip acc">${x.d.n} drives</span>
@@ -241,7 +297,7 @@ function render() {
       <div class="chart" data-i="${i}"><div class="ph">chargement du chart…</div></div>
     </div>`;
   }).join('');
-  g.querySelectorAll('.chart').forEach(el => io.observe(el));
+  g.querySelectorAll('.chart').forEach(el => setTimeout(() => draw(el, items[+el.dataset.i]), 0));   // dessin direct (pas d'attente du défilement)
 }
 
 ['drives', 'fresh', 'os', 'cciLen', 't3Len', 't3v'].forEach(id => $(id).addEventListener('change', () => { save(); scan(); }));
@@ -250,7 +306,8 @@ $('reload').addEventListener('click', load);
 // dans marketscanner.co : les liens du menu changent de page du site
 try { if (window.top !== window) document.querySelectorAll('.menu a').forEach(a => { a.target = '_top'; a.href = 'https://marketscanner.co/' + {'conso.html': 'consolidations', 'reveil.html': 'reveil', 'winners.html': 'winners'}[a.getAttribute('href')]; }); } catch (e) {}
 load();
-setInterval(() => { if (!document.hidden) load(); }, 15 * 60 * 1000);
+// rescan : toutes les 5 min quand les alertes sont actives (même onglet en arrière-plan), sinon toutes les 15 min si la page est visible
+setInterval(() => { if (alertsOn || (!document.hidden && Date.now() - lastLoad > 14 * 60 * 1000)) load(); }, 5 * 60 * 1000);
 </script>
 </body>
 </html>
