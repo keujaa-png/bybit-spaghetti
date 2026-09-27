@@ -205,7 +205,7 @@ async function loadMacro() {
 let shown = [];
 function drawSweep(box, x) {
   if (!window.LightweightCharts || !x || !x.bars) return;
-  box.innerHTML = '<span class="tag">Daily Bybit · sweep après run + conso</span>';
+  box.innerHTML = '';
   const ch = LightweightCharts.createChart(box, {autoSize: true, layout: {background: {color: '#0e1117'}, textColor: '#7f8fa3', fontSize: 11},
     grid: {vertLines: {color: '#1a2029'}, horzLines: {color: '#1a2029'}}, rightPriceScale: {borderColor: '#262d36'},
     timeScale: {borderColor: '#262d36'}, crosshair: {mode: 0}, handleScroll: false, handleScale: false});
@@ -213,15 +213,10 @@ function drawSweep(box, x) {
   const T = t => Math.floor(t / 1000);
   s.setData(x.bars.slice(-60).map(b => ({time: T(b.t), open: b.o, high: b.h, low: b.l, close: b.c})));
   const w = x.sweep;
-  // zone de conso : deux lignes limitées aux bougies de la conso et après
-  const zone = (price, color) => { const l = ch.addLineSeries({color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
-    l.setData(x.bars.filter(b => b.t >= w.cT).map(b => ({time: T(b.t), value: price}))); };
-  zone(w.hi, '#4aa3ff'); zone(w.lvl, '#f0a030');
-  s.createPriceLine({price: w.hi, color: '#4aa3ff', lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: 'breakout'});
-  s.createPriceLine({price: w.lvl, color: '#f0a030', lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: 'bas conso'});
-  s.createPriceLine({price: w.low, color: '#ef5350', lineStyle: 0, lineWidth: 1, axisLabelVisible: true, title: 'sweep · stop'});
-  s.setMarkers([{time: T(w.cT), position: 'aboveBar', color: '#f0a030', shape: 'arrowDown', text: 'conso'},
-                {time: T(w.t), position: 'belowBar', color: '#26c281', shape: 'arrowUp', text: 'SWEEP'}]);
+  // comme sur TradingView : le niveau balayé en pointillés à partir du sweep + l'étiquette sous la mèche
+  const lvl = ch.addLineSeries({color: '#f0a030', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+  lvl.setData(x.bars.filter(b => b.t >= w.t).map(b => ({time: T(b.t), value: w.lvl})));
+  s.setMarkers([{time: T(w.t), position: 'belowBar', color: '#26c281', shape: 'arrowUp', text: 'Sweep'}]);
   ch.timeScale().fitContent();
 }
 const io = new IntersectionObserver(es => es.forEach(e => {
@@ -255,14 +250,14 @@ function render() {
     const cons = x.cons ? `<span class="chip warn">conso ${x.range.toFixed(0)}%</span>` : '';
     const swc = x.sweep ? `<span class="chip up">🧹 sweep ${x.sweep.ago === 1 ? 'hier' : 'il y a ' + x.sweep.ago + ' j'} · ${fmt(x.sweep.since, 0)} depuis</span>` : '';
     const lv = show === 'sweep' && x.sweep
-      ? `mèche du sweep <b>${px(x.sweep.low)}</b> (stop) · bas conso <b>${px(x.sweep.lvl)}</b> · haut conso <b>${px(x.sweep.hi)}</b> (breakout) · prix <b>${px(x.price)}</b>`
+      ? `sweep du niveau <b>${px(x.sweep.lvl)}</b> · mèche <b>${px(x.sweep.low)}</b>`
       : x.approx
       ? `haut 1 mois <b>${px(x.cHi)}</b> · bas 1 mois <b>${px(x.cLo)}</b> · ${x.pos}`
       : x.cons ? `breakout &gt; <b>${px(x.cHi)}</b> · sweep &lt; <b>${px(x.cLo)}</b> · prix ${x.pos}` : `niveau du signal <b>${px(x.sig.lvl)}</b>`;
     return `<div class="tile">
       <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener" title="${x.desc ? x.desc.replace(/"/g, '') : 'Ouvrir sur TradingView'}">${x.label} ↗</a></span>
         <span class="chip ${x.perf7 >= 0 ? 'up' : 'down'}">${x.perf7 >= 0 ? '▲' : '▼'} ${fmt(x.perf7)} 7j</span>
-        <span class="chip">run ${fmt(x.run, 0)}</span>${cons}${sig}${swc}</div>
+        <span class="chip">run ${fmt(x.run, 0)}</span>${show === 'sweep' ? swc : cons + sig + swc}</div>
       <div class="lv">${lv}</div>
       <div class="chart" data-sym="${x.sym}"${x.sweep && x.bars ? ` data-lw="${idx}"` : ''}><div class="ph">chargement du chart…</div></div>
     </div>`;
