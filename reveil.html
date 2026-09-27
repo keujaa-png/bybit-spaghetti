@@ -444,8 +444,9 @@ const CAT_RULES = [
   ['💰 Rachat / treasury', /\b(treasury|buybacks?|burns?|acquires?|acquisition|raises|funding round|invests?)\b/i],
   ['🚀 Lancement', /\b(mainnet|launch(es|ed)?|upgrade|hard fork|goes live|roll(s|ed)? out)\b/i]
 ];
-const STOPT = new Set('THE ONE NOW ALL CAT DOG BIG NEW TOP KEY GAS RED SUN MOVE OPEN HOME SAFE BANK MEME REAL LINK DATA BEST FREE GOOD HIGH FAST PEOPLE TRUMP MORE BAND PUMP GAME COOK HYPE BOME ACE ID IO IP ZK US ME AI OM T S W C Q A B X G BTC ETH'.split(' '));
+const STOPT = new Set('THE ONE NOW ALL CAT DOG BIG NEW TOP KEY GAS RED SUN MOVE OPEN HOME SAFE BANK MEME REAL LINK DATA BEST FREE GOOD HIGH FAST PEOPLE TRUMP MORE BAND PUMP GAME COOK HYPE BOME ACE ID IO IP ZK US ME AI OM T S W C Q A B X G BTC ETH STRK'.split(' '));
 const STOPN = new Set('Quant Near Flow Magic Story Movement Blast Render Curve Maker Compound Theta Gala Kaito Zora Cosmos Stellar Solana Polygon Optimism Celo Mask Core Echo Wave Pixel Mode Life Venus Saga Space Ethena Gold Moon Hype Pump Pepe Echelon Plume Sonic Aura Neiro Bank Nexus Orca'.split(' '));
+const NOISE = /price (prediction|analysis|forecast|outlook)|technical analysis|top gainers|weekly (crypto )?gains|lead .{0,40}gains|can .{0,30}hold|what'?s next|should you buy|market wrap|daily recap/i;
 let CAT = [];
 const catKey = 'reveil-news';
 function catMatch(text) {
@@ -485,13 +486,14 @@ async function loadCatalysts() {
   const rx = coinRegexes(), out = [];
   for (const it of Object.values(store)) {
     const text = it.title + ' ' + it.desc;
-    let tags = catMatch(text);
+    if (NOISE.test(it.title)) continue;                     // analyses, prédictions, tops de la semaine : pas des catalyseurs
+    let tags = catMatch(it.title) || catMatch(it.desc);
     if (it.bybit === 'new_crypto') tags = ['🏷️ Listing'];
     if (it.bybit === 'delistings') tags = ['⚠️ Risque'];
     if (!tags) continue;
     for (const {c, res, strictName} of rx) {
-      const inTitle = res.some(r => r.test(it.title)), inText = inTitle || res.some(r => r.test(it.desc));
-      if (!inText) continue;
+      const inTitle = res.some(r => r.test(it.title));
+      if (!inTitle) continue;                                 // le coin doit être le sujet de l'actu
       if (strictName && !new RegExp('(^|[^A-Za-z0-9])\\$?' + c.b + '(?![A-Za-z0-9])').test(text) && !new RegExp(c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' ?(\\(|token|crypto|network|price|coin)', 'i').test(text)) continue;
       const vm = c.avgTurn ? c.turn / c.avgTurn : 0;
       const react = !tags[0].startsWith('⚠️') && (c.perf1 >= 5 || vm >= 2);
