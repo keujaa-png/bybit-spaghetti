@@ -300,11 +300,18 @@ function renderCons() {
 }
 
 // ─── Alertes Chrome : prix live toutes les minutes sur la liste des consolidations ──
+// Page ouverte directement : Notification API. Page intégrée (marketscanner.co) : Chrome bloque les
+// notifications dans un iframe, on les confie à la page parente (même relais que la page Spaghetti).
 const inFrame = (() => { try { return window.top !== window; } catch (e) { return true; } })();
+let parentPerm = 'unknown';
+const perm = () => inFrame ? parentPerm : ('Notification' in window ? Notification.permission : 'unsupported');
 function alertBtn() {
-  const b = $('alertBtn');
-  b.classList.toggle('on', alertsOn && Notification.permission === 'granted');
-  b.textContent = alertsOn && Notification.permission === 'granted' ? '🔔 Alertes actives' : '🔔 Alertes Chrome';
+  const b = $('alertBtn'), st = perm(), on = alertsOn && st === 'granted';
+  b.classList.toggle('on', on);
+  b.textContent = on ? '🔔 Alertes actives' : st === 'denied' ? '🔕 Alertes bloquées' : st === 'unsupported' ? '🔔 Alertes (ouvrir la page)' : '🔔 Alertes Chrome';
+  b.title = st === 'denied' ? 'Notifications bloquées : autorise-les pour ce site dans Chrome (icône à gauche de l’adresse)'
+    : st === 'unsupported' ? 'Clic : ouvrir la page dans un nouvel onglet pour activer les alertes'
+    : 'Notifications Chrome quand un coin en conso casse ou s’approche de sa cassure';
 }
 function notified(key) {
   const day = new Date().toISOString().slice(0, 10);
@@ -312,11 +319,15 @@ function notified(key) {
   return false;
 }
 function notify(c, title, body) {
-  const n = new Notification(title, {body, tag: c.s + title.slice(0, 2), requireInteraction: title.startsWith('🚀')});
-  n.onclick = () => { window.open(tvUrl(c), '_blank'); n.close(); };
+  const url = tvUrl(c), tag = 'reveil-' + c.s + title.slice(0, 2);
+  if (inFrame) { window.parent.postMessage({type: 'spaghetti-alert', title, body, tag, url}, '*'); return; }
+  try {
+    const n = new Notification(title, {body, tag, requireInteraction: title.startsWith('🚀')});
+    n.onclick = () => { window.open(url, '_blank'); n.close(); };
+  } catch (e) {}
 }
 async function pollAlerts() {
-  if (!alertsOn || Notification.permission !== 'granted' || !coins.length) return;
+  if (!alertsOn || perm() !== 'granted' || !coins.length) return;
   try {
     const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
     const live = Object.fromEntries(tk.result.list.map(t => [t.symbol, t]));
@@ -332,15 +343,24 @@ async function pollAlerts() {
     }
   } catch (e) {}
 }
-$('alertBtn').addEventListener('click', async () => {
-  if (inFrame) { window.open(location.href, '_blank'); return; }       // Chrome refuse les notifications dans un cadre intégré
-  if (!('Notification' in window)) { alert('Notifications non disponibles dans ce navigateur.'); return; }
-  if (alertsOn && Notification.permission === 'granted') alertsOn = false;
-  else { const p = await Notification.requestPermission(); alertsOn = p === 'granted'; if (!alertsOn) alert('Autorise les notifications pour cette page dans Chrome (icône à gauche de l’adresse).'); }
-  save(); alertBtn(); pollAlerts();
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'spaghetti-perm') return;
+  parentPerm = e.data.state; if (alertsOn === null) { alertsOn = parentPerm === 'granted'; save(); }
+  alertBtn(); pollAlerts();
 });
-if (inFrame) { $('alertBtn').textContent = '🔔 Alertes (ouvrir la page)'; $('alertBtn').title = 'Les alertes Chrome ne marchent que sur la page ouverte directement : clic pour l’ouvrir dans un nouvel onglet'; }
-else if ('Notification' in window) alertBtn(); else $('alertBtn').style.display = 'none';
+$('alertBtn').addEventListener('click', async () => {
+  const st = perm();
+  if (st === 'unsupported') { window.open(location.href, '_blank'); return; }
+  if (alertsOn && st === 'granted') { alertsOn = false; save(); alertBtn(); return; }
+  if (st !== 'granted') {
+    if (inFrame) { alertsOn = null; window.parent.postMessage({type: 'spaghetti-perm-request'}, '*'); return; }   // la réponse arrive par « message »
+    try { await Notification.requestPermission(); } catch (e) {}
+    if (Notification.permission !== 'granted') { alertBtn(); return; }
+  }
+  alertsOn = true; save(); alertBtn(); pollAlerts();
+});
+if (inFrame) { window.parent.postMessage({type: 'spaghetti-perm-query'}, '*'); setTimeout(() => { if (parentPerm === 'unknown') { parentPerm = 'unsupported'; alertBtn(); } }, 4000); }
+alertBtn();
 setInterval(pollAlerts, 60 * 1000);
 
 const pick = id => { selected = selected === id ? null : id; render(); if (selected) $('gridTitle').scrollIntoView({behavior: 'smooth', block: 'start'}); };
