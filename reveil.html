@@ -123,8 +123,6 @@
         <li>Clique <b>🔔 Alertes Chrome</b> puis <b>Autoriser</b>.</li>
         <li>Règle le seuil avec <b>Proche = 2 / 3 / 5 %</b>.</li>
         <li>Laisse l’onglet ouvert (en arrière-plan, c’est bon). Une alerte par coin et par jour ; clic sur la notification = chart TradingView.</li></ul></div>
-    <div><h3>Catalyseurs 📰</h3>
-      <p>Le tableau relie les actus des grands médias crypto et les annonces Bybit aux coins cités, et ne garde que les vrais catalyseurs : banques/tokenisation, listing, ETF, partenariat, régulation, rachat, lancement. <b>Réaction ✅</b> = le prix suit déjà (≥ +5 % sur 24 h ou volume ≥ 2×) : c’est ce cas-là qui déclenche l’alerte Chrome. ⚠️ = risque (hack, unlock, delisting).</p></div>
     <div><h3>Passer sur TradingView</h3>
       <p>Clic sur le nom d’un coin = ton layout « Scanner » avec les panneaux Run + Conso et Trend Tracker. La watchlist <b>Reveils_Narratives</b> reprend les réveils et les 3 narratives chaudes, mise à jour chaque matin.</p></div>
     <div><h3>Gestion du risque</h3>
@@ -145,7 +143,7 @@
   </table></div>
 </section>
 
-<section class="sec">
+<section class="sec" hidden>   <!-- catalyseurs retirés à la demande -->
   <div class="sech"><h2 id="catTitle">📰 Catalyseurs</h2>
     <span class="hint">Actus crypto des 3 derniers jours (CoinDesk, Cointelegraph, The Block, Decrypt…) + annonces Bybit, reliées aux coins cités. On ne garde que les vrais catalyseurs (banques, listing, ETF, partenariat, régulation, rachat…) ; <b>réaction</b> = le coin bouge (≥ +5 % sur 24 h ou volume ≥ 2×). Alerte Chrome sur chaque catalyseur avec réaction.</span></div>
   <div class="tw"><table class="cat">
@@ -521,6 +519,7 @@ function coinRegexes() {
   });
 }
 async function loadCatalysts() {
+  return;                                                   // panneau catalyseurs retiré à la demande
   let store = {};
   try { store = JSON.parse(localStorage.getItem(catKey) || '{}'); } catch (e) {}
   const now = Date.now();
