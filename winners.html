@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winners du cycle</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏆</text></svg>">
+<style>
+  :root { --bg:#0e1117; --panel:#161b22; --line:#262d36; --txt:#d7dde5; --mut:#7f8fa3; --up:#26c281; --down:#ef5350; --acc:#4aa3ff; --hot:#ff7a45; --gold:#f0c040; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.4 "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:rgba(14,17,23,.96); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  h1 { font-size:17px; margin:0 8px 0 0; font-weight:600; }
+  h2 { font-size:15px; margin:0; font-weight:600; }
+  a { color:var(--acc); }
+  .ctl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; color:var(--mut); }
+  .ctl select, .ctl button { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
+  .ctl label { display:flex; gap:5px; align-items:center; font-size:13px; }
+  .status { margin-left:auto; color:var(--mut); font-size:13px; }
+  .sec { padding:14px 16px 0; }
+  .sech { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .hint { color:var(--mut); font-size:12.5px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { font-size:12px; padding:2px 8px; border-radius:10px; background:#0e1117; border:1px solid var(--line); color:var(--mut); white-space:nowrap; }
+  .chip.hot { color:var(--hot); border-color:#6b3420; }
+  .chip.gold { color:var(--gold); border-color:#5a4a1a; }
+  .chip.up { color:var(--up); } .chip.down { color:var(--down); }
+  .tw { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  table { border-collapse:collapse; width:100%; min-width:760px; font-size:13px; }
+  th, td { padding:7px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:500; font-size:12px; }
+  th:nth-child(2), td:nth-child(2), th:last-child, td:last-child { text-align:left; }
+  tr:last-child td { border-bottom:0; }
+  td a { color:var(--txt); text-decoration:none; } td a:hover { color:var(--acc); }
+  .up { color:var(--up); } .down { color:var(--down); } .mut { color:var(--mut); }
+  .big { font-weight:600; font-size:14px; }
+  main { padding:12px 16px 40px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(var(--tile, 330px), 1fr)); }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+  .th { display:flex; align-items:baseline; gap:6px; padding:7px 10px 4px; flex-wrap:wrap; }
+  .sym { font-weight:600; font-size:15px; } .sym a { color:inherit; text-decoration:none; } .sym a:hover { color:var(--acc); }
+  .lv { padding:0 10px 6px; font-size:12px; color:var(--mut); display:flex; gap:6px; flex-wrap:wrap; }
+  .lv b { color:var(--txt); font-weight:500; }
+  .chart { position:relative; height:var(--tileh, 230px); background:#0e1117; }
+  .chart iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
+  @media (max-width:560px) { header { padding:8px 12px; } .sec { padding:12px 12px 0; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏆 Winners du cycle</h1>
+  <div class="ctl">
+    <select id="per" title="Point de départ">
+      <option value="cycle" selected>Cycle (depuis le bas de nov. 2022)</option>
+      <option value="12m">12 derniers mois</option>
+      <option value="ytd">Depuis le 1er janvier</option>
+      <option value="6m">6 derniers mois</option>
+    </select>
+    <select id="rank" title="Classement">
+      <option value="now" selected>Classement : perf aujourd’hui</option>
+      <option value="peak">Classement : plus haut atteint</option>
+    </select>
+    <label title="Inclure les coins listés sur Bybit après le point de départ (perf comptée depuis leur listing)"><input type="checkbox" id="late"> listés en cours de route</label>
+    <select id="n"><option value="10" selected>Top 10</option><option value="20">Top 20</option></select>
+    <a href="reveil.html" style="font-size:13px">⚡ Réveils & narratives</a>
+    <a href="conso.html" style="font-size:13px">🧩 Consolidations</a>
+  </div>
+  <div class="status" id="status">chargement…</div>
+</header>
+
+<section class="sec">
+  <div class="sech"><h2>🔥 Narratives des winners</h2><span class="hint">Combien de winners appartiennent à chaque narrative : les secteurs qui ont porté le cycle.</span></div>
+  <div class="chips" id="narSum"></div>
+</section>
+
+<section class="sec">
+  <div class="sech"><h2 id="tTitle">🏆 Top 10</h2><span class="hint" id="tHint"></span></div>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Coin</th><th>Départ</th><th>Aujourd’hui</th><th>Perf</th><th>Plus haut</th><th>Depuis le plus haut</th><th>Narratives</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+</section>
+<main id="grid"></main>
+
+<script>
+const $ = id => document.getElementById(id);
+const LAYOUT = 'LAU9xwF7';
+const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE SAMSUNG'.split(' '));
+let DATA = [], NAR = null, busy = false;
+try { const s = JSON.parse(localStorage.getItem('winners-page') || '{}'); ['per', 'rank', 'n'].forEach(k => { if (s[k]) $(k).value = s[k]; }); $('late').checked = !!s.late; } catch (e) {}
+const save = () => { try { localStorage.setItem('winners-page', JSON.stringify({per: $('per').value, rank: $('rank').value, n: $('n').value, late: $('late').checked})); } catch (e) {} };
+const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
+const mult = r => r >= 2 ? '×' + r.toFixed(r >= 10 ? 0 : 1) : (r >= 1 ? '+' : '') + ((r - 1) * 100).toFixed(0) + ' %';
+const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'mut';
+const dFmt = t => new Date(t).toLocaleDateString('fr-FR', {month: 'short', year: 'numeric'});
+
+function startTime() {
+  const now = Date.now(), p = $('per').value;
+  if (p === 'cycle') return Date.UTC(2022, 10, 21);          // bas du cycle BTC (≈ 15,5 k$)
+  if (p === '12m') return now - 365 * 864e5;
+  if (p === '6m') return now - 182 * 864e5;
+  return Date.UTC(new Date().getUTCFullYear(), 0, 1);
+}
+
+async function load() {
+  if (busy) return; busy = true;
+  try {
+    NAR = await fetch('narratives.json?x=' + Math.floor(Date.now() / 36e5)).then(r => r.json()).catch(() => ({labels: {}, coins: {}}));
+    const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+    const seen = new Set();
+    const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+      .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h, last: +t.lastPrice}))
+      .filter(t => t.v >= 1e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v).filter(t => !seen.has(t.b) && seen.add(t.b));
+    const out = []; let done = 0;
+    for (let i = 0; i < list.length; i += 20) {
+      await Promise.all(list.slice(i, i + 20).map(async t => {
+        try {
+          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=W&limit=220`).then(r => r.json())).result.list.reverse();
+          if (k.length < 4) return;
+          out.push({...t, w: k.map(x => ({t0: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4]})),
+                    name: (NAR.coins[t.b] || {}).name || t.b, nar: (NAR.coins[t.b] || {}).n || []});
+        } catch (e) {}
+        done++;
+      }));
+      $('status').textContent = `analyse ${done}/${list.length}…`;
+    }
+    DATA = out;
+    $('status').textContent = `${out.length} perps Bybit > 1 M$/jour · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`;
+  } catch (e) { $('status').textContent = 'erreur : ' + e.message; }
+  busy = false;
+  render();
+}
+
+function compute() {
+  const t0 = startTime(), late = $('late').checked;
+  return DATA.map(c => {
+    // bougie hebdo qui contient le point de départ, sinon la première dispo (coin listé après)
+    let i = c.w.findIndex(x => x.t0 + 7 * 864e5 > t0);
+    if (i < 0) return null;
+    const listedLate = c.w[0].t0 > t0 + 7 * 864e5;
+    if (listedLate && !late) return null;
+    if (listedLate) i = Math.min(2, c.w.length - 1);          // on saute les 2 premières semaines de cotation (trop volatiles)
+    const start = c.w[i].o || c.w[i].c, cur = c.last || c.w[c.w.length - 1].c;
+    let peak = 0, peakT = 0;
+    for (let q = i; q < c.w.length; q++) if (c.w[q].h > peak) { peak = c.w[q].h; peakT = c.w[q].t0; }
+    return {...c, start, startT: c.w[i].t0, cur, r: cur / start, rPeak: peak / start, peak, peakT, dd: (cur / peak - 1) * 100, listedLate};
+  }).filter(Boolean);
+}
+
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  const box = e.target; io.unobserve(box);
+  const f = document.createElement('iframe');
+  f.loading = 'lazy';
+  f.src = 'https://s.tradingview.com/widgetembed/?' + new URLSearchParams({
+    symbol: box.dataset.sym, interval: 'W', hidesidetoolbar: 1, hidetoptoolbar: 1, symboledit: 0, saveimage: 0,
+    toolbarbg: '161b22', theme: 'dark', style: 1, timezone: 'Etc/UTC', withdateranges: 0, hideideas: 1, hidevolume: 0, locale: 'fr'}).toString();
+  box.appendChild(f);
+}), {rootMargin: '300px'});
+
+function render() {
+  const N = +$('n').value, byPeak = $('rank').value === 'peak';
+  const all = compute().sort((a, b) => byPeak ? b.rPeak - a.rPeak : b.r - a.r);
+  const top = all.slice(0, N);
+  const lab = id => (NAR.labels || {})[id] || id;
+  // narratives des winners
+  const cnt = {};
+  top.forEach(c => c.nar.forEach(id => cnt[id] = (cnt[id] || 0) + 1));
+  $('narSum').innerHTML = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([id, n], i) =>
+    `<span class="chip ${i < 3 ? 'hot' : ''}">${i < 3 ? '🔥 ' : ''}${lab(id)} · ${n}</span>`).join('') || '<span class="mut">—</span>';
+  $('tTitle').textContent = `🏆 Top ${N}${byPeak ? ' (plus haut atteint)' : ''}`;
+  $('tHint').textContent = `Perf depuis ${dFmt(startTime())} sur ${all.length} perps Bybit liquides` + ($('late').checked ? ' (coins listés plus tard : depuis leur 3e semaine de cotation)' : ' (coins listés avant le départ uniquement)') + '.';
+  const tv = c => `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(`BYBIT:${c.s}.P`)}`;
+  $('rows').innerHTML = top.map((c, i) => `<tr>
+    <td class="mut">${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td>
+    <td><a href="${tv(c)}" target="_blank" rel="noopener"><b>${c.b}</b> <span class="mut">${c.name !== c.b ? c.name : ''}</span></a>${c.listedLate ? ` <span class="chip">listé ${dFmt(c.w[0].t0)}</span>` : ''}</td>
+    <td>${px(c.start)} <span class="mut">${dFmt(c.startT)}</span></td>
+    <td>${px(c.cur)}</td>
+    <td class="big ${cls(c.r - 1)}">${mult(c.r)}</td>
+    <td>${mult(c.rPeak)} <span class="mut">${dFmt(c.peakT)}</span></td>
+    <td class="${cls(c.dd)}">${c.dd.toFixed(0)} %</td>
+    <td>${c.nar.slice(0, 3).map(id => `<span class="chip">${lab(id)}</span>`).join(' ') || '<span class="mut">—</span>'}</td></tr>`).join('')
+    || `<tr><td colspan="8" class="mut" style="text-align:center">${busy ? 'analyse en cours…' : 'aucune donnée'}</td></tr>`;
+  $('grid').innerHTML = top.map((c, i) => `<div class="tile">
+    <div class="th"><span class="sym"><a href="${tv(c)}" target="_blank" rel="noopener">${i + 1}. ${c.b} ↗</a></span>
+      <span class="chip gold">${mult(c.r)}</span><span class="chip ${cls(c.dd)}">${c.dd.toFixed(0)} % vs plus haut</span></div>
+    <div class="lv">${c.nar.slice(0, 3).map(id => `<span class="chip">${lab(id)}</span>`).join('') || '<span>pas de narrative connue</span>'}</div>
+    <div class="chart" data-sym="BYBIT:${c.s}.P"><div class="ph">chargement du chart…</div></div>
+  </div>`).join('');
+  $('grid').querySelectorAll('.chart').forEach(el => io.observe(el));
+}
+
+['per', 'rank', 'n', 'late'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
+// dans marketscanner.co : les liens changent de page du site
+try { if (window.top !== window) document.querySelectorAll('header a').forEach(a => { a.target = '_top'; a.href = 'https://marketscanner.co/' + (a.getAttribute('href') === 'conso.html' ? 'consolidations' : 'reveil'); }); } catch (e) {}
+load();
+</script>
+</body>
+</html>
