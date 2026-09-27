@@ -449,7 +449,7 @@ function notify(c, title, body, link) {
   const url = link || tvUrl(c), tag = 'reveil-' + c.s + title.slice(0, 2);
   if (inFrame) { window.parent.postMessage({type: 'spaghetti-alert', title, body, tag, url}, '*'); return; }
   try {
-    const n = new Notification(title, {body, tag, requireInteraction: title.startsWith('🚀')});
+    const n = new Notification(title, {body, tag, requireInteraction: false}); setTimeout(() => n.close(), 20000);   // disparaît toute seule
     n.onclick = () => { window.open(url, '_blank'); n.close(); };
   } catch (e) {}
 }

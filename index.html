@@ -1003,7 +1003,7 @@ function notify(title, body, tag, url){
   if(inFrame){ window.parent.postMessage({type: 'spaghetti-alert', title, body, tag, url}, '*'); return; }
   try{
     if(!('Notification' in window) || Notification.permission !== 'granted') return;
-    const n = new Notification(title, {body, tag, renotify: true, requireInteraction: true});
+    const n = new Notification(title, {body, tag, renotify: true, requireInteraction: false}); setTimeout(() => n.close(), 20000);
     n.onclick = () => { window.focus(); if(url) window.open(url, '_blank', 'noopener'); n.close(); };
   }catch(e){}
 }
