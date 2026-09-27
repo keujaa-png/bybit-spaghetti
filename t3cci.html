@@ -67,13 +67,13 @@
   </nav>
   <div class="status" id="status">chargement…</div>
 </header>
-<div class="note">Perps Bybit ≥ 5 M$ de volume 24 h. Divergence haussière en plusieurs drives : le prix fait des plus bas de plus en plus bas (pivots de bas), pendant que le T3-CCI (indicateur « FX Sniper: T3-CCI » de TradingView, CCI 14 · T3 5 · 0,618) fait des plus bas de plus en plus hauts. Invalidé si le prix repasse sous le dernier drive. Clic sur le nom = ouvrir sur ton layout TradingView.</div>
+<div class="note">Perps Bybit ≥ 5 M$ de volume 24 h. Divergence haussière en plusieurs drives, méthode des indicateurs de divergence TradingView : on prend les creux du T3-CCI sous 0 (zone rouge) ; entre deux creux consécutifs, le prix fait un plus bas plus bas pendant que le T3-CCI (indicateur « FX Sniper: T3-CCI » de TradingView, CCI 14 · T3 5 · 0,618) fait des plus bas de plus en plus hauts. Invalidé si le prix repasse sous le dernier drive. Clic sur le nom = ouvrir sur ton layout TradingView.</div>
 <main id="grid"></main>
 
 <script>
 const $ = id => document.getElementById(id);
 const LAYOUT = 'LAU9xwF7';
-const PIV_L = 4, PIV_R = 2, MAX_GAP = 60;             // pivot de bas : 4 bougies avant, 2 après ; 60 bougies max entre deux drives
+const OSC_L = 5, OSC_R = 3, RANGE_MIN = 5, RANGE_MAX = 60;   // creux du T3-CCI : 5 bougies avant, 3 après ; 5 à 60 bougies entre deux creux
 const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE SAMSUNG'.split(' '));
 let RAW = [], items = [], busy = false;
 const keys = ['tf', 'drives', 'fresh', 'cciLen', 't3Len', 't3v'];
@@ -106,49 +106,41 @@ function t3(src, len, v) {
   return out;
 }
 
-// ─── Détection : chaîne de drives (plus bas plus bas + T3-CCI plus haut) ──
-// Dernier drive = un pivot de bas récent que le prix n'a pas cassé depuis. On remonte ensuite de drive en drive :
-// le drive précédent est le plus bas pivot avant lui (dans MAX_GAP bougies, sans bas plus bas entre les deux),
-// et son T3-CCI doit être plus bas. On garde la plus longue série.
+// ─── Détection : même méthode que les indicateurs de divergence TradingView ───────────────
+// Les drives sont les creux du T3-CCI lui-même (pivotlow sur l'oscillateur, 5 bougies avant / 3 après), pris dans la zone
+// rouge (sous 0). Divergence haussière entre deux creux consécutifs : T3-CCI plus haut ET prix plus bas (plus bas du prix
+// autour du creux). Écart entre deux creux : 5 à 60 bougies. On compte combien de creux consécutifs forment la série.
 function detect(b, P) {
   const n = b.length, ind = t3(cci(b, P.cciLen), P.t3Len, P.t3v);
   const warm = P.cciLen + P.t3Len * 6;
-  const piv = [];
-  for (let i = Math.max(PIV_L, warm); i < n - PIV_R; i++) {
+  const troughs = [];
+  for (let i = Math.max(OSC_L, warm); i < n - OSC_R; i++) {
+    const v = ind[i]; if (isNaN(v) || v >= 0) continue;                 // creux rouges uniquement
     let ok = true;
-    for (let j = i - PIV_L; j < i && ok; j++) if (b[j].l <= b[i].l) ok = false;
-    for (let j = i + 1; j <= i + PIV_R && ok; j++) if (b[j].l < b[i].l) ok = false;
-    if (ok && !isNaN(ind[i])) piv.push(i);
+    for (let j = i - OSC_L; j < i && ok; j++) if (!(ind[j] > v)) ok = false;
+    for (let j = i + 1; j <= i + OSC_R && ok; j++) if (!(ind[j] >= v)) ok = false;
+    if (!ok) continue;
+    let pi = i;                                                          // plus bas du prix autour du creux (± 2 bougies)
+    for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) if (b[j].l < b[pi].l) pi = j;
+    troughs.push({i, pi, v, low: b[pi].l});
   }
-  let best = null;
-  for (let s = piv.length - 1; s >= 0; s--) {
-    const last = piv[s];
-    if (n - 1 - last > P.fresh) break;
-    let broken = false;
-    for (let j = last + 1; j < n && !broken; j++) if (b[j].l < b[last].l) broken = true;    // cassé sous ce drive : invalidé
-    if (broken) continue;
-    const chain = [last];
-    let k = s - 1;
-    while (k >= 0) {
-      const cur = chain[chain.length - 1];
-      let bi = -1;
-      for (let q = k; q >= 0; q--) {
-        const p = piv[q];
-        if (cur - p > MAX_GAP || b[p].l <= b[cur].l) break;
-        if (bi < 0 || b[p].l < b[piv[bi]].l) bi = q;
-      }
-      if (bi < 0 || !(ind[piv[bi]] < ind[cur])) break;
-      chain.push(piv[bi]); k = bi - 1;
-    }
-    if (!best || chain.length > best.length) best = chain;
+  if (troughs.length < P.drives) return null;
+  const last = troughs[troughs.length - 1];
+  if (n - 1 - last.i > P.fresh) return null;
+  for (let j = last.pi + 1; j < n; j++) if (b[j].l < last.low) return null;      // prix repassé sous le dernier drive : invalidé
+  const chain = [last];
+  for (let k = troughs.length - 2; k >= 0; k--) {
+    const cur = chain[chain.length - 1], p = troughs[k], gap = cur.i - p.i;
+    if (gap < RANGE_MIN || gap > RANGE_MAX) break;
+    if (cur.v > p.v && cur.low < p.low) chain.push(p); else break;     // T3-CCI plus haut + prix plus bas
   }
-  if (!best || best.length < P.drives) return null;
-  const chain = best.reverse();
-  if (P.os && ind[chain[0]] > -100) return null;
-  const first = chain[0], lastD = chain[chain.length - 1];
-  return {drives: chain, ind, n: chain.length, ago: n - 1 - lastD, low: b[lastD].l,
-          drop: (b[lastD].l / b[first].l - 1) * 100, cciGain: ind[lastD] - ind[first], cciNow: ind[n - 1],
-          bounce: (b[n - 1].c / b[lastD].l - 1) * 100};
+  if (chain.length < P.drives) return null;
+  chain.reverse();
+  if (P.os && chain[0].v > -100) return null;
+  const first = chain[0];
+  return {drives: chain.map(c => c.pi), osc: chain.map(c => c.i), ind, n: chain.length, ago: n - 1 - last.i, low: last.low,
+          drop: (last.low / first.low - 1) * 100, cciGain: last.v - first.v, cciNow: ind[n - 1],
+          bounce: (b[n - 1].c / last.low - 1) * 100};
 }
 
 async function load() {
@@ -183,7 +175,7 @@ async function load() {
 
 function params() {
   return {cciLen: Math.max(5, +$('cciLen').value || 14), t3Len: Math.max(2, +$('t3Len').value || 5), t3v: Math.min(1, Math.max(0.1, +$('t3v').value || 0.618)),
-          drives: +$('drives').value, fresh: +$('fresh').value + PIV_R, os: $('os').checked};
+          drives: +$('drives').value, fresh: +$('fresh').value + OSC_R, os: $('os').checked};
 }
 function scan() {
   const P = params();
@@ -226,7 +218,7 @@ function draw(box, x) {
   const pl = ch.addSeries(LC.LineSeries, {color: '#00e676', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3});
   pl.setData(dv.map(i => ({time: T(x.bars[i].t), value: x.bars[i].l})));
   const cl = ch.addSeries(LC.LineSeries, {color: '#00e676', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true, pointMarkersRadius: 3}, 1);
-  cl.setData(dv.map(i => ({time: T(x.bars[i].t), value: x.d.ind[i]})));
+  cl.setData(x.d.osc.filter(i => i >= off).map(i => ({time: T(x.bars[i].t), value: x.d.ind[i]})));
   LC.createSeriesMarkers(s, dv.map((i, k) => ({time: T(x.bars[i].t), position: 'belowBar', color: '#00e676', shape: 'arrowUp', text: String(first + k + 1)})));
   try { ch.panes()[1].setHeight(Math.round(box.clientHeight * 0.34)); } catch (e) {}
   ch.timeScale().fitContent();
