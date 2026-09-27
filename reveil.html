@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réveils & narratives</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+<style>
+  :root { --bg:#0e1117; --panel:#161b22; --line:#262d36; --txt:#d7dde5; --mut:#7f8fa3; --up:#26c281; --down:#ef5350; --warn:#f0a030; --acc:#4aa3ff; --hot:#ff7a45; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.4 "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:rgba(14,17,23,.96); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  h1 { font-size:17px; margin:0 8px 0 0; font-weight:600; }
+  h2 { font-size:15px; margin:0; font-weight:600; }
+  a { color:var(--acc); }
+  .ctl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; color:var(--mut); }
+  .ctl select, .ctl button { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
+  .status { margin-left:auto; color:var(--mut); font-size:13px; }
+  .sec { padding:14px 16px 0; }
+  .sech { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .sech .hint { color:var(--mut); font-size:12.5px; }
+  .tw { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  table { border-collapse:collapse; width:100%; min-width:760px; font-size:13px; }
+  th, td { padding:6px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:500; font-size:12px; position:sticky; top:0; background:var(--panel); }
+  th:nth-child(2), td:nth-child(2), th:last-child, td:last-child { text-align:left; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:#1b222c; }
+  tbody tr.sel { background:#1f3a5c; }
+  tr:last-child td { border-bottom:0; }
+  .up { color:var(--up); } .down { color:var(--down); } .mut { color:var(--mut); }
+  .heat { display:inline-block; height:8px; border-radius:4px; background:var(--hot); vertical-align:middle; margin-right:6px; opacity:.85; }
+  .chip { font-size:12px; padding:1px 6px; border-radius:10px; background:#0e1117; border:1px solid var(--line); color:var(--mut); white-space:nowrap; }
+  .chip.up { color:var(--up); } .chip.down { color:var(--down); } .chip.acc { color:var(--acc); border-color:#23466b; }
+  .chip.hot { color:var(--hot); border-color:#6b3420; }
+  .chip.btn { cursor:pointer; }
+  .flt { display:none; }
+  .flt.on { display:inline-flex; gap:6px; align-items:center; }
+  main { padding:12px 16px 40px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(var(--tile, 330px), 1fr)); }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+  .th { display:flex; align-items:baseline; gap:6px; padding:7px 10px 4px; flex-wrap:wrap; }
+  .sym { font-weight:600; font-size:15px; }
+  .sym a { color:inherit; text-decoration:none; }
+  .sym a:hover { color:var(--acc); }
+  .lv { padding:0 10px 6px; font-size:12px; color:var(--mut); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .lv b { color:var(--txt); font-weight:500; }
+  .lv a { font-size:12px; }
+  .chart { position:relative; height:var(--tileh, 230px); background:#0e1117; }
+  .chart iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
+  .empty { grid-column:1/-1; color:var(--mut); padding:30px 0; text-align:center; }
+  @media (max-width:560px) { header { padding:8px 12px; } .sec { padding:12px 12px 0; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Réveils & narratives</h1>
+  <div class="ctl">
+    <a href="conso.html" style="font-size:13px">🧩 Consolidations</a>
+    <select id="size" title="Taille des fenêtres">
+      <option value="260">Petites</option>
+      <option value="330" selected>Moyennes</option>
+      <option value="440">Grandes</option>
+    </select>
+    <select id="tf" title="Unité de temps des mini-charts">
+      <option value="D" selected>Daily</option>
+      <option value="240">4h</option>
+      <option value="W">Weekly</option>
+    </select>
+    <button id="reload" title="Recalculer maintenant">↻</button>
+  </div>
+  <div class="status" id="status">chargement…</div>
+</header>
+
+<section class="sec">
+  <div class="sech"><h2>🔥 Narratives</h2>
+    <span class="hint">Perps Bybit regroupés par secteur. Chaleur = perf 7 j médiane + part des coins qui cassent leur plus haut 20 j + réveils. Clic sur une ligne = voir ses charts.</span></div>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Narrative</th><th>Coins</th><th>24 h</th><th>7 j</th><th>30 j</th><th title="Part des coins qui ont clôturé au-dessus de leur plus haut 20 j sur les 3 derniers jours">Cassures 20 j</th><th title="Réveils : cassure du plus haut 55 j avec volume ≥ 2,5× et base calme">Réveils</th><th>Chaleur</th><th>Leaders 7 j</th></tr></thead>
+    <tbody id="nar"></tbody>
+  </table></div>
+</section>
+
+<section class="sec">
+  <div class="sech"><h2 id="gridTitle">⚡ Réveils</h2>
+    <span class="flt" id="flt"><span class="chip acc" id="fltName"></span><span class="chip btn" id="fltClear">✕ tous les réveils</span></span>
+    <span class="hint" id="gridHint"></span></div>
+</section>
+<main id="grid"></main>
+
+<script>
+// ─── Règles ──────────────────────────────────────────────────────────────
+// Réveil = clôture au-dessus du plus haut 55 j, volume ≥ 2,5× la moyenne 20 j, après une base calme (range 20 j ≤ 30 %).
+const RV = {hiLen: 55, volMult: 2.5, baseLen: 20, baseMax: 30, days: 3, minTurnover: 1e6};
+const LAYOUT = 'LAU9xwF7';
+const MIN_MEMBERS = 4;
+const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE'.split(' '));
+const $ = id => document.getElementById(id);
+let coins = [], nars = [], NAR = null, selected = null, busy = false;
+try { const s = JSON.parse(localStorage.getItem('reveil-page') || '{}'); ['size', 'tf'].forEach(k => { if (s[k]) $(k).value = s[k]; }); } catch (e) {}
+const save = () => { try { localStorage.setItem('reveil-page', JSON.stringify({size: $('size').value, tf: $('tf').value})); } catch (e) {} };
+const fmt = (v, d = 1) => v == null || isNaN(v) ? '–' : (v > 0 ? '+' : '') + v.toFixed(d) + '%';
+const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'mut';
+const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
+const med = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const setStatus = t => $('status').textContent = t;
+const agoTxt = a => a === 0 ? 'aujourd’hui (en cours)' : a === 1 ? 'hier' : `il y a ${a} j`;
+
+// ─── Analyse d'un coin (bougies daily Bybit, la dernière est en cours) ────
+function analyse(b) {
+  const n = b.length; if (n < RV.hiLen + 5) return null;
+  const last = b[n - 1];
+  const out = {price: last.c, perf1: (last.c / b[n - 2].c - 1) * 100, perf7: (last.c / b[n - 8].c - 1) * 100,
+               perf30: n > 31 ? (last.c / b[n - 31].c - 1) * 100 : NaN, brk20: false, rev: null};
+  for (let i = n - 1; i >= n - 1 - RV.days; i--) {           // i = n-1 : bougie du jour, encore ouverte
+    let hi55 = -Infinity, hi20 = -Infinity, lo20 = Infinity, av = 0;
+    for (let q = i - RV.hiLen; q < i; q++) hi55 = Math.max(hi55, b[q].h);
+    for (let q = i - RV.baseLen; q < i; q++) { hi20 = Math.max(hi20, b[q].h); lo20 = Math.min(lo20, b[q].l); av += b[q].t; }
+    av /= RV.baseLen;
+    const x = b[i];
+    if (i < n - 1 && x.c > hi20) out.brk20 = true;
+    // bougie du jour : on extrapole le volume au prorata de l'heure écoulée (au moins 25 % de la journée)
+    const frac = i === n - 1 ? Math.max(0.25, (Date.now() - x.t0) / 864e5) : 1;
+    const vm = x.t / frac / av, base = (hi20 / lo20 - 1) * 100;
+    if (!out.rev && x.c > hi55 && vm >= RV.volMult && base <= RV.baseMax)
+      out.rev = {ago: n - 1 - i, lvl: hi55, vm, base, since: (last.c / hi55 - 1) * 100};
+  }
+  return out;
+}
+
+async function load() {
+  if (busy) return; busy = true;
+  try {
+    setStatus('narratives…');
+    NAR = await fetch('narratives.json?x=' + Math.floor(Date.now() / 36e5)).then(r => r.json());
+    setStatus('liste Bybit…');
+    const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+    const seen = new Set();
+    const list = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+      .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
+      .filter(t => t.v >= RV.minTurnover && !NON.has(t.b)).sort((a, b) => b.v - a.v)
+      .filter(t => !seen.has(t.b) && seen.add(t.b));
+    const out = []; let done = 0;
+    for (let i = 0; i < list.length; i += 15) {
+      await Promise.all(list.slice(i, i + 15).map(async t => {
+        try {
+          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=80`).then(r => r.json())).result.list.reverse();
+          const a = analyse(k.map(x => ({t0: +x[0], h: +x[2], l: +x[3], c: +x[4], t: +x[6]})));
+          if (a) out.push({s: t.s, b: t.b, sym: `BYBIT:${t.s}.P`, turn: t.v, nar: (NAR.coins[t.b] || {}).n || [], name: (NAR.coins[t.b] || {}).name || t.b, ...a});
+        } catch (e) {}
+        done++;
+      }));
+      setStatus(`analyse ${done}/${list.length}…`);
+    }
+    coins = out;
+    buildNarratives();
+    const nR = coins.filter(c => c.rev).length;
+    setStatus(`${coins.length} perps · ${nR} réveils · ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`);
+  } catch (e) { setStatus('erreur : ' + e.message); }
+  busy = false;
+  render();
+}
+
+function buildNarratives() {
+  nars = Object.entries(NAR.labels).map(([id, label]) => {
+    const m = coins.filter(c => c.nar.includes(id));
+    if (m.length < MIN_MEMBERS) return null;
+    const med7 = med(m.map(c => c.perf7)), breadth = m.filter(c => c.brk20).length / m.length, nRev = m.filter(c => c.rev).length;
+    return {id, label, m, n: m.length, med1: med(m.map(c => c.perf1)), med7, med30: med(m.filter(c => !isNaN(c.perf30)).map(c => c.perf30)),
+            breadth, nRev, score: med7 + 40 * breadth + 4 * nRev,
+            leaders: [...m].sort((a, b) => b.perf7 - a.perf7).slice(0, 4)};
+  }).filter(Boolean).sort((a, b) => b.score - a.score);
+  // rang de chaleur de chaque narrative, pour colorer les tags
+  nars.forEach((x, i) => x.rank = i);
+}
+const narById = id => nars.find(x => x.id === id);
+
+function renderTable() {
+  const max = Math.max(1, ...nars.map(x => x.score));
+  $('nar').innerHTML = nars.map((x, i) => `<tr data-id="${x.id}" class="${selected === x.id ? 'sel' : ''}">
+    <td class="mut">${i + 1}</td><td>${i < 5 ? '🔥 ' : ''}${x.label}</td><td class="mut">${x.n}</td>
+    <td class="${cls(x.med1)}">${fmt(x.med1)}</td><td class="${cls(x.med7)}">${fmt(x.med7)}</td><td class="${cls(x.med30)}">${fmt(x.med30, 0)}</td>
+    <td>${Math.round(x.breadth * 100)} %</td><td>${x.nRev || '<span class="mut">0</span>'}</td>
+    <td><span class="heat" style="width:${Math.max(2, Math.round(60 * Math.max(0, x.score) / max))}px"></span>${x.score.toFixed(0)}</td>
+    <td>${x.leaders.map(c => `<span class="${cls(c.perf7)}">${c.b} ${fmt(c.perf7, 0)}</span>`).join(' · ')}</td></tr>`).join('')
+    || '<tr><td colspan="10" class="mut" style="text-align:center">aucune donnée</td></tr>';
+}
+
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  const box = e.target; io.unobserve(box);
+  const f = document.createElement('iframe');
+  f.loading = 'lazy';
+  f.src = 'https://s.tradingview.com/widgetembed/?' + new URLSearchParams({
+    symbol: box.dataset.sym, interval: $('tf').value, hidesidetoolbar: 1, hidetoptoolbar: 1, symboledit: 0, saveimage: 0,
+    toolbarbg: '161b22', theme: 'dark', style: 1, timezone: 'Etc/UTC', withdateranges: 0, hideideas: 1, hidevolume: 0, locale: 'fr'}).toString();
+  box.appendChild(f);
+}), {rootMargin: '300px'});
+
+function narChips(c) {
+  return c.nar.map(narById).filter(Boolean).sort((a, b) => a.rank - b.rank).slice(0, 3)
+    .map(x => `<span class="chip btn ${x.rank < 5 ? 'hot' : ''}" data-nar="${x.id}">${x.rank < 5 ? '🔥 ' : ''}${x.label}</span>`).join('');
+}
+
+function render() {
+  document.documentElement.style.setProperty('--tile', $('size').value + 'px');
+  document.documentElement.style.setProperty('--tileh', Math.round(+$('size').value * 0.7) + 'px');
+  renderTable();
+  const sel = selected && narById(selected);
+  let list;
+  if (sel) {
+    list = [...sel.m].sort((a, b) => b.perf7 - a.perf7);
+    $('gridTitle').textContent = `📈 ${sel.label}`;
+    $('fltName').textContent = `${sel.n} coins · tri perf 7 j`;
+    $('gridHint').textContent = 'Tous les perps Bybit de la narrative — pour repérer ceux qui n’ont pas encore suivi le leader.';
+  } else {
+    // réveils : les plus récents d'abord, puis ceux dont la narrative chauffe le plus
+    const heat = c => Math.min(99, ...c.nar.map(narById).filter(Boolean).map(x => x.rank));
+    list = coins.filter(c => c.rev).sort((a, b) => a.rev.ago - b.rev.ago || heat(a) - heat(b) || b.rev.vm - a.rev.vm);
+    $('gridTitle').textContent = `⚡ Réveils (${list.length})`;
+    $('gridHint').textContent = 'Coins qui cassent leur plus haut 55 j avec un gros volume après une base calme, sur tous les perps Bybit > 1 M$/jour. Stop logique : sous la base.';
+  }
+  $('flt').classList.toggle('on', !!sel);
+  const grid = $('grid');
+  if (!list.length) { grid.innerHTML = `<div class="empty">${busy ? 'analyse en cours…' : 'Aucun réveil sur les 3 derniers jours.'}</div>`; return; }
+  grid.innerHTML = list.slice(0, 60).map(c => {
+    const url = `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(c.sym)}`;
+    const news = `https://news.google.com/search?q=${encodeURIComponent(`"${c.name}" crypto ${c.b} when:7d`)}&hl=fr`;
+    const rev = c.rev ? `<span class="chip acc">réveil ${agoTxt(c.rev.ago)}</span>` : c.brk20 ? '<span class="chip">cassure 20 j</span>' : '';
+    const lv = c.rev
+      ? `cassure &gt; <b>${px(c.rev.lvl)}</b> · vol <b>×${c.rev.vm.toFixed(1)}</b> · base <b>${c.rev.base.toFixed(0)} %</b> · depuis <b class="${cls(c.rev.since)}">${fmt(c.rev.since, 0)}</b>`
+      : `30 j <b class="${cls(c.perf30)}">${fmt(c.perf30, 0)}</b> · volume 24 h <b>${(c.turn / 1e6).toFixed(0)} M$</b>`;
+    return `<div class="tile">
+      <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener" title="${c.name.replace(/"/g, '')} · ouvrir sur TradingView">${c.b} ↗</a></span>
+        <span class="chip ${cls(c.perf1)}">${c.perf1 >= 0 ? '▲' : '▼'} ${fmt(c.perf1)} 24h</span>
+        <span class="chip ${cls(c.perf7)}">${fmt(c.perf7, 0)} 7j</span>${rev}</div>
+      <div class="lv">${lv} · <a href="${news}" target="_blank" rel="noopener">pourquoi ?</a></div>
+      <div class="lv">${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
+      <div class="chart" data-sym="${c.sym}"><div class="ph">chargement du chart…</div></div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.chart').forEach(el => io.observe(el));
+}
+
+const pick = id => { selected = selected === id ? null : id; render(); if (selected) $('gridTitle').scrollIntoView({behavior: 'smooth', block: 'start'}); };
+$('nar').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) pick(tr.dataset.id); });
+$('grid').addEventListener('click', e => { const ch = e.target.closest('[data-nar]'); if (ch) pick(ch.dataset.nar); });
+$('fltClear').addEventListener('click', () => { selected = null; render(); });
+['size', 'tf'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
+$('reload').addEventListener('click', load);
+load();
+setInterval(() => { if (!document.hidden) load(); }, 30 * 60 * 1000);
+</script>
+</body>
+</html>

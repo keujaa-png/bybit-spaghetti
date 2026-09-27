@@ -7,6 +7,7 @@
 // Pour chaque marché :
 // 1) deux univers de 38 symboles : momentum court (Run + Conso) et tendance (Trend Tracker)
 // 2) deux watchlists cliquables, en sections, dans l'ordre des panneaux
+//    (+ en crypto : « Reveils_Narratives » = réveils ≤ 3 j et les 3 narratives les plus chaudes)
 // 3) entrées des indicateurs du layout ouvert mises à jour (+ sauvegarde du layout)
 // 4) alertes des indicateurs de ce marché mises à jour (sinon elles gardent l'ancienne liste)
 // Résultat dans window.__refreshResult (texte) et dans localStorage « runconso_last_refresh_<marché> ».
@@ -33,6 +34,7 @@ async function runMarket(MODE) {
     return (j.data || []).map(x => ({s: x.s, d: x.d}));
   };
   let symsRC, symsTT, wlRC, wlTT, res;
+  const extra = [];                                          // watchlists supplémentaires [nom, symboles]
   try {
     // ── 1. univers + watchlists ─────────────────────────────────────────
     if (MODE === 'crypto') {
@@ -89,6 +91,49 @@ async function runMarket(MODE) {
       if (flat.length) wlTT.push('###Hors tendance', ...flat.map(s => `BYBIT:${s}.P`));
       wlRC = ['###Top 20 · perf 7 j', ...symsRC.slice(0, 20), '###Reste de l\'univers', ...symsRC.slice(20)];
       log.push('en tendance : ' + trend.slice(0, 5).map(t => t.s.replace('USDT', '') + ' +' + t.gain.toFixed(0) + '%').join(', '));
+      // ── Réveils + narratives chaudes, sur tous les perps > 1 M$/jour (même règles que reveil.html) ──
+      try {
+        const NAR = await fetch('https://raw.githubusercontent.com/keujaa-png/bybit-spaghetti/main/narratives.json?x=' + Date.now()).then(r => r.json());
+        const seen2 = new Set();
+        const all = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
+          .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
+          .filter(t => t.v >= 1e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v).filter(t => !seen2.has(t.b) && seen2.add(t.b));
+        const med = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : NaN; };
+        for (let i = 0; i < all.length; i += 12) {
+          await Promise.all(all.slice(i, i + 12).map(async t => {
+            try {
+              const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=80`).then(r => r.json())).result.list.reverse();
+              const b = k.map(x => ({t0: +x[0], h: +x[2], l: +x[3], c: +x[4], v: +x[6]})), n = b.length;
+              if (n < 60) return;
+              t.p7 = (b[n - 1].c / b[n - 8].c - 1) * 100;
+              t.nar = (NAR.coins[t.b] || {}).n || [];
+              for (let j = n - 1; j >= n - 4; j--) {
+                let hi55 = -Infinity, hi20 = -Infinity, lo20 = Infinity, av = 0;
+                for (let q = j - 55; q < j; q++) hi55 = Math.max(hi55, b[q].h);
+                for (let q = j - 20; q < j; q++) { hi20 = Math.max(hi20, b[q].h); lo20 = Math.min(lo20, b[q].l); av += b[q].v / 20; }
+                const frac = j === n - 1 ? Math.max(0.25, (Date.now() - b[j].t0) / 864e5) : 1;
+                if (j < n - 1 && b[j].c > hi20) t.brk = true;
+                if (!t.rev && b[j].c > hi55 && b[j].v / frac >= 2.5 * av && (hi20 / lo20 - 1) <= 0.30) t.rev = {ago: n - 1 - j, vm: b[j].v / frac / av};
+              }
+            } catch (e) {}
+          }));
+        }
+        const ok = all.filter(t => t.p7 !== undefined);
+        const hot = Object.entries(NAR.labels).map(([id, label]) => {
+          const m = ok.filter(t => t.nar.includes(id));
+          if (m.length < 4) return null;
+          const md = med(m.map(t => t.p7)), br = m.filter(t => t.brk).length / m.length, nr = m.filter(t => t.rev).length;
+          return {label, m, md, score: md + 40 * br + 4 * nr};
+        }).filter(Boolean).sort((a, b) => b.score - a.score);
+        const revs = ok.filter(t => t.rev).sort((a, b) => a.rev.ago - b.rev.ago || b.rev.vm - a.rev.vm);
+        const wlRV = [`###⚡ Réveils ≤ 3 j · ${revs.length} coins`, ...revs.map(t => `BYBIT:${t.s}.P`)];
+        for (const h of hot.slice(0, 3)) {
+          wlRV.push(`###🔥 ${h.label} · 7 j ${h.md >= 0 ? '+' : ''}${h.md.toFixed(0)}%`,
+                    ...[...h.m].sort((a, b) => b.p7 - a.p7).slice(0, 10).map(t => `BYBIT:${t.s}.P`));
+        }
+        extra.push(['Reveils_Narratives', wlRV]);
+        log.push('réveils : ' + (revs.slice(0, 6).map(t => t.b).join(', ') || 'aucun') + ' · narratives chaudes : ' + hot.slice(0, 3).map(h => h.label).join(', '));
+      } catch (e) { log.push('réveils : échec ' + e.message); }
     } else if (MODE === 'us') {
       // actions US : capitalisation > 1 Md$, prix > 5 $, volume échangé > 20 M$/jour
       const rows = await scan('america', {
@@ -152,6 +197,7 @@ async function runMarket(MODE) {
     };
     await put(CFG.wlRC, wlRC);
     await put(CFG.wlTT, wlTT);
+    for (const [name, syms] of extra) await put(name, syms);
 
     // ── 3. entrées des indicateurs du layout ouvert ─────────────────────
     const ch = TradingViewApi.activeChart();
