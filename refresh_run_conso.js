@@ -18,7 +18,7 @@ const N = 38;
 const LAYOUTS = {crypto: 'Scanner', us: 'Scanner US', macro: 'Scanner Commo ETF'};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function runMarket(MODE) {
+async function prepare(MODE) {
   const CFG = {
     crypto: {wlRC: 'Run_Conso_Sweeps', wlTT: 'Trend_Tracker', alertSym: 'BTCUSDT'},
     us:     {wlRC: 'US_Run_Conso',     wlTT: 'US_Trend_Tracker', alertSym: 'SPY'},
@@ -42,21 +42,32 @@ async function runMarket(MODE) {
       const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'HYPEUSDT', 'DOGEUSDT', 'ZECUSDT', 'BNBUSDT'];
       const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE CONLUSDT'.split(' '));
       const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+      const NAR = await fetch('https://raw.githubusercontent.com/keujaa-png/bybit-spaghetti/main/narratives.json?x=' + Date.now()).then(r => r.json()).catch(() => null);
       const seen = new Set();
-      const cands = tk.result.list
-        .filter(t => t.symbol.endsWith('USDT'))
+      // tous les perps > 1 M$/jour : une seule série de requêtes (80 bougies daily) sert à la perf 7 j, aux réveils et aux narratives
+      const all = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
         .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
-        .filter(t => t.v >= MIN_VOL && !NON.has(t.b))
-        .sort((a, b) => b.v - a.v)
-        .filter(t => !seen.has(t.b) && seen.add(t.b));
-      for (let i = 0; i < cands.length; i += 8) {
-        await Promise.all(cands.slice(i, i + 8).map(async t => {
+        .filter(t => t.v >= 1e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v).filter(t => !seen.has(t.b) && seen.add(t.b));
+      for (let i = 0; i < all.length; i += 20) {
+        await Promise.all(all.slice(i, i + 20).map(async t => {
           try {
-            const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=8`).then(r => r.json())).result.list;
-            if (k.length >= 8) t.p7 = (+k[0][4] / +k[7][4] - 1) * 100;
+            const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=80`).then(r => r.json())).result.list.reverse();
+            const b = k.map(x => ({t0: +x[0], h: +x[2], l: +x[3], c: +x[4], v: +x[6]})), n = b.length;
+            if (n >= 8) t.p7 = (b[n - 1].c / b[n - 8].c - 1) * 100;
+            t.nar = NAR ? ((NAR.coins[t.b] || {}).n || []) : [];
+            if (n < 60) return;
+            for (let j = n - 1; j >= n - 4; j--) {
+              let hi55 = -Infinity, hi20 = -Infinity, lo20 = Infinity, av = 0;
+              for (let q = j - 55; q < j; q++) hi55 = Math.max(hi55, b[q].h);
+              for (let q = j - 20; q < j; q++) { hi20 = Math.max(hi20, b[q].h); lo20 = Math.min(lo20, b[q].l); av += b[q].v / 20; }
+              const frac = j === n - 1 ? Math.max(0.25, (Date.now() - b[j].t0) / 864e5) : 1;
+              if (j < n - 1 && b[j].c > hi20) t.brk = true;
+              if (!t.rev && b[j].c > hi55 && b[j].v / frac >= 2.5 * av && (hi20 / lo20 - 1) <= 0.30) t.rev = {ago: n - 1 - j, vm: b[j].v / frac / av};
+            }
           } catch (e) {}
         }));
       }
+      const cands = all.filter(t => t.v >= MIN_VOL);
       const ranked = cands.filter(t => t.p7 !== undefined).sort((a, b) => b.p7 - a.p7);
       const uniRC = ranked.slice(0, TOP).map(t => t.s);
       for (const m of MAJORS) if (uniRC.length < N && !uniRC.includes(m)) uniRC.push(m);
@@ -68,56 +79,30 @@ async function runMarket(MODE) {
       log.push('top 7 j : ' + ranked.slice(0, 6).map(t => t.s.replace('USDT', '') + ' ' + t.p7.toFixed(0) + '%').join(', '));
       // état de tendance exact (mêmes règles que l'indicateur) pour trier la watchlist
       const trend = [], flat = [];
-      for (let i = 0; i < uniTT.length; i += 8) {
-        await Promise.all(uniTT.slice(i, i + 8).map(async s => {
-          try {
-            const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${s}&interval=D&limit=400`).then(r => r.json())).result.list.reverse();
-            const b = k.map(x => ({h: +x[2], l: +x[3], c: +x[4]}));
-            const live = b[b.length - 1].c, closed = b.slice(0, -1);
-            let inPos = false, entry = 0;
-            for (let j = 55; j < closed.length; j++) {
-              let hi = -Infinity, lo = Infinity;
-              for (let q = j - 55; q < j; q++) hi = Math.max(hi, closed[q].h);
-              for (let q = j - 20; q < j; q++) lo = Math.min(lo, closed[q].l);
-              if (inPos && closed[j].c < lo) inPos = false;
-              if (!inPos && closed[j].c > hi) { inPos = true; entry = closed[j].c; }
-            }
-            if (inPos) trend.push({s, gain: (live / entry - 1) * 100}); else flat.push(s);
-          } catch (e) { flat.push(s); }
-        }));
-      }
+      await Promise.all(uniTT.map(async s => {
+        try {
+          const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${s}&interval=D&limit=400`).then(r => r.json())).result.list.reverse();
+          const b = k.map(x => ({h: +x[2], l: +x[3], c: +x[4]}));
+          const live = b[b.length - 1].c, closed = b.slice(0, -1);
+          let inPos = false, entry = 0;
+          for (let j = 55; j < closed.length; j++) {
+            let hi = -Infinity, lo = Infinity;
+            for (let q = j - 55; q < j; q++) hi = Math.max(hi, closed[q].h);
+            for (let q = j - 20; q < j; q++) lo = Math.min(lo, closed[q].l);
+            if (inPos && closed[j].c < lo) inPos = false;
+            if (!inPos && closed[j].c > hi) { inPos = true; entry = closed[j].c; }
+          }
+          if (inPos) trend.push({s, gain: (live / entry - 1) * 100}); else flat.push(s);
+        } catch (e) { flat.push(s); }
+      }));
       trend.sort((a, b) => b.gain - a.gain);
       wlTT = [`###🚀 Tendance 55j · ${trend.length} coins (tri par gain)`, ...trend.map(t => `BYBIT:${t.s}.P`)];
       if (flat.length) wlTT.push('###Hors tendance', ...flat.map(s => `BYBIT:${s}.P`));
       wlRC = ['###Top 20 · perf 7 j', ...symsRC.slice(0, 20), '###Reste de l\'univers', ...symsRC.slice(20)];
       log.push('en tendance : ' + trend.slice(0, 5).map(t => t.s.replace('USDT', '') + ' +' + t.gain.toFixed(0) + '%').join(', '));
-      // ── Réveils + narratives chaudes, sur tous les perps > 1 M$/jour (même règles que reveil.html) ──
-      try {
-        const NAR = await fetch('https://raw.githubusercontent.com/keujaa-png/bybit-spaghetti/main/narratives.json?x=' + Date.now()).then(r => r.json());
-        const seen2 = new Set();
-        const all = tk.result.list.filter(t => t.symbol.endsWith('USDT'))
-          .map(t => ({s: t.symbol, b: t.symbol.replace(/USDT$/, '').replace(/^(1000000|100000|10000|1000)/, ''), v: +t.turnover24h}))
-          .filter(t => t.v >= 1e6 && !NON.has(t.b)).sort((a, b) => b.v - a.v).filter(t => !seen2.has(t.b) && seen2.add(t.b));
+      // ── Réveils + narratives chaudes (mêmes règles que reveil.html) ──
+      if (NAR) {
         const med = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : NaN; };
-        for (let i = 0; i < all.length; i += 12) {
-          await Promise.all(all.slice(i, i + 12).map(async t => {
-            try {
-              const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=80`).then(r => r.json())).result.list.reverse();
-              const b = k.map(x => ({t0: +x[0], h: +x[2], l: +x[3], c: +x[4], v: +x[6]})), n = b.length;
-              if (n < 60) return;
-              t.p7 = (b[n - 1].c / b[n - 8].c - 1) * 100;
-              t.nar = (NAR.coins[t.b] || {}).n || [];
-              for (let j = n - 1; j >= n - 4; j--) {
-                let hi55 = -Infinity, hi20 = -Infinity, lo20 = Infinity, av = 0;
-                for (let q = j - 55; q < j; q++) hi55 = Math.max(hi55, b[q].h);
-                for (let q = j - 20; q < j; q++) { hi20 = Math.max(hi20, b[q].h); lo20 = Math.min(lo20, b[q].l); av += b[q].v / 20; }
-                const frac = j === n - 1 ? Math.max(0.25, (Date.now() - b[j].t0) / 864e5) : 1;
-                if (j < n - 1 && b[j].c > hi20) t.brk = true;
-                if (!t.rev && b[j].c > hi55 && b[j].v / frac >= 2.5 * av && (hi20 / lo20 - 1) <= 0.30) t.rev = {ago: n - 1 - j, vm: b[j].v / frac / av};
-              }
-            } catch (e) {}
-          }));
-        }
         const ok = all.filter(t => t.p7 !== undefined);
         const hot = Object.entries(NAR.labels).map(([id, label]) => {
           const m = ok.filter(t => t.nar.includes(id));
@@ -133,7 +118,7 @@ async function runMarket(MODE) {
         }
         extra.push(['Reveils_Narratives', wlRV]);
         log.push('réveils : ' + (revs.slice(0, 6).map(t => t.b).join(', ') || 'aucun') + ' · narratives chaudes : ' + hot.slice(0, 3).map(h => h.label).join(', '));
-      } catch (e) { log.push('réveils : échec ' + e.message); }
+      } else log.push('réveils : narratives.json introuvable');
     } else if (MODE === 'us') {
       // actions US : capitalisation > 1 Md$, prix > 5 $, volume échangé > 20 M$/jour
       const rows = await scan('america', {
@@ -163,7 +148,7 @@ async function runMarket(MODE) {
                      'OANDA:BCOUSD', 'OANDA:NATGASUSD', 'OANDA:CORNUSD', 'OANDA:WHEATUSD', 'OANDA:SOYBNUSD', 'OANDA:SUGARUSD'];
       const fut = await scan('cfd', {symbols: {tickers: COMMO}, columns: ['Perf.W', 'Perf.3M']}).catch(() => []);
       const fperf = Object.fromEntries(fut.map(x => [x.s, {w: x.d[0] ?? -999, m3: x.d[1] ?? -999}]));
-      const bad = /\b(2x|3x|leveraged|inverse|ultra|ultrapro|daily|bull|bear|short|option|income|yieldmax|covered|buffer|bitcoin|ether|ethereum|solana|xrp|crypto|staking)\b/i;
+      const bad = /\b(2x|3x|leveraged|inverse|ultra|ultrapro|daily|bull|bear|short|option|income|yieldmax|covered|buffer|bitcoin|ether|ethereum|solana|xrp|crypto|staking|zcash|litecoin|dogecoin|avalanche|chainlink|hedera|cardano|polkadot|sui|grayscale)\b/i;
       const etfRows = await scan('america', {
         filter: [
           {left: 'type', operation: 'equal', right: 'fund'},
@@ -198,21 +183,6 @@ async function runMarket(MODE) {
     await put(CFG.wlRC, wlRC);
     await put(CFG.wlTT, wlTT);
     for (const [name, syms] of extra) await put(name, syms);
-
-    // ── 3. entrées des indicateurs du layout ouvert ─────────────────────
-    const ch = TradingViewApi.activeChart();
-    const studies = ch.getAllStudies().filter(x => /Run \+ Conso|Trend Tracker/.test(x.name));
-    for (const st of studies) {
-      const study = ch.getStudyById(st.id);
-      const iv = study.getInputValues().filter(x => /^in_\d+$/.test(x.id) && isSym(x.value))
-        .sort((a, b) => +a.id.slice(3) - +b.id.slice(3));
-      const list = /Trend Tracker/.test(st.name) ? symsTT : symsRC;
-      study.setInputValues(iv.map((x, i) => ({id: x.id, value: list[i]})));
-      log.push(st.name.slice(0, 12) + ' : ' + iv.length + ' symboles');
-    }
-    if (!studies.length) log.push('indicateurs absents du graphique');
-    await sleep(3000);
-    await saveLayout();
 
     // ── 4. alertes de ce marché (repérées par le symbole sur lequel elles sont posées) ──
     const la = await fetch('https://pricealerts.tradingview.com/list_alerts', {credentials: 'include'}).then(r => r.json());
@@ -249,7 +219,25 @@ async function runMarket(MODE) {
   }
   // trace du dernier passage (lisible depuis n'importe quel onglet TradingView)
   try { localStorage.setItem('runconso_last_refresh_' + MODE, new Date().toISOString() + ' · ' + res); } catch (e) {}
-  return res;
+  return {res, symsRC, symsTT};
+}
+
+// entrées des indicateurs du layout ouvert (les 38 symboles de chaque panneau), puis sauvegarde
+async function panels(d) {
+  const isSym = v => typeof v === 'string' && /^[A-Z0-9_]+:\S+$/.test(v);
+  const ch = TradingViewApi.activeChart();
+  const studies = ch.getAllStudies().filter(x => /Run \+ Conso|Trend Tracker/.test(x.name));
+  for (const st of studies) {
+    const study = ch.getStudyById(st.id);
+    const iv = study.getInputValues().filter(x => /^in_\d+$/.test(x.id) && isSym(x.value))
+      .sort((a, b) => +a.id.slice(3) - +b.id.slice(3));
+    const list = /Trend Tracker/.test(st.name) ? d.symsTT : d.symsRC;
+    study.setInputValues(iv.map((x, i) => ({id: x.id, value: list[i]})));
+  }
+  if (!studies.length) return 'indicateurs absents';
+  await sleep(2500);
+  await saveLayout();
+  return 'panneaux à jour';
 }
 
 // ─── Pilote : les trois layouts, l'un après l'autre, dans le même onglet ──
@@ -270,26 +258,34 @@ async function switchTo(rec) {
   }
   await sleep(4000);                                          // laisse les indicateurs se charger
 }
-const results = [];
+// 1) tout ce qui passe par les API (univers, watchlists, alertes) pour les trois marchés : rapide, sans changer de layout
+// 2) panneaux du layout ouvert → résultat publié dans window.__refreshResult (< 1 min)
+// 3) ensuite seulement, les panneaux des deux autres layouts (changement de layout dans l'onglet, puis retour)
+const results = {}, panelState = {};
+const order = window.__refreshMarkets || ['crypto', 'us', 'macro'];
+const publish = () => {
+  window.__refreshResult = order.map(m => (results[m] ? results[m].res : 'ERREUR · ' + m) + ' · ' + (panelState[m] || 'panneaux en attente')).join('\n');
+  try { localStorage.setItem('runconso_last_refresh', new Date().toISOString() + '\n' + window.__refreshResult); } catch (e) {}
+};
 try {
+  await Promise.all(order.map(async m => { try { results[m] = await prepare(m); } catch (e) { results[m] = {res: `ERREUR · ${m} · ${e.message}`}; } }));
   const startName = api.layoutName();
+  const here = order.find(m => LAYOUTS[m] === startName);
+  if (here && results[here].symsRC) { try { panelState[here] = await panels(results[here]); } catch (e) { panelState[here] = 'panneaux : ' + e.message; } }
+  publish();
   const recs = await new Promise(res => { try { api.getSavedCharts(x => res(x || [])); } catch (e) { res([]); } setTimeout(() => res([]), 12000); });
-  const order = window.__refreshMarkets || ['crypto', 'us', 'macro'];
   for (const m of order) {
+    if (m === here || !results[m].symsRC) continue;
     try {
-      if (api.layoutName() !== LAYOUTS[m]) {
-        const rec = recs.find(r => r.name === LAYOUTS[m]);
-        if (!rec) { results.push(`ERREUR ${m} · layout « ${LAYOUTS[m]} » introuvable`); continue; }
-        await switchTo(rec);
-      }
-      results.push(await runMarket(m));
-    } catch (e) { results.push(`ERREUR ${m} · ${e.message}`); }
+      const rec = recs.find(r => r.name === LAYOUTS[m]);
+      if (!rec) { panelState[m] = `layout « ${LAYOUTS[m]} » introuvable`; continue; }
+      await switchTo(rec);
+      panelState[m] = await panels(results[m]);
+    } catch (e) { panelState[m] = 'panneaux : ' + e.message; }
+    try { localStorage.setItem('runconso_panels_' + m, new Date().toISOString() + ' · ' + panelState[m]); } catch (e) {}
+    publish();
   }
-  if (api.layoutName() !== startName) {
-    const rec = recs.find(r => r.name === startName);
-    if (rec) await switchTo(rec);
-  }
-} catch (e) { results.push('ERREUR · ' + e.message); }
-window.__refreshResult = results.join('\n');
-try { localStorage.setItem('runconso_last_refresh', new Date().toISOString() + '\n' + window.__refreshResult); } catch (e) {}
+  if (api.layoutName() !== startName) { const rec = recs.find(r => r.name === startName); if (rec) await switchTo(rec); }
+  publish();
+} catch (e) { window.__refreshResult = 'ERREUR · ' + e.message; }
 })();

@@ -48,6 +48,10 @@
   .chart { position:relative; height:var(--tileh, 230px); background:#0e1117; }
   .chart iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
   .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
+  h2 { scroll-margin-top:70px; }
+  .chip.go { color:#fff; background:#1f6e43; border-color:#26c281; }
+  .chip.near { color:var(--warn); border-color:#5a4520; }
+  #alertBtn.on { background:#1f6e43; border-color:var(--up); color:#fff; }
   .empty { grid-column:1/-1; color:var(--mut); padding:30px 0; text-align:center; }
   @media (max-width:560px) { header { padding:8px 12px; } .sec { padding:12px 12px 0; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
 </style>
@@ -68,6 +72,12 @@
       <option value="W">Weekly</option>
     </select>
     <button id="reload" title="Recalculer maintenant">↻</button>
+    <select id="near" title="Distance au breakout qui déclenche l’alerte « proche »">
+      <option value="2">Proche = 2 %</option>
+      <option value="3" selected>Proche = 3 %</option>
+      <option value="5">Proche = 5 %</option>
+    </select>
+    <button id="alertBtn" title="Notifications Chrome quand un coin en conso casse ou s’approche de sa cassure">🔔 Alertes Chrome</button>
   </div>
   <div class="status" id="status">chargement…</div>
 </header>
@@ -88,17 +98,25 @@
 </section>
 <main id="grid"></main>
 
+<section class="sec">
+  <div class="sech"><h2 id="consTitle">🧩 Consolidations</h2>
+    <span class="hint">Coins en conso, triés par distance à la cassure : run ≥ 30 % puis conso de 4 j (règles du panneau Run + Conso), ou base calme de 20 j (range ≤ 30 %) sous le plus haut 55 j. Les alertes Chrome surveillent cette liste.</span></div>
+</section>
+<main id="cgrid"></main>
+
 <script>
 // ─── Règles ──────────────────────────────────────────────────────────────
 // Réveil = clôture au-dessus du plus haut 55 j, volume ≥ 2,5× la moyenne 20 j, après une base calme (range 20 j ≤ 30 %).
 const RV = {hiLen: 55, volMult: 2.5, baseLen: 20, baseMax: 30, days: 3, minTurnover: 1e6};
 const LAYOUT = 'LAU9xwF7';
 const MIN_MEMBERS = 4;
+const RC = {runLen: 20, runMin: 30, consLen: 4, consMax: 25, retr: 50};   // mêmes règles que le panneau Run + Conso
+const WATCH_MAX = 6;                                                          // coins affichés : jusqu'à 6 % du niveau
 const NON = new Set('XAU XAUT XAG PAXG CL BZ WTI BRENT NG SOXL SOXS SPCX SNDK SNXX MSTR SKHY SKHYNIX AAPL KORU INTC MU CRCL META TSLA NVDA EWY MSFT HOOD DRAM CHIP AMZN GOOGL COIN QQQ SPY IBIT MSFU CONL USDC USDE'.split(' '));
 const $ = id => document.getElementById(id);
-let coins = [], nars = [], NAR = null, selected = null, busy = false;
-try { const s = JSON.parse(localStorage.getItem('reveil-page') || '{}'); ['size', 'tf'].forEach(k => { if (s[k]) $(k).value = s[k]; }); } catch (e) {}
-const save = () => { try { localStorage.setItem('reveil-page', JSON.stringify({size: $('size').value, tf: $('tf').value})); } catch (e) {} };
+let coins = [], nars = [], NAR = null, selected = null, busy = false, alertsOn = false;
+try { const s = JSON.parse(localStorage.getItem('reveil-page') || '{}'); ['size', 'tf', 'near'].forEach(k => { if (s[k]) $(k).value = s[k]; }); alertsOn = !!s.alerts; } catch (e) {}
+const save = () => { try { localStorage.setItem('reveil-page', JSON.stringify({size: $('size').value, tf: $('tf').value, near: $('near').value, alerts: alertsOn})); } catch (e) {} };
 const fmt = (v, d = 1) => v == null || isNaN(v) ? '–' : (v > 0 ? '+' : '') + v.toFixed(d) + '%';
 const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'mut';
 const px = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
@@ -125,6 +143,20 @@ function analyse(b) {
     if (!out.rev && x.c > hi55 && vm >= RV.volMult && base <= RV.baseMax)
       out.rev = {ago: n - 1 - i, lvl: hi55, vm, base, since: (last.c / hi55 - 1) * 100};
   }
+  // consolidation sur les bougies clôturées (la bougie du jour sert de prix live)
+  const i = n - 1;
+  let cHi = -Infinity, cLo = Infinity, runLow = Infinity, hi55 = -Infinity, hi20 = -Infinity, lo20 = Infinity;
+  for (let q = i - RC.consLen; q < i; q++) { cHi = Math.max(cHi, b[q].h); cLo = Math.min(cLo, b[q].l); }
+  for (let q = i - RC.consLen - RC.runLen; q < i - RC.consLen; q++) runLow = Math.min(runLow, b[q].l);
+  for (let q = i - RV.hiLen; q < i; q++) hi55 = Math.max(hi55, b[q].h);
+  for (let q = i - RV.baseLen; q < i; q++) { hi20 = Math.max(hi20, b[q].h); lo20 = Math.min(lo20, b[q].l); }
+  const cRange = (cHi / cLo - 1) * 100, run = (cHi / runLow - 1) * 100;
+  const holds = cLo >= runLow + (cHi - runLow) * (1 - RC.retr / 100);
+  let av = 0; for (let q = i - 20; q < i; q++) av += b[q].t; av /= 20;
+  out.avgTurn = av;
+  if (cRange <= RC.consMax && run >= RC.runMin && holds) out.watch = {type: 'run + conso', lvl: cHi, low: cLo, range: cRange, run};
+  else if ((hi20 / lo20 - 1) * 100 <= RV.baseMax) out.watch = {type: 'base calme', lvl: hi55, low: lo20, range: (hi20 / lo20 - 1) * 100};
+  if (out.watch) out.watch.dist = (out.watch.lvl / last.c - 1) * 100;   // > 0 : sous le niveau ; < 0 : déjà cassé
   return out;
 }
 
@@ -159,6 +191,7 @@ async function load() {
   } catch (e) { setStatus('erreur : ' + e.message); }
   busy = false;
   render();
+  pollAlerts();
 }
 
 function buildNarratives() {
@@ -197,6 +230,8 @@ const io = new IntersectionObserver(es => es.forEach(e => {
   box.appendChild(f);
 }), {rootMargin: '300px'});
 
+const xUrl = c => `https://x.com/search?q=${encodeURIComponent('$' + c.b + ' min_faves:10')}&f=live`;
+const tvUrl = c => `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(c.sym)}`;
 function narChips(c) {
   return c.nar.map(narById).filter(Boolean).sort((a, b) => a.rank - b.rank).slice(0, 3)
     .map(x => `<span class="chip btn ${x.rank < 5 ? 'hot' : ''}" data-nar="${x.id}">${x.rank < 5 ? '🔥 ' : ''}${x.label}</span>`).join('');
@@ -206,6 +241,7 @@ function render() {
   document.documentElement.style.setProperty('--tile', $('size').value + 'px');
   document.documentElement.style.setProperty('--tileh', Math.round(+$('size').value * 0.7) + 'px');
   renderTable();
+  renderCons();
   const sel = selected && narById(selected);
   let list;
   if (sel) {
@@ -225,7 +261,7 @@ function render() {
   if (!list.length) { grid.innerHTML = `<div class="empty">${busy ? 'analyse en cours…' : 'Aucun réveil sur les 3 derniers jours.'}</div>`; return; }
   grid.innerHTML = list.slice(0, 60).map(c => {
     const url = `https://www.tradingview.com/chart/${LAYOUT}/?symbol=${encodeURIComponent(c.sym)}`;
-    const news = `https://news.google.com/search?q=${encodeURIComponent(`"${c.name}" crypto ${c.b} when:7d`)}&hl=fr`;
+    const news = xUrl(c);
     const rev = c.rev ? `<span class="chip acc">réveil ${agoTxt(c.rev.ago)}</span>` : c.brk20 ? '<span class="chip">cassure 20 j</span>' : '';
     const lv = c.rev
       ? `cassure &gt; <b>${px(c.rev.lvl)}</b> · vol <b>×${c.rev.vm.toFixed(1)}</b> · base <b>${c.rev.base.toFixed(0)} %</b> · depuis <b class="${cls(c.rev.since)}">${fmt(c.rev.since, 0)}</b>`
@@ -234,7 +270,7 @@ function render() {
       <div class="th"><span class="sym"><a href="${url}" target="_blank" rel="noopener" title="${c.name.replace(/"/g, '')} · ouvrir sur TradingView">${c.b} ↗</a></span>
         <span class="chip ${cls(c.perf1)}">${c.perf1 >= 0 ? '▲' : '▼'} ${fmt(c.perf1)} 24h</span>
         <span class="chip ${cls(c.perf7)}">${fmt(c.perf7, 0)} 7j</span>${rev}</div>
-      <div class="lv">${lv} · <a href="${news}" target="_blank" rel="noopener">pourquoi ?</a></div>
+      <div class="lv">${lv} · <a href="${news}" target="_blank" rel="noopener" title="Tweets récents sur $${c.b} (≥ 10 likes)">pourquoi ? 𝕏</a></div>
       <div class="lv">${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
       <div class="chart" data-sym="${c.sym}"><div class="ph">chargement du chart…</div></div>
     </div>`;
@@ -242,14 +278,79 @@ function render() {
   grid.querySelectorAll('.chart').forEach(el => io.observe(el));
 }
 
+function watchList() {
+  return coins.filter(c => c.watch && c.watch.dist <= WATCH_MAX && c.watch.dist >= -15).sort((a, b) => a.watch.dist - b.watch.dist);
+}
+function renderCons() {
+  const list = watchList(), nearPct = +$('near').value;
+  $('consTitle').textContent = `🧩 Consolidations (${list.length})`;
+  const g = $('cgrid');
+  if (!list.length) { g.innerHTML = `<div class="empty">${busy ? 'analyse en cours…' : 'Aucun coin en conso près de sa cassure.'}</div>`; return; }
+  g.innerHTML = list.slice(0, 48).map(c => {
+    const w = c.watch, st = w.dist < 0 ? `<span class="chip go">🚀 cassé ${fmt(-w.dist)}</span>` : w.dist <= nearPct ? `<span class="chip near">🔔 à ${w.dist.toFixed(1)} % du breakout</span>` : `<span class="chip">à ${w.dist.toFixed(1)} % du breakout</span>`;
+    return `<div class="tile">
+      <div class="th"><span class="sym"><a href="${tvUrl(c)}" target="_blank" rel="noopener" title="${c.name.replace(/"/g, '')} · ouvrir sur TradingView">${c.b} ↗</a></span>
+        <span class="chip ${cls(c.perf1)}">${c.perf1 >= 0 ? '▲' : '▼'} ${fmt(c.perf1)} 24h</span>${st}</div>
+      <div class="lv">${w.type}${w.run ? ` (run ${fmt(w.run, 0)})` : ''} · range <b>${w.range.toFixed(0)} %</b> · breakout &gt; <b>${px(w.lvl)}</b> · bas <b>${px(w.low)}</b> · <a href="${xUrl(c)}" target="_blank" rel="noopener">pourquoi ? 𝕏</a></div>
+      <div class="lv">${narChips(c) || '<span class="mut">pas de narrative connue</span>'}</div>
+      <div class="chart" data-sym="${c.sym}"><div class="ph">chargement du chart…</div></div>
+    </div>`;
+  }).join('');
+  g.querySelectorAll('.chart').forEach(el => io.observe(el));
+}
+
+// ─── Alertes Chrome : prix live toutes les minutes sur la liste des consolidations ──
+const inFrame = (() => { try { return window.top !== window; } catch (e) { return true; } })();
+function alertBtn() {
+  const b = $('alertBtn');
+  b.classList.toggle('on', alertsOn && Notification.permission === 'granted');
+  b.textContent = alertsOn && Notification.permission === 'granted' ? '🔔 Alertes actives' : '🔔 Alertes Chrome';
+}
+function notified(key) {
+  const day = new Date().toISOString().slice(0, 10);
+  try { const m = JSON.parse(localStorage.getItem('reveil-notified') || '{}'); if (m[key] === day) return true; m[key] = day; localStorage.setItem('reveil-notified', JSON.stringify(m)); } catch (e) {}
+  return false;
+}
+function notify(c, title, body) {
+  const n = new Notification(title, {body, tag: c.s + title.slice(0, 2), requireInteraction: title.startsWith('🚀')});
+  n.onclick = () => { window.open(tvUrl(c), '_blank'); n.close(); };
+}
+async function pollAlerts() {
+  if (!alertsOn || Notification.permission !== 'granted' || !coins.length) return;
+  try {
+    const tk = await fetch('https://api.bybit.com/v5/market/tickers?category=linear').then(r => r.json());
+    const live = Object.fromEntries(tk.result.list.map(t => [t.symbol, t]));
+    const nearPct = +$('near').value;
+    for (const c of watchList()) {
+      const t = live[c.s]; if (!t) continue;
+      const p = +t.lastPrice, w = c.watch, dist = (w.lvl / p - 1) * 100, vm = c.avgTurn ? +t.turnover24h / c.avgTurn : 0;
+      const tags = c.nar.map(narById).filter(Boolean).sort((a, b) => a.rank - b.rank).slice(0, 2).map(x => x.label).join(', ');
+      if (p > w.lvl && !notified(c.s + ':go'))
+        notify(c, `🚀 ${c.b} casse ${px(w.lvl)}`, `${w.type} · prix ${px(p)} · volume 24 h ×${vm.toFixed(1)}${tags ? ' · ' + tags : ''}`);
+      else if (p <= w.lvl && dist <= nearPct && !notified(c.s + ':near'))
+        notify(c, `🔔 ${c.b} à ${dist.toFixed(1)} % du breakout`, `${w.type} · niveau ${px(w.lvl)} · prix ${px(p)}${tags ? ' · ' + tags : ''}`);
+    }
+  } catch (e) {}
+}
+$('alertBtn').addEventListener('click', async () => {
+  if (inFrame) { window.open(location.href, '_blank'); return; }       // Chrome refuse les notifications dans un cadre intégré
+  if (!('Notification' in window)) { alert('Notifications non disponibles dans ce navigateur.'); return; }
+  if (alertsOn && Notification.permission === 'granted') alertsOn = false;
+  else { const p = await Notification.requestPermission(); alertsOn = p === 'granted'; if (!alertsOn) alert('Autorise les notifications pour cette page dans Chrome (icône à gauche de l’adresse).'); }
+  save(); alertBtn(); pollAlerts();
+});
+if (inFrame) { $('alertBtn').textContent = '🔔 Alertes (ouvrir la page)'; $('alertBtn').title = 'Les alertes Chrome ne marchent que sur la page ouverte directement : clic pour l’ouvrir dans un nouvel onglet'; }
+else if ('Notification' in window) alertBtn(); else $('alertBtn').style.display = 'none';
+setInterval(pollAlerts, 60 * 1000);
+
 const pick = id => { selected = selected === id ? null : id; render(); if (selected) $('gridTitle').scrollIntoView({behavior: 'smooth', block: 'start'}); };
 $('nar').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) pick(tr.dataset.id); });
 $('grid').addEventListener('click', e => { const ch = e.target.closest('[data-nar]'); if (ch) pick(ch.dataset.nar); });
 $('fltClear').addEventListener('click', () => { selected = null; render(); });
-['size', 'tf'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
+['size', 'tf', 'near'].forEach(id => $(id).addEventListener('change', () => { save(); render(); }));
 $('reload').addEventListener('click', load);
 load();
-setInterval(() => { if (!document.hidden) load(); }, 30 * 60 * 1000);
+setInterval(() => { if (!document.hidden || alertsOn) load(); }, 30 * 60 * 1000);   // alertes actives : on recalcule même en arrière-plan
 </script>
 </body>
 </html>
