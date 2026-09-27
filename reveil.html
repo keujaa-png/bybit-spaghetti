@@ -603,6 +603,7 @@ $('reload').addEventListener('click', load);
   if (inFrame) { $('otherView').href = 'https://marketscanner.co/' + other.page; $('otherView').target = '_top'; }
   else $('otherView').href = 'reveil.html' + other.q;
   if (VIEW === 'conso') { document.title = 'Consolidations & alertes'; $('h1').textContent = '🧩 Consolidations & alertes'; }
+  if (VIEW === 'conso') { document.querySelector('header').after($('consTitle').closest('section'), $('cgrid')); document.body.insertBefore($('tuto'), document.querySelector('script')); }   // vue conso : la grille de charts d'abord, le mode d'emploi en bas
 }
 // mode d'emploi : ouvert à la première visite, puis on retient le choix
 try { const t = localStorage.getItem('reveil-tuto-' + VIEW); $('tuto').open = t === null ? true : t === '1'; } catch (e) { $('tuto').open = true; }
