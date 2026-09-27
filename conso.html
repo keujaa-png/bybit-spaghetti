@@ -32,7 +32,9 @@
   .chart .ph { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-size:12px; }
   .empty { grid-column:1/-1; color:var(--mut); padding:40px 0; text-align:center; }
   @media (max-width:560px) { header { padding:8px 12px; } main { padding:10px 12px 30px; --tile: 100%; } .status { margin-left:0; width:100%; } }
+  .chart .tag { position:absolute; top:4px; left:8px; z-index:2; font-size:11px; color:var(--mut); pointer-events:none; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 <header>
@@ -106,9 +108,9 @@ async function loadCrypto() {
     await Promise.all(list.slice(i, i + 10).map(async t => {
       try {
         const k = (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${t.s}&interval=D&limit=70`).then(r => r.json())).result.list.reverse();
-        const b = k.map(x => ({o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5]}));
+        const b = k.map(x => ({t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5]}));
         const r = evalCrypto(b, R);
-        if (r) out.push({sym: `BYBIT:${t.s}.P`, label: t.s.replace('USDT', ''), ...r});
+        if (r) out.push({sym: `BYBIT:${t.s}.P`, label: t.s.replace('USDT', ''), ...r, bars: r.sweep ? b : null});
       } catch (e) {}
       done++;
     }));
@@ -144,7 +146,7 @@ function evalCrypto(b, R) {
   for (let i = n - 2; i >= n - 6; i--) {
     const c = consoAt(b, i, R); if (!c || !c.ok) continue;
     const x = b[i], rng = x.h - x.l, wick = rng > 0 ? (Math.min(x.o, x.c) - x.l) / rng * 100 : 0;
-    if (x.l < c.cLo && x.c > c.cLo && wick >= R.wick) { sweep = {ago: n - 1 - i, low: x.l, lvl: c.cLo, hi: c.cHi, run: c.run, since: (last.c / x.c - 1) * 100}; break; }
+    if (x.l < c.cLo && x.c > c.cLo && wick >= R.wick) { sweep = {ago: n - 1 - i, t: x.t, cT: b[i - R.consLen].t, low: x.l, lvl: c.cLo, hi: c.cHi, run: c.run, since: (last.c / x.c - 1) * 100}; break; }
   }
   const perf7 = (last.c / b[n - 8].c - 1) * 100;
   if (!now.ok && !sig && !sweep) return null;
@@ -199,9 +201,33 @@ async function loadMacro() {
 }
 
 // ─── Grille ──────────────────────────────────────────────────────────────
+// chart daily Bybit avec la conso, le sweep et les niveaux (bibliothèque Lightweight Charts)
+let shown = [];
+function drawSweep(box, x) {
+  if (!window.LightweightCharts || !x || !x.bars) return;
+  box.innerHTML = '<span class="tag">Daily Bybit · sweep après run + conso</span>';
+  const ch = LightweightCharts.createChart(box, {autoSize: true, layout: {background: {color: '#0e1117'}, textColor: '#7f8fa3', fontSize: 11},
+    grid: {vertLines: {color: '#1a2029'}, horzLines: {color: '#1a2029'}}, rightPriceScale: {borderColor: '#262d36'},
+    timeScale: {borderColor: '#262d36'}, crosshair: {mode: 0}, handleScroll: false, handleScale: false});
+  const s = ch.addCandlestickSeries({upColor: '#26c281', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26c281', wickDownColor: '#ef5350'});
+  const T = t => Math.floor(t / 1000);
+  s.setData(x.bars.slice(-60).map(b => ({time: T(b.t), open: b.o, high: b.h, low: b.l, close: b.c})));
+  const w = x.sweep;
+  // zone de conso : deux lignes limitées aux bougies de la conso et après
+  const zone = (price, color) => { const l = ch.addLineSeries({color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false});
+    l.setData(x.bars.filter(b => b.t >= w.cT).map(b => ({time: T(b.t), value: price}))); };
+  zone(w.hi, '#4aa3ff'); zone(w.lvl, '#f0a030');
+  s.createPriceLine({price: w.hi, color: '#4aa3ff', lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: 'breakout'});
+  s.createPriceLine({price: w.lvl, color: '#f0a030', lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: 'bas conso'});
+  s.createPriceLine({price: w.low, color: '#ef5350', lineStyle: 0, lineWidth: 1, axisLabelVisible: true, title: 'sweep · stop'});
+  s.setMarkers([{time: T(w.cT), position: 'aboveBar', color: '#f0a030', shape: 'arrowDown', text: 'conso'},
+                {time: T(w.t), position: 'belowBar', color: '#26c281', shape: 'arrowUp', text: 'SWEEP'}]);
+  ch.timeScale().fitContent();
+}
 const io = new IntersectionObserver(es => es.forEach(e => {
   if (!e.isIntersecting) return;
   const box = e.target; io.unobserve(box);
+  if (box.dataset.lw !== undefined) { drawSweep(box, shown[+box.dataset.lw]); return; }   // coin avec sweep : notre propre chart, niveaux dessinés
   const f = document.createElement('iframe');
   f.loading = 'lazy';
   f.src = 'https://s.tradingview.com/widgetembed/?' + new URLSearchParams({
@@ -222,7 +248,8 @@ function render() {
     : (market === 'us' ? 'Actions US > 1 Md$' : 'Matières premières + ETF > 1 Md$') + ' : approximation via le screener TradingView (forte perf 3 mois, prix proche du plus haut 3 mois, semaine calme). Pas de détection sweep/breakout ici. Clic sur le nom = ouvrir sur ton layout.';
   const grid = $('grid');
   if (!list.length) { grid.innerHTML = `<div class="empty">Aucun actif ${show === 'sweep' ? 'avec un sweep récent après run + conso' : show === 'sig' ? 'avec un signal récent' : 'en consolidation'} pour l’instant.</div>`; return; }
-  grid.innerHTML = list.map(x => {
+  shown = list;
+  grid.innerHTML = list.map((x, idx) => {
     const url = `https://www.tradingview.com/chart/${LAYOUT[market]}/?symbol=${encodeURIComponent(x.sym)}`;
     const sig = x.sig ? `<span class="chip acc">${x.sig.kind} ${x.sig.ago === 1 ? 'hier' : 'il y a ' + x.sig.ago + ' j'}</span>` : '';
     const cons = x.cons ? `<span class="chip warn">conso ${x.range.toFixed(0)}%</span>` : '';
@@ -237,7 +264,7 @@ function render() {
         <span class="chip ${x.perf7 >= 0 ? 'up' : 'down'}">${x.perf7 >= 0 ? '▲' : '▼'} ${fmt(x.perf7)} 7j</span>
         <span class="chip">run ${fmt(x.run, 0)}</span>${cons}${sig}${swc}</div>
       <div class="lv">${lv}</div>
-      <div class="chart" data-sym="${x.sym}"><div class="ph">chargement du chart…</div></div>
+      <div class="chart" data-sym="${x.sym}"${x.sweep && x.bars ? ` data-lw="${idx}"` : ''}><div class="ph">chargement du chart…</div></div>
     </div>`;
   }).join('');
   grid.querySelectorAll('.chart').forEach(el => io.observe(el));
