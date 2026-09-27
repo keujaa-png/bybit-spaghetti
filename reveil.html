@@ -118,8 +118,8 @@
         <li><b>run + conso</b> = pause après une hausse ≥ 30 % ; <b>base calme</b> = range serré sous le plus haut 55 j.</li></ul></div>
     <div><h3>Vérifier le « pourquoi ? 𝕏 »</h3>
       <p>Ouvre les tweets récents sur le coin (≥ 10 likes). Un catalyseur concret (partenariat, listing, produit, chiffres) rend le mouvement plus solide. S’il n’y a rien, ou que de l’appel au pump, prudence.</p></div>
-    <div class="only-cs"><h3>Activer les alertes Chrome 🔔</h3>
-      <ul><li>Ouvre la page directe : <a href="https://keujaa-png.github.io/bybit-spaghetti/reveil.html?vue=conso" target="_blank" rel="noopener">keujaa-png.github.io/…/reveil.html?vue=conso</a>.</li>
+    <div><h3>Activer les alertes Chrome 🔔</h3>
+      <ul><li>Ouvre la page directe : <a href="https://keujaa-png.github.io/bybit-spaghetti/reveil.html" target="_blank" rel="noopener">keujaa-png.github.io/…/reveil.html</a>.</li>
         <li>Clique <b>🔔 Alertes Chrome</b> puis <b>Autoriser</b>.</li>
         <li>Règle le seuil avec <b>Proche = 2 / 3 / 5 %</b>.</li>
         <li>Laisse l’onglet ouvert (en arrière-plan, c’est bon). Une alerte par coin et par jour ; clic sur la notification = chart TradingView.</li></ul></div>
@@ -598,10 +598,10 @@ $('fltClear').addEventListener('click', () => { selected = null; render(); });
 $('reload').addEventListener('click', load);
 // titre + lien vers l'autre vue (dans marketscanner.co : on change de page du site)
 {
-  const other = VIEW === 'conso' ? {txt: '⚡ Réveils & narratives', page: 'reveil', q: ''} : {txt: '🧩 Consolidations + alertes', page: 'consolidations', q: '?vue=conso'};
+  const other = VIEW === 'conso' ? {txt: '⚡ Réveils & narratives', page: 'reveil', q: ''} : {txt: '🧩 Consolidations', page: 'consolidations', file: 'conso.html'};
   $('otherView').textContent = other.txt;
   if (inFrame) { $('otherView').href = 'https://marketscanner.co/' + other.page; $('otherView').target = '_top'; }
-  else $('otherView').href = 'reveil.html' + other.q;
+  else $('otherView').href = other.file || 'reveil.html' + (other.q || '');
   if (VIEW === 'conso') { document.title = 'Consolidations & alertes'; $('h1').textContent = '🧩 Consolidations & alertes'; }
   if (VIEW === 'conso') { document.querySelector('header').after($('consTitle').closest('section'), $('cgrid')); document.body.insertBefore($('tuto'), document.querySelector('script')); }   // vue conso : la grille de charts d'abord, le mode d'emploi en bas
 }
