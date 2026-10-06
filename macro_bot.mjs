@@ -67,14 +67,14 @@ async function headlines(q) {
   try {
     const r = await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:7d') + '&hl=en-US&gl=US&ceid=US:en', {headers: {'User-Agent': 'Mozilla/5.0'}});
     const x = await r.text();
-    return [...x.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 3).map(m => {
+    return [...x.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 2).map(m => {
       const g = t => unent(((m[1].match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
       const src = g('source'); let title = g('title'); if (src && title.endsWith(' - ' + src)) title = title.slice(0, -src.length - 3);
       return {title, link: g('link'), src};
     }).filter(i => i.title && /^https:\/\//.test(i.link));
   } catch (e) { return []; }
 }
-const newsText = (th, H) => `📰 <b>Dans l’actualité cette semaine</b> (${ME.esc(th.name)})\n` + H.map(h => `• <a href="${ME.esc(h.link)}">${ME.esc(h.title)}</a>${h.src ? ' — ' + ME.esc(h.src) : ''}`).join('\n');
+const newsText = (th, H) => '📰 ' + H.map(h => `<a href="${ME.esc(h.link)}">${ME.esc(h.title)}</a>`).join('\n📰 ');
 if (cur[0]) { const th = ME.theme(cur[0].th), H = th.news ? await headlines(th.news) : []; console.log('Titres de presse (' + th.name + ') : ' + H.length + (H[0] ? ' · ex. « ' + H[0].title + ' »' : '')); }
 
 if (!TOKEN) {
@@ -93,7 +93,7 @@ if (!TOKEN) {
   }
   if (CHAT) {
     if (welcome || !state.hello) {
-      const r = await sendText(`✅ <b>Idées macro : alertes activées.</b>\nTu recevras ici chaque nouvelle idée avec son chart, 4 vérifications par jour, sans rien garder ouvert.\n\n${ME.esc(ME.btLine())}\nIdées en cours : ${cur.length}. <a href="https://keujaa-png.github.io/bybit-spaghetti/macro.html">Voir la page</a>`);
+      const r = await sendText(`✅ <b>Idées macro activées.</b> <a href="https://keujaa-png.github.io/bybit-spaghetti/macro.html">Voir la page</a>`);
       if (r.ok) state.hello = today;
     }
     let n = 0;

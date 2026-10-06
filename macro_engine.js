@@ -168,8 +168,13 @@
     return `Backtest ${nf((today() - ME.firstDay()) / 365.25, 0)} ans : ${s.n} idées, ${nf(100 * s.win, 0)} % gagnantes, ${pct(s.avg)} en moyenne (${sg(100 * s.exc)} pt contre le hasard).`;
   };
   ME.caption = (th, tr) => {
-    const tx = ME.ideaText(th, tr), e = ME.esc;
-    return `${th.flag} <b>${e(tx.title)}</b>\n${tr.s > 0 ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(tr.leg.n)}</b> (${e(tr.sym)})\n\n<b>Contexte.</b> ${e(tx.ctx)}\n<b>Déclencheur.</b> ${e(tx.trig)}\n<b>Pourquoi ce titre.</b> ${e(tx.why)}\n<b>Plan testé.</b> ${e(tx.plan)}\n\n${e(ME.btLine())}\n<a href="${ME.tvUrl(tr.sym)}">Chart TradingView</a> · idée à étudier, pas un conseil`;
+    const e = ME.esc, f = drvFmt(th), R = ruleOf(th), side = tr.sig.sg > 0 ? th.up : th.down;
+    const lb = th.rule ? R.LB + ' mois' : Math.round(R.LB / 20) + ' mois';
+    return `${th.flag} <b>${e(side.t)}</b>\n${tr.s > 0 ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(tr.leg.n)}</b> · ${e(ME.short(tr.sym))}\n\n` +
+      `${e(th.drv.label)} : ${f(tr.sig.v)} (${drvChg(th, tr.sig.ch)} en ${ME.per(th).ch}), ${tr.sig.sg > 0 ? 'plus haut' : 'plus bas'} de ${lb}.\n` +
+      `Le titre n’a pas encore réagi : ${pct(tr.s * tr.r20)} en 20 séances.\n` +
+      `Horizon : environ ${Math.round(ME.RULE.hold / 20)} mois. Invalidation : retour de l’indicateur vers ${f(tr.sig.ref)}.\n` +
+      `<a href="${ME.tvUrl(tr.sym)}">Chart TradingView</a>`;
   };
 
   // ----- charts (canvas du navigateur ou de Node) -----
@@ -214,7 +219,9 @@
   };
   ME.polyText = o => {
     const e = ME.esc, lag = o.legs.filter(x => x.st.lag);
-    return `🗳️ <b>${e(o.p.t)}</b>\nCote Polymarket : <b>${nf(100 * o.pr, 0)} %</b> (${sg(100 * o.w1, 0)} pt en une semaine).\n${e(o.p.w)}\n\n` + (lag.length ? 'Titres liés qui n’ont pas encore réagi : ' + lag.map(x => `${x.s > 0 ? '🟢' : '🔴'} <a href="${ME.tvUrl(x.l.tv)}">${e(x.l.n)}</a> (${pct(x.s * x.st.r20, 0)} sur 20 séances)`).join(', ') + '.' : 'Tous les titres liés ont déjà bougé : rien à proposer, le marché a déjà payé la nouvelle.') + `\n\nNon backtesté · <a href="https://polymarket.com/event/${e(o.p.slug)}">voir le pari</a>`;
+    return `🗳️ <b>${e(o.p.t)}</b>\nPolymarket : <b>${nf(100 * o.pr, 0)} %</b> (${sg(100 * o.w1, 0)} pt en une semaine).\n` +
+      (lag.length ? 'Pas encore réagi : ' + lag.map(x => `${x.s > 0 ? '🟢' : '🔴'} <a href="${ME.tvUrl(x.l.tv)}">${e(x.l.n)}</a> (${pct(x.s * x.st.r20, 0)})`).join(', ') + '.' : 'Les titres liés ont déjà bougé : rien à proposer.') +
+      `\n<a href="https://polymarket.com/event/${e(o.p.slug)}">Voir le pari</a>`;
   };
 
   root.ME = ME;
