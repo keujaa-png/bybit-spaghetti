@@ -1,5 +1,5 @@
 {
- "v": 4,
+ "v": 5,
  "updated": "2026-10-06",
  "rule": {
   "LB": 120,
@@ -352,6 +352,16 @@
      "tv": "NYSE:MFG",
      "n": "Mizuho",
      "w": "banque japonaise"
+    },
+    {
+     "tv": "TSE:8306",
+     "n": "Mitsubishi UFJ (Tokyo)",
+     "w": "banque japonaise"
+    },
+    {
+     "tv": "TSE:8316",
+     "n": "Sumitomo Mitsui (Tokyo)",
+     "w": "banque japonaise"
     }
    ],
    "poly": "bank of japan",
@@ -452,6 +462,31 @@
      "tv": "CBOE:INDA",
      "n": "INDA (ETF Inde)",
      "w": "gros importateur de pétrole"
+    },
+    {
+     "tv": "ASX:QAN",
+     "n": "Qantas",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "SGX:C6L",
+     "n": "Singapore Airlines",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "TSE:9202",
+     "n": "ANA Holdings",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "NYSE:DAL",
+     "n": "Delta Air Lines",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "NASDAQ:UAL",
+     "n": "United Airlines",
+     "w": "kérosène plus cher"
     }
    ],
    "long": [
@@ -474,6 +509,31 @@
      "tv": "AMEX:XOP",
      "n": "XOP (exploration-production)",
      "w": "producteurs les plus sensibles au prix"
+    },
+    {
+     "tv": "LSE:SHEL",
+     "n": "Shell",
+     "w": "producteur"
+    },
+    {
+     "tv": "ASX:WDS",
+     "n": "Woodside Energy",
+     "w": "producteur australien"
+    },
+    {
+     "tv": "HKEX:883",
+     "n": "CNOOC",
+     "w": "producteur chinois"
+    },
+    {
+     "tv": "TSE:1605",
+     "n": "Inpex",
+     "w": "producteur japonais"
+    },
+    {
+     "tv": "TSX:CNQ",
+     "n": "Canadian Natural",
+     "w": "producteur canadien"
     }
    ],
    "poly": "oil price",
@@ -558,6 +618,16 @@
      "tv": "NASDAQ:WYNN",
      "n": "Wynn Resorts",
      "w": "casinos de Macao"
+    },
+    {
+     "tv": "HKEX:1928",
+     "n": "Sands China",
+     "w": "casinos de Macao"
+    },
+    {
+     "tv": "HKEX:27",
+     "n": "Galaxy Entertainment",
+     "w": "casinos de Macao"
     }
    ],
    "poly": "china",
@@ -633,6 +703,16 @@
     {
      "tv": "NASDAQ:WYNN",
      "n": "Wynn Resorts",
+     "w": "casinos de Macao"
+    },
+    {
+     "tv": "HKEX:1928",
+     "n": "Sands China",
+     "w": "casinos de Macao"
+    },
+    {
+     "tv": "HKEX:27",
+     "n": "Galaxy Entertainment",
      "w": "casinos de Macao"
     }
    ],
@@ -1042,6 +1122,21 @@
      "tv": "LSE:GLEN",
      "n": "Glencore",
      "w": "cuivre, négoce"
+    },
+    {
+     "tv": "NYSE:TECK",
+     "n": "Teck Resources",
+     "w": "cuivre"
+    },
+    {
+     "tv": "TSX:FM",
+     "n": "First Quantum",
+     "w": "producteur de cuivre"
+    },
+    {
+     "tv": "TSX:LUN",
+     "n": "Lundin Mining",
+     "w": "cuivre"
     }
    ],
    "poly": "copper",
@@ -1081,6 +1176,21 @@
     {
      "tv": "NYSE:VALE",
      "n": "Vale",
+     "w": "minerai de fer"
+    },
+    {
+     "tv": "ASX:FMG",
+     "n": "Fortescue",
+     "w": "minerai de fer pur"
+    },
+    {
+     "tv": "ASX:BHP",
+     "n": "BHP (Sydney)",
+     "w": "minerai de fer"
+    },
+    {
+     "tv": "ASX:RIO",
+     "n": "Rio Tinto (Sydney)",
      "w": "minerai de fer"
     }
    ],
@@ -1132,6 +1242,26 @@
      "tv": "NYSE:PAAS",
      "n": "Pan American Silver",
      "w": "argent et or"
+    },
+    {
+     "tv": "ASX:NST",
+     "n": "Northern Star",
+     "w": "mine d’or australienne"
+    },
+    {
+     "tv": "ASX:EVN",
+     "n": "Evolution Mining",
+     "w": "mine d’or australienne"
+    },
+    {
+     "tv": "NYSE:KGC",
+     "n": "Kinross",
+     "w": "mine d’or"
+    },
+    {
+     "tv": "NYSE:GFI",
+     "n": "Gold Fields",
+     "w": "mine d’or sud-africaine"
     }
    ],
    "poly": "gold",
@@ -1395,6 +1525,16 @@
      "tv": "AMEX:UEC",
      "n": "Uranium Energy",
      "w": "producteur d’uranium"
+    },
+    {
+     "tv": "ASX:PDN",
+     "n": "Paladin Energy",
+     "w": "producteur d’uranium"
+    },
+    {
+     "tv": "NYSE:NXE",
+     "n": "NexGen Energy",
+     "w": "projet d’uranium"
     }
    ],
    "poly": "nuclear",
@@ -1485,6 +1625,16 @@
      "tv": "AMEX:DXJ",
      "n": "DXJ (Japon couvert du yen)",
      "w": "actions japonaises sans le risque yen"
+    },
+    {
+     "tv": "TSE:7203",
+     "n": "Toyota (Tokyo)",
+     "w": "exportateur"
+    },
+    {
+     "tv": "TSE:6758",
+     "n": "Sony (Tokyo)",
+     "w": "exportateur"
     }
    ],
    "poly": "bank of japan",
@@ -1585,6 +1735,638 @@
    ],
    "poly": "fed rate",
    "news": "Treasury yield curve"
+  },
+  {
+   "id": "de",
+   "fam": "souverain",
+   "flag": "🇩🇪",
+   "name": "Taux allemands",
+   "news": "Bund yield German real estate",
+   "drv": {
+    "k": "yield",
+    "a": "TVC:DE10Y",
+    "x": 0.25,
+    "label": "Taux allemand à 10 ans (Bund)"
+   },
+   "up": {
+    "t": "Le Bund décroche",
+    "w": "Le taux allemand à 10 ans casse à la hausse. Les foncières résidentielles allemandes, très endettées, sont les premières touchées."
+   },
+   "down": {
+    "t": "Détente sur le Bund",
+    "w": "Le taux allemand à 10 ans casse à la baisse : bouffée d’air pour les foncières allemandes."
+   },
+   "short": [
+    {
+     "tv": "XETR:VNA",
+     "n": "Vonovia",
+     "w": "foncière résidentielle endettée"
+    },
+    {
+     "tv": "XETR:LEG",
+     "n": "LEG Immobilien",
+     "w": "foncière résidentielle"
+    },
+    {
+     "tv": "XETR:AT1",
+     "n": "Aroundtown",
+     "w": "foncière endettée"
+    },
+    {
+     "tv": "XETR:TEG",
+     "n": "TAG Immobilien",
+     "w": "foncière résidentielle"
+    }
+   ],
+   "long": [],
+   "poly": "ecb"
+  },
+  {
+   "id": "mx",
+   "fam": "souverain",
+   "flag": "🇲🇽",
+   "name": "Mexique",
+   "news": "Mexico bond yields peso Banxico",
+   "drv": {
+    "k": "yield",
+    "a": "TVC:MX10Y",
+    "x": 0.4,
+    "label": "Taux mexicain à 10 ans"
+   },
+   "up": {
+    "t": "Le risque Mexique remonte",
+    "w": "Le taux mexicain à 10 ans casse à la hausse (politique, commerce avec les États-Unis). Les actions mexicaines suivent en général à la baisse."
+   },
+   "down": {
+    "t": "Le risque Mexique recule",
+    "w": "Le taux mexicain à 10 ans casse à la baisse : bon pour les actions mexicaines."
+   },
+   "short": [
+    {
+     "tv": "AMEX:EWW",
+     "n": "EWW (ETF Mexique)",
+     "w": "indice Mexique en dollars"
+    },
+    {
+     "tv": "NYSE:AMX",
+     "n": "América Móvil",
+     "w": "télécoms"
+    },
+    {
+     "tv": "NYSE:FMX",
+     "n": "Femsa",
+     "w": "distribution, boissons"
+    },
+    {
+     "tv": "NYSE:CX",
+     "n": "Cemex",
+     "w": "ciment"
+    }
+   ],
+   "long": [],
+   "poly": "mexico"
+  },
+  {
+   "id": "euro",
+   "fam": "marche",
+   "flag": "💶",
+   "name": "Euro",
+   "news": "euro dollar exchange rate",
+   "drv": {
+    "k": "price",
+    "a": "FX:EURUSD",
+    "x": 0.03,
+    "label": "Euro contre dollar"
+   },
+   "up": {
+    "t": "L’euro casse à la hausse",
+    "w": "L’euro gagne plus de 3 % en un mois. Les exportateurs européens qui vendent en dollars perdent de la marge."
+   },
+   "down": {
+    "t": "L’euro décroche",
+    "w": "L’euro perd plus de 3 % en un mois. Les exportateurs européens qui vendent en dollars gagnent mécaniquement en marge."
+   },
+   "short": [
+    {
+     "tv": "EURONEXT:AIR",
+     "n": "Airbus",
+     "w": "vend en dollars, produit en euros"
+    },
+    {
+     "tv": "EURONEXT:SAF",
+     "n": "Safran",
+     "w": "vend en dollars"
+    },
+    {
+     "tv": "XETR:SAP",
+     "n": "SAP",
+     "w": "revenus en dollars"
+    },
+    {
+     "tv": "EURONEXT:EL",
+     "n": "EssilorLuxottica",
+     "w": "gros chiffre d’affaires américain"
+    },
+    {
+     "tv": "EURONEXT:SAN",
+     "n": "Sanofi",
+     "w": "gros chiffre d’affaires américain"
+    }
+   ],
+   "long": [],
+   "poly": "ecb"
+  },
+  {
+   "id": "ble",
+   "fam": "matieres",
+   "flag": "🌾",
+   "name": "Blé",
+   "news": "wheat prices drought harvest",
+   "drv": {
+    "k": "price",
+    "a": "CBOT:ZW1!",
+    "x": 0.1,
+    "label": "Blé (Chicago)"
+   },
+   "up": {
+    "t": "Le blé casse à la hausse",
+    "w": "Le blé gagne plus de 10 % en un mois (sécheresse, gel, guerre, interdiction d’exporter). Les négociants en profitent ; les fabricants de céréales et de pain voient leurs coûts monter."
+   },
+   "down": {
+    "t": "Le blé décroche",
+    "w": "Le blé perd plus de 10 % en un mois : bonne récolte. Les industriels de l’alimentaire regagnent de la marge."
+   },
+   "short": [
+    {
+     "tv": "NYSE:GIS",
+     "n": "General Mills",
+     "w": "céréales, farine"
+    },
+    {
+     "tv": "NYSE:CPB",
+     "n": "Campbell’s",
+     "w": "biscuits, pain"
+    },
+    {
+     "tv": "NASDAQ:KHC",
+     "n": "Kraft Heinz",
+     "w": "alimentaire"
+    }
+   ],
+   "long": [
+    {
+     "tv": "NYSE:BG",
+     "n": "Bunge",
+     "w": "négoce de grains"
+    },
+    {
+     "tv": "NYSE:ADM",
+     "n": "Archer-Daniels-Midland",
+     "w": "négoce de grains"
+    }
+   ],
+   "poly": "wheat"
+  },
+  {
+   "id": "soja",
+   "fam": "matieres",
+   "flag": "🫘",
+   "name": "Soja",
+   "news": "soybean prices weather Brazil Argentina",
+   "drv": {
+    "k": "price",
+    "a": "CBOT:ZS1!",
+    "x": 0.1,
+    "label": "Soja (Chicago)"
+   },
+   "up": {
+    "t": "Le soja casse à la hausse",
+    "w": "Le soja gagne plus de 10 % en un mois (météo au Brésil ou en Argentine, achats chinois). Les triturateurs et les vendeurs de machines en profitent ; les producteurs de volaille paient l’aliment plus cher."
+   },
+   "down": {
+    "t": "Le soja décroche",
+    "w": "Le soja perd plus de 10 % en un mois : l’aliment du bétail baisse, les producteurs de volaille respirent."
+   },
+   "short": [
+    {
+     "tv": "NASDAQ:PPC",
+     "n": "Pilgrim’s Pride",
+     "w": "volaille"
+    },
+    {
+     "tv": "NYSE:TSN",
+     "n": "Tyson Foods",
+     "w": "volaille"
+    }
+   ],
+   "long": [
+    {
+     "tv": "NYSE:BG",
+     "n": "Bunge",
+     "w": "trituration du soja"
+    },
+    {
+     "tv": "NYSE:DE",
+     "n": "Deere",
+     "w": "machines agricoles"
+    },
+    {
+     "tv": "NYSE:CTVA",
+     "n": "Corteva",
+     "w": "semences"
+    }
+   ],
+   "poly": "soybean"
+  },
+  {
+   "id": "betail",
+   "fam": "matieres",
+   "flag": "🐄",
+   "name": "Bétail",
+   "news": "cattle prices herd drought beef",
+   "drv": {
+    "k": "price",
+    "a": "CME:LE1!",
+    "x": 0.07,
+    "label": "Bovins vivants (Chicago)"
+   },
+   "up": {
+    "t": "Le bétail casse à la hausse",
+    "w": "Les bovins gagnent plus de 7 % en un mois (cheptel au plus bas après les sécheresses). Les abatteurs achètent plus cher et leur marge se fait écraser."
+   },
+   "down": {
+    "t": "Le bétail décroche",
+    "w": "Les bovins perdent plus de 7 % en un mois : la marge des abatteurs se regonfle."
+   },
+   "short": [
+    {
+     "tv": "NYSE:TSN",
+     "n": "Tyson Foods",
+     "w": "abattage de bœuf"
+    },
+    {
+     "tv": "NYSE:JBS",
+     "n": "JBS",
+     "w": "premier abatteur mondial"
+    }
+   ],
+   "long": [],
+   "poly": "beef"
+  },
+  {
+   "id": "sucre",
+   "fam": "matieres",
+   "flag": "🍬",
+   "name": "Sucre",
+   "news": "sugar prices India Brazil weather",
+   "drv": {
+    "k": "price",
+    "a": "ICEUS:SB1!",
+    "x": 0.12,
+    "label": "Sucre brut (New York)"
+   },
+   "up": {
+    "t": "Le sucre casse à la hausse",
+    "w": "Le sucre gagne plus de 12 % en un mois (mousson indienne, sécheresse au Brésil). Les confiseurs et fabricants de sodas paient plus cher."
+   },
+   "down": {
+    "t": "Le sucre décroche",
+    "w": "Le sucre perd plus de 12 % en un mois : bon pour la marge des confiseurs et fabricants de sodas."
+   },
+   "short": [
+    {
+     "tv": "NASDAQ:MDLZ",
+     "n": "Mondelez",
+     "w": "confiserie, biscuits"
+    },
+    {
+     "tv": "NYSE:HSY",
+     "n": "Hershey",
+     "w": "confiserie"
+    },
+    {
+     "tv": "NASDAQ:MNST",
+     "n": "Monster Beverage",
+     "w": "boissons sucrées"
+    },
+    {
+     "tv": "NASDAQ:KDP",
+     "n": "Keurig Dr Pepper",
+     "w": "sodas"
+    }
+   ],
+   "long": [],
+   "poly": "sugar"
+  },
+  {
+   "id": "bois",
+   "fam": "matieres",
+   "flag": "🪵",
+   "name": "Bois de construction",
+   "news": "lumber prices housing tariffs wildfire",
+   "drv": {
+    "k": "price",
+    "a": "CME:LBR1!",
+    "x": 0.12,
+    "label": "Bois de construction (Chicago)"
+   },
+   "up": {
+    "t": "Le bois casse à la hausse",
+    "w": "Le bois de construction gagne plus de 12 % en un mois (incendies, droits de douane, reprise des chantiers). Les forestiers et scieries encaissent."
+   },
+   "down": {
+    "t": "Le bois décroche",
+    "w": "Le bois de construction perd plus de 12 % en un mois : mauvais pour les forestiers et scieries."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:WY",
+     "n": "Weyerhaeuser",
+     "w": "forêts, scieries"
+    },
+    {
+     "tv": "NYSE:LPX",
+     "n": "Louisiana-Pacific",
+     "w": "panneaux de bois"
+    },
+    {
+     "tv": "NYSE:WFG",
+     "n": "West Fraser",
+     "w": "scieries"
+    },
+    {
+     "tv": "NYSE:PCH",
+     "n": "PotlatchDeltic",
+     "w": "forêts"
+    }
+   ],
+   "poly": "lumber"
+  },
+  {
+   "id": "alu",
+   "fam": "matieres",
+   "flag": "🥫",
+   "name": "Aluminium",
+   "news": "aluminium prices smelter power",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:ALI1!",
+    "x": 0.08,
+    "label": "Aluminium (contrat à terme)"
+   },
+   "up": {
+    "t": "L’aluminium casse à la hausse",
+    "w": "L’aluminium gagne plus de 8 % en un mois (électricité chère, fonderies à l’arrêt). Les producteurs encaissent."
+   },
+   "down": {
+    "t": "L’aluminium décroche",
+    "w": "L’aluminium perd plus de 8 % en un mois : mauvais pour les producteurs."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:AA",
+     "n": "Alcoa",
+     "w": "producteur d’aluminium"
+    },
+    {
+     "tv": "OSL:NHY",
+     "n": "Norsk Hydro",
+     "w": "producteur d’aluminium"
+    },
+    {
+     "tv": "NASDAQ:CENX",
+     "n": "Century Aluminum",
+     "w": "fonderies"
+    },
+    {
+     "tv": "ASX:S32",
+     "n": "South32",
+     "w": "alumine, aluminium"
+    }
+   ],
+   "poly": "aluminium"
+  },
+  {
+   "id": "argent",
+   "fam": "matieres",
+   "flag": "🥈",
+   "name": "Argent",
+   "news": "silver price",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:SI1!",
+    "x": 0.12,
+    "label": "Argent (contrat à terme)"
+   },
+   "up": {
+    "t": "L’argent casse à la hausse",
+    "w": "L’argent gagne plus de 12 % en un mois. Les mines d’argent amplifient le mouvement."
+   },
+   "down": {
+    "t": "L’argent décroche",
+    "w": "L’argent perd plus de 12 % en un mois : les mines d’argent amplifient la baisse."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "AMEX:SIL",
+     "n": "SIL (mines d’argent)",
+     "w": "secteur"
+    },
+    {
+     "tv": "NYSE:PAAS",
+     "n": "Pan American Silver",
+     "w": "mine d’argent"
+    },
+    {
+     "tv": "NYSE:AG",
+     "n": "First Majestic",
+     "w": "mine d’argent"
+    },
+    {
+     "tv": "NYSE:HL",
+     "n": "Hecla Mining",
+     "w": "mine d’argent"
+    },
+    {
+     "tv": "NYSE:WPM",
+     "n": "Wheaton Precious Metals",
+     "w": "royalties argent et or"
+    }
+   ],
+   "poly": "silver"
+  },
+  {
+   "id": "platine",
+   "fam": "matieres",
+   "flag": "⚪",
+   "name": "Platine",
+   "news": "platinum price South Africa supply",
+   "drv": {
+    "k": "price",
+    "a": "NYMEX:PL1!",
+    "x": 0.1,
+    "label": "Platine (contrat à terme)"
+   },
+   "up": {
+    "t": "Le platine casse à la hausse",
+    "w": "Le platine gagne plus de 10 % en un mois (coupures de courant et grèves en Afrique du Sud). Les mines sud-africaines encaissent."
+   },
+   "down": {
+    "t": "Le platine décroche",
+    "w": "Le platine perd plus de 10 % en un mois : mauvais pour les mines sud-africaines."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:SBSW",
+     "n": "Sibanye-Stillwater",
+     "w": "platine, palladium"
+    },
+    {
+     "tv": "AMEX:PPLT",
+     "n": "PPLT (platine physique)",
+     "w": "le métal lui-même"
+    }
+   ],
+   "poly": "platinum"
+  },
+  {
+   "id": "lithium",
+   "fam": "matieres",
+   "flag": "🔋",
+   "name": "Lithium",
+   "news": "lithium prices supply",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:LTH1!",
+    "x": 0.12,
+    "label": "Hydroxyde de lithium (contrat à terme)"
+   },
+   "up": {
+    "t": "Le lithium casse à la hausse",
+    "w": "Le lithium gagne plus de 12 % en un mois (fermetures de mines, demande des batteries). Les producteurs sortent du creux."
+   },
+   "down": {
+    "t": "Le lithium décroche",
+    "w": "Le lithium perd plus de 12 % en un mois : offre excédentaire, mauvais pour les producteurs."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:ALB",
+     "n": "Albemarle",
+     "w": "producteur de lithium"
+    },
+    {
+     "tv": "NYSE:SQM",
+     "n": "SQM",
+     "w": "producteur de lithium"
+    },
+    {
+     "tv": "ASX:PLS",
+     "n": "Pilbara Minerals",
+     "w": "producteur australien"
+    },
+    {
+     "tv": "ASX:MIN",
+     "n": "Mineral Resources",
+     "w": "lithium, fer"
+    },
+    {
+     "tv": "AMEX:LIT",
+     "n": "LIT (lithium et batteries)",
+     "w": "secteur"
+    }
+   ],
+   "poly": "lithium"
+  },
+  {
+   "id": "charbon",
+   "fam": "matieres",
+   "flag": "⚫",
+   "name": "Charbon",
+   "news": "thermal coal prices Newcastle",
+   "drv": {
+    "k": "price",
+    "a": "ICEEUR:NCF1!",
+    "x": 0.1,
+    "label": "Charbon thermique (Newcastle)"
+   },
+   "up": {
+    "t": "Le charbon casse à la hausse",
+    "w": "Le charbon gagne plus de 10 % en un mois (canicule ou froid en Asie, inondations dans les mines). Les producteurs encaissent."
+   },
+   "down": {
+    "t": "Le charbon décroche",
+    "w": "Le charbon perd plus de 10 % en un mois : mauvais pour les producteurs."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:BTU",
+     "n": "Peabody",
+     "w": "producteur de charbon"
+    },
+    {
+     "tv": "ASX:WHC",
+     "n": "Whitehaven Coal",
+     "w": "producteur australien"
+    },
+    {
+     "tv": "ASX:YAL",
+     "n": "Yancoal",
+     "w": "producteur australien"
+    },
+    {
+     "tv": "NYSE:CNR",
+     "n": "Core Natural Resources",
+     "w": "producteur de charbon"
+    }
+   ],
+   "poly": "coal"
+  },
+  {
+   "id": "acier",
+   "fam": "matieres",
+   "flag": "🏗️",
+   "name": "Acier américain",
+   "news": "US steel prices tariffs hot-rolled coil",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:HRC1!",
+    "x": 0.1,
+    "label": "Acier laminé à chaud (États-Unis)"
+   },
+   "up": {
+    "t": "L’acier américain casse à la hausse",
+    "w": "L’acier laminé gagne plus de 10 % en un mois (droits de douane, demande). Les aciéristes américains encaissent."
+   },
+   "down": {
+    "t": "L’acier américain décroche",
+    "w": "L’acier laminé perd plus de 10 % en un mois : mauvais pour les aciéristes américains."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:NUE",
+     "n": "Nucor",
+     "w": "aciériste"
+    },
+    {
+     "tv": "NASDAQ:STLD",
+     "n": "Steel Dynamics",
+     "w": "aciériste"
+    },
+    {
+     "tv": "NYSE:CLF",
+     "n": "Cleveland-Cliffs",
+     "w": "aciériste"
+    }
+   ],
+   "poly": "steel tariffs"
   }
  ],
  "polys": [

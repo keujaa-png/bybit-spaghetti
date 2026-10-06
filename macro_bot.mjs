@@ -89,7 +89,7 @@ async function opinion(th, tr) {
   if (!AKEY) return '';
   try {
     const tx = ME.ideaText(th, tr);
-    const system = `Tu es un stratège macro. On te soumet une idée de swing trade de quelques mois, produite par une règle mécanique backtestée (un indicateur macro casse, un titre lié n'a pas encore réagi). Vérifie dans l'actualité récente ce qui se passe vraiment sur ce thème et sur ce titre : cause de la cassure, raison possible du retard du titre (bonne ou mauvaise), événement à venir qui peut tout changer. Sois critique et factuel. Termine par <json>{"avis": "une ou deux phrases courtes en français, 220 caractères max, avec le fait le plus important et le risque principal", "conviction": 1 à 5}</json>.`;
+    const system = `Tu es le desk global macro d'un hedge fund. On te soumet une idée de swing trade de quelques mois, produite par une règle mécanique backtestée (un indicateur macro casse, un titre lié n'a pas encore réagi). Vérifie dans l'actualité récente ce qui se passe vraiment sur ce thème et sur ce titre : cause de la cassure, raison possible du retard du titre (bonne ou mauvaise), événement à venir qui peut tout changer. Sois critique et factuel. Termine par <json>{"avis": "une ou deux phrases courtes en français, 220 caractères max, avec le fait le plus important et le risque principal", "conviction": 1 à 5}</json>.`;
     const user = `Idée : ${tr.s > 0 ? 'ACHAT' : 'VENTE'} ${tr.leg.n} (${tr.sym}, ${tr.leg.w}).\nThème : ${tx.title}. ${tx.ctx}\nDéclencheur : ${tx.trig}\nÉtat du titre : ${tx.why}\nDate : ${new Date().toISOString().slice(0, 10)}.`;
     const j = jsonOf(await claude(system, user, true));
     if (!j || !j.avis) return '';
@@ -162,8 +162,15 @@ async function checkSym(tv) {
 }
 async function aiIdeas() {
   // titres de presse : à la une (économie, monde) + une recherche par thème
-  const feeds = ['https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en'];
-  const qs = ['central bank rate decision', 'bond market selloff', 'election markets reaction', 'tariffs trade war', 'China economy stimulus', 'profit warning sector demand', 'commodity supply shock', 'currency crisis', ...ME.PB.themes.map(t => t.news).filter(Boolean)];
+  const feeds = ['https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en', 'https://www.nhc.noaa.gov/index-at.xml'];
+  const qs = ['central bank rate decision', 'bond market selloff', 'election markets reaction', 'tariffs trade war', 'China economy stimulus property', 'profit warning sector demand', 'commodity supply shock', 'currency crisis emerging markets', 'sovereign debt downgrade',
+    // météo et climat
+    'El Niño La Niña forecast NOAA', 'drought crop yields', 'heat wave power prices', 'cold snap natural gas demand', 'hurricane Gulf of Mexico energy', 'frost Brazil coffee sugar', 'monsoon India crops', 'Rhine water levels shipping', 'flood mine port closure', 'wildfire lumber', 'harvest forecast USDA',
+    // offre, transport, politique des matières premières
+    'OPEC production decision', 'mine strike supply', 'export ban commodity', 'Red Sea Suez Panama canal shipping', 'refinery outage', 'sanctions oil metals', 'port strike',
+    // monde
+    'Bank of Japan yen', 'ECB decision', 'Federal Reserve outlook', 'India economy rupee', 'Brazil fiscal real', 'Mexico peso trade', 'Australia RBA iron ore', 'Korea Taiwan semiconductor exports', 'export controls chips', 'Middle East conflict oil',
+    ...ME.PB.themes.map(t => t.news).filter(Boolean)];
   const H = [], seen = new Set();
   const push = (x, max) => { let n = 0; for (const m of x.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const g = t => unent(((m[1].match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
@@ -180,14 +187,17 @@ async function aiIdeas() {
   const uni = new Map();
   for (const th of ME.PB.themes) for (const l of [...th.short, ...th.long]) { if (l.liq === false || uni.has(l.tv)) continue; const st = ME.legState(l.tv, 1, today); if (st) uni.set(l.tv, `${l.tv} | ${l.n} | ${l.w} | 20 séances ${ME.pct(st.r20, 0)} | ${st.conf ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances`); }
   const recent = Object.entries(state.ai || {}).filter(([, d]) => d > today - 30).map(([k]) => k);
-  const system = `Tu es un stratège macro pour un trader particulier qui fait du swing sur plusieurs mois. À partir des titres de presse des derniers jours et du tableau de marché fournis, tu proposes au plus 2 grandes idées de trade, ou aucune.
-Exigences :
-- Une idée part d'un fait macro ou fondamental majeur et vérifiable dans les titres fournis (banque centrale, dette, élection, guerre commerciale, choc de matière première, demande d'un secteur). Pas de bruit de marché, pas d'analyse technique.
-- L'effet doit durer des mois, et le titre proposé ne doit pas avoir déjà fait le mouvement : sers-toi des performances du tableau.
-- Uniquement des actions ou ETF très liquides, négociables chez Interactive Brokers. Prends de préférence un titre du tableau ; sinon donne son symbole TradingView exact (PLACE:TICKER).
+  const system = `Tu es le desk global macro d'un hedge fund. Tu écris pour un trader qui prend peu de positions, en swing sur plusieurs mois, et qui ne veut que tes meilleures idées. À partir des titres de presse des derniers jours et du tableau de marché fournis, tu proposes au plus 2 idées, et le plus souvent aucune.
+Champ : le monde entier. Banques centrales, dette et budget, élections, guerre commerciale, géopolitique, matières premières (énergie, métaux, agricole) avec leurs facteurs d'offre : météo et climat (El Niño ou La Niña, sécheresse, gel, canicule, ouragan, mousson, niveau des fleuves), grèves, quotas, embargos, routes maritimes. Demande d'un secteur quand elle bascule.
+Ce qu'exige une idée de desk :
+- Un fait daté et vérifiable, trouvé dans les titres fournis ou confirmé par ta recherche web. Pas de rumeur, pas d'analyse technique.
+- Une chaîne de causalité claire jusqu'au titre, et la preuve que le marché ne l'a pas encore payée : sers-toi des performances du tableau et vérifie le cours récent.
+- Une asymétrie : dis ce qui se passe si tu as tort. Si le scénario adverse est aussi probable, pas d'idée.
+- Un effet qui dure des mois, pas des jours.
+- Un instrument très liquide et négociable chez Interactive Brokers, partout dans le monde : action, ETF pays ou secteur, ETF de matière première (par exemple WEAT, CORN, SOYB, UNG, USO, GLD, SLV, CPER, DBA) quand c'est l'expression la plus propre. Prends de préférence un titre du tableau ; sinon donne son symbole TradingView exact (PLACE:TICKER).
 - Ne répète aucune de ces idées déjà envoyées : ${recent.join(', ') || 'aucune'}.
-- S'il n'y a rien de vraiment fort, réponds []. Ne rien proposer est la bonne réponse la plupart des jours.
-Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON, vide s'il n'y a rien. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre, une phrase courte en français", "mois": nombre de mois, "invalidation": "ce qui annule l'idée, 10 mots max", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
+Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds, 5 est rare. En dessous de 4, l'idée ne sera pas envoyée, donc ne force rien.
+Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON, vide s'il n'y a rien. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const user = `TITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTITRES DU TABLEAU\n${[...uni.values()].join('\n')}`;
   let ideas = jsonOf(await claude(system, user, true));
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
@@ -200,7 +210,7 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     if (!ok || !ok.liquid) { console.log('  écartée : ' + it.tv + (ok ? ' trop peu liquide' : ' introuvable')); continue; }
     console.log(`  ${buy ? 'ACHAT' : 'VENTE'} ${it.nom} (${ok.tv}) · ${it.titre}`);
     if (!TOKEN || !CHAT) continue;
-    const e = ME.esc, cap = `🧠 <b>${e(it.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))}\n\n${e(it.fait)}\n${e(it.pourquoi)}\nHorizon : environ ${e(it.mois)} mois. Invalidation : ${e(it.invalidation)}.\n<a href="${ME.tvUrl(ok.tv)}">Chart TradingView</a> · idée IA, non backtestée`;
+    const e = ME.esc, cap = `🧠 <b>${e(it.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))}\n\n${e(it.fait)}\n${e(it.pourquoi)}\nRisque : ${e(it.risque || 'non précisé')}.\nHorizon : environ ${e(it.mois)} mois. Je coupe si : ${e(it.invalidation)}.\n<a href="${ME.tvUrl(ok.tv)}">Chart TradingView</a> · conviction ${e(it.confiance)}/5 · idée du desk IA, non backtestée`;
     let res = {ok: false};
     const L = ME.FULL[ok.tv];
     if (L && L.c.length > 130) { try {
