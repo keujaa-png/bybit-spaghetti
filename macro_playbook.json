@@ -1,5 +1,5 @@
 {
- "v": 5,
+ "v": 6,
  "updated": "2026-10-06",
  "rule": {
   "LB": 120,
@@ -294,8 +294,7 @@
     {
      "tv": "LSE:TW.",
      "n": "Taylor Wimpey",
-     "w": "constructeur de maisons",
-     "liq": false
+     "w": "constructeur de maisons"
     },
     {
      "tv": "LSE:BTRW",
@@ -717,7 +716,8 @@
     }
    ],
    "poly": "china",
-   "news": "Hang Seng index"
+   "news": "Hang Seng index",
+   "alert": false
   },
   {
    "id": "cn-pmi",
@@ -1529,7 +1529,8 @@
     {
      "tv": "ASX:PDN",
      "n": "Paladin Energy",
-     "w": "producteur d’uranium"
+     "w": "producteur d’uranium",
+     "liq": false
     },
     {
      "tv": "NYSE:NXE",
@@ -1770,12 +1771,14 @@
     {
      "tv": "XETR:AT1",
      "n": "Aroundtown",
-     "w": "foncière endettée"
+     "w": "foncière endettée",
+     "liq": false
     },
     {
      "tv": "XETR:TEG",
      "n": "TAG Immobilien",
-     "w": "foncière résidentielle"
+     "w": "foncière résidentielle",
+     "liq": false
     }
    ],
    "long": [],
@@ -1903,14 +1906,9 @@
      "w": "céréales, farine"
     },
     {
-     "tv": "NYSE:CPB",
+     "tv": "NASDAQ:CPB",
      "n": "Campbell’s",
      "w": "biscuits, pain"
-    },
-    {
-     "tv": "NASDAQ:KHC",
-     "n": "Kraft Heinz",
-     "w": "alimentaire"
     }
    ],
    "long": [
@@ -2093,12 +2091,8 @@
     {
      "tv": "NYSE:WFG",
      "n": "West Fraser",
-     "w": "scieries"
-    },
-    {
-     "tv": "NYSE:PCH",
-     "n": "PotlatchDeltic",
-     "w": "forêts"
+     "w": "scieries",
+     "liq": false
     }
    ],
    "poly": "lumber"
@@ -2318,7 +2312,8 @@
     {
      "tv": "ASX:YAL",
      "n": "Yancoal",
-     "w": "producteur australien"
+     "w": "producteur australien",
+     "liq": false
     },
     {
      "tv": "NYSE:CNR",
