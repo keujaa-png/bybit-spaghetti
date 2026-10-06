@@ -93,7 +93,7 @@
 </section>
 
 <section class="sec">
-  <div class="sech"><h2>🧭 Tableau macro</h2><span class="hint">Chaque thème suit un indicateur. « Signal » = il vient de casser. Les titres en jaune sont les retardataires (ceux que le système propose) ; les autres ont déjà bougé. Les thèmes « contexte » ne déclenchent pas d’alerte.</span></div>
+  <div class="sech"><h2>🧭 Tableau macro</h2><span class="hint">Chaque thème suit un indicateur. « Signal » = il vient de casser. Les titres en jaune sont les retardataires (ceux que le système propose) ; les autres ont déjà bougé. Les thèmes « contexte » ne déclenchent pas d’alerte. Les titres grisés s’échangent moins de 20 M$ par jour : ils ne sont jamais proposés.</span></div>
   <div class="grid" id="themes"></div>
 </section>
 
@@ -134,7 +134,7 @@
   </div>
 </section>
 
-<script src="macro_engine.js?v=3"></script>
+<script src="macro_engine.js?v=4"></script>
 <script>
 const $ = id => document.getElementById(id);
 const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
@@ -203,7 +203,7 @@ function renderThemes() {
       <div style="margin-top:4px">${esc(th.drv.label)} : <b>${f(v)}</b> · ${p.ch} : <b class="${cls(ch)}">${ME.drvChg(th, ch)}</b> <span class="mut">(seuil ± ${ME.drvX(th)})</span></div>
       <canvas></canvas>
       <p class="mut">${esc(act ? (act.sg > 0 ? th.up : th.down).w : 'Pas de cassure récente. Sens des titres ci-dessous : celui du mouvement en cours.')}</p>
-      <div class="legs">${legs.map(o => `<a class="leg${act && th.alert !== false && o.st.lag ? ' lag' : ''}" href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n + ' · ' + o.l.w)}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>`;
+      <div class="legs">${legs.map(o => `<a class="leg${act && th.alert !== false && o.st.lag && o.l.liq !== false ? ' lag' : ''}"${o.l.liq === false ? ' style="opacity:.45"' : ''} href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n + ' · ' + o.l.w + (o.l.liq === false ? ' · trop peu liquide : jamais proposé' : ''))}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>`;
     box.appendChild(el);
     const d0 = Math.max(0, n - (th.rule ? 48 : 130));
     spark(el.querySelector('canvas'), D.t.slice(d0), D.v.slice(d0), {fmt: f, marks: act && act.i >= d0 ? [{i: act.i - d0, v: act.v, color: '#f0a030', label: 'signal'}] : []});

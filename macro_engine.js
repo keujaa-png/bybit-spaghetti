@@ -113,7 +113,7 @@
       const S = ME.SIGS[th.id] = ME.signals(th);
       for (const sig of S) {
         const legs = [...th.short.map(l => [l, -sig.sg]), ...th.long.map(l => [l, sig.sg])], ep = [];
-        for (const [l, s] of legs) { const st = legState(l.tv, s, sig.day); if (st) ep.push(Object.assign(st, {th: th.id, fam: th.fam, day: sig.day, sig, leg: l})); }
+        for (const [l, s] of legs) { if (l.liq === false) continue; const st = legState(l.tv, s, sig.day); if (st) ep.push(Object.assign(st, {th: th.id, fam: th.fam, day: sig.day, sig, leg: l})); }
         const pick = ep.filter(x => x.lag).sort((a, b) => a.r20 - b.r20).slice(0, ME.RULE.max);
         if (th.alert === false) ME.ECO.push(...pick); else { ME.ALL.push(...ep); ME.PICK.push(...pick); }
       }

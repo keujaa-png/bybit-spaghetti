@@ -1,5 +1,5 @@
 {
- "v": 3,
+ "v": 4,
  "updated": "2026-10-06",
  "rule": {
   "LB": 120,
@@ -48,12 +48,14 @@
     {
      "tv": "EURONEXT:NXI",
      "n": "Nexity",
-     "w": "immobilier neuf"
+     "w": "immobilier neuf",
+     "liq": false
     },
     {
      "tv": "EURONEXT:KOF",
      "n": "Kaufman & Broad",
-     "w": "immobilier neuf"
+     "w": "immobilier neuf",
+     "liq": false
     },
     {
      "tv": "EURONEXT:CS",
@@ -63,7 +65,8 @@
     {
      "tv": "EURONEXT:AMUN",
      "n": "Amundi",
-     "w": "gestion d’actifs"
+     "w": "gestion d’actifs",
+     "liq": false
     },
     {
      "tv": "EURONEXT:DG",
@@ -78,7 +81,8 @@
     {
      "tv": "EURONEXT:ICAD",
      "n": "Icade",
-     "w": "foncière"
+     "w": "foncière",
+     "liq": false
     },
     {
      "tv": "EURONEXT:LI",
@@ -103,7 +107,8 @@
    ],
    "long": [],
    "poly": "france election",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "OAT Bund spread"
   },
   {
    "id": "it",
@@ -158,7 +163,8 @@
    ],
    "long": [],
    "poly": "italy",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "BTP Bund spread"
   },
   {
    "id": "es",
@@ -208,7 +214,8 @@
    ],
    "long": [],
    "poly": "spain",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "Spain bond spread Bund"
   },
   {
    "id": "us",
@@ -257,7 +264,8 @@
    ],
    "long": [],
    "poly": "fed rate",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "Treasury 10-year yield"
   },
   {
    "id": "uk",
@@ -286,7 +294,8 @@
     {
      "tv": "LSE:TW.",
      "n": "Taylor Wimpey",
-     "w": "constructeur de maisons"
+     "w": "constructeur de maisons",
+     "liq": false
     },
     {
      "tv": "LSE:BTRW",
@@ -306,7 +315,8 @@
    ],
    "long": [],
    "poly": "uk prime minister",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "gilt yields"
   },
   {
    "id": "jp",
@@ -345,7 +355,8 @@
     }
    ],
    "poly": "bank of japan",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "Japan 10-year JGB yield"
   },
   {
    "id": "br",
@@ -394,7 +405,8 @@
    ],
    "long": [],
    "poly": "brazil",
-   "fam": "souverain"
+   "fam": "souverain",
+   "news": "Brazil bond yields real"
   },
   {
    "id": "oil",
@@ -423,7 +435,8 @@
     {
      "tv": "EURONEXT:AF",
      "n": "Air France-KLM",
-     "w": "kérosène plus cher"
+     "w": "kérosène plus cher",
+     "liq": false
     },
     {
      "tv": "XETR:LHA",
@@ -464,7 +477,8 @@
     }
    ],
    "poly": "oil price",
-   "fam": "matieres"
+   "fam": "matieres",
+   "news": "Brent crude oil"
   },
   {
    "id": "cn-conso",
@@ -547,7 +561,8 @@
     }
    ],
    "poly": "china",
-   "alert": false
+   "alert": false,
+   "news": "China retail sales"
   },
   {
    "id": "cn-bourse",
@@ -621,7 +636,8 @@
      "w": "casinos de Macao"
     }
    ],
-   "poly": "china"
+   "poly": "china",
+   "news": "Hang Seng index"
   },
   {
    "id": "cn-pmi",
@@ -679,7 +695,8 @@
     }
    ],
    "poly": "china",
-   "alert": false
+   "alert": false,
+   "news": "China manufacturing PMI"
   },
   {
    "id": "us-ism",
@@ -737,7 +754,8 @@
     }
    ],
    "poly": "recession",
-   "alert": false
+   "alert": false,
+   "news": "ISM manufacturing"
   },
   {
    "id": "de-ifo",
@@ -800,7 +818,8 @@
     }
    ],
    "poly": "germany",
-   "alert": false
+   "alert": false,
+   "news": "Ifo business climate"
   },
   {
    "id": "kr-exp",
@@ -858,7 +877,8 @@
     }
    ],
    "poly": "nvidia",
-   "alert": false
+   "alert": false,
+   "news": "South Korea exports"
   },
   {
    "id": "us-logement",
@@ -915,7 +935,8 @@
     }
    ],
    "poly": "housing",
-   "alert": false
+   "alert": false,
+   "news": "US housing starts"
   },
   {
    "id": "us-conso",
@@ -973,7 +994,8 @@
     }
    ],
    "poly": "recession",
-   "alert": false
+   "alert": false,
+   "news": "US consumer confidence"
   },
   {
    "id": "cuivre",
@@ -1022,7 +1044,8 @@
      "w": "cuivre, négoce"
     }
    ],
-   "poly": "copper"
+   "poly": "copper",
+   "news": "copper price"
   },
   {
    "id": "fer",
@@ -1061,7 +1084,8 @@
      "w": "minerai de fer"
     }
    ],
-   "poly": "china"
+   "poly": "china",
+   "news": "iron ore price"
   },
   {
    "id": "or",
@@ -1110,7 +1134,8 @@
      "w": "argent et or"
     }
    ],
-   "poly": "gold"
+   "poly": "gold",
+   "news": "gold price"
   },
   {
    "id": "gaz-us",
@@ -1149,7 +1174,8 @@
      "w": "producteur de gaz"
     }
    ],
-   "poly": "natural gas"
+   "poly": "natural gas",
+   "news": "natural gas prices Henry Hub"
   },
   {
    "id": "gaz-eu",
@@ -1194,7 +1220,8 @@
      "w": "premier fournisseur de gaz de l’Europe"
     }
    ],
-   "poly": "russia gas"
+   "poly": "russia gas",
+   "news": "TTF gas price Europe"
   },
   {
    "id": "cereales",
@@ -1249,7 +1276,8 @@
      "w": "négoce de grains"
     }
    ],
-   "poly": "corn wheat"
+   "poly": "corn wheat",
+   "news": "corn futures prices"
   },
   {
    "id": "cacao",
@@ -1289,11 +1317,13 @@
     {
      "tv": "SIX:BARN",
      "n": "Barry Callebaut",
-     "w": "transformateur de cacao"
+     "w": "transformateur de cacao",
+     "liq": false
     }
    ],
    "long": [],
-   "poly": "cocoa"
+   "poly": "cocoa",
+   "news": "cocoa prices"
   },
   {
    "id": "cafe",
@@ -1327,7 +1357,8 @@
     }
    ],
    "long": [],
-   "poly": "coffee"
+   "poly": "coffee",
+   "news": "arabica coffee prices"
   },
   {
    "id": "uranium",
@@ -1366,7 +1397,8 @@
      "w": "producteur d’uranium"
     }
    ],
-   "poly": "nuclear"
+   "poly": "nuclear",
+   "news": "uranium price"
   },
   {
    "id": "btc",
@@ -1410,7 +1442,8 @@
      "w": "courtier, gros volumes crypto"
     }
    ],
-   "poly": "bitcoin"
+   "poly": "bitcoin",
+   "news": "bitcoin price"
   },
   {
    "id": "yen",
@@ -1454,7 +1487,8 @@
      "w": "actions japonaises sans le risque yen"
     }
    ],
-   "poly": "bank of japan"
+   "poly": "bank of japan",
+   "news": "yen dollar"
   },
   {
    "id": "dollar",
@@ -1503,7 +1537,8 @@
     }
    ],
    "long": [],
-   "poly": "fed rate"
+   "poly": "fed rate",
+   "news": "dollar index"
   },
   {
    "id": "courbe",
@@ -1548,7 +1583,8 @@
      "w": "banque"
     }
    ],
-   "poly": "fed rate"
+   "poly": "fed rate",
+   "news": "Treasury yield curve"
   }
  ],
  "polys": [

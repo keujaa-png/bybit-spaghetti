@@ -61,6 +61,22 @@ async function sendIdea(tr) {
   return sendText(cap);
 }
 
+// Titres de presse de la semaine sur le thème (Google Actualités), joints à chaque idée
+const unent = s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+async function headlines(q) {
+  try {
+    const r = await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:7d') + '&hl=en-US&gl=US&ceid=US:en', {headers: {'User-Agent': 'Mozilla/5.0'}});
+    const x = await r.text();
+    return [...x.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 3).map(m => {
+      const g = t => unent(((m[1].match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
+      const src = g('source'); let title = g('title'); if (src && title.endsWith(' - ' + src)) title = title.slice(0, -src.length - 3);
+      return {title, link: g('link'), src};
+    }).filter(i => i.title && /^https:\/\//.test(i.link));
+  } catch (e) { return []; }
+}
+const newsText = (th, H) => `📰 <b>Dans l’actualité cette semaine</b> (${ME.esc(th.name)})\n` + H.map(h => `• <a href="${ME.esc(h.link)}">${ME.esc(h.title)}</a>${h.src ? ' — ' + ME.esc(h.src) : ''}`).join('\n');
+if (cur[0]) { const th = ME.theme(cur[0].th), H = th.news ? await headlines(th.news) : []; console.log('Titres de presse (' + th.name + ') : ' + H.length + (H[0] ? ' · ex. « ' + H[0].title + ' »' : '')); }
+
 if (!TOKEN) {
   console.log('Pas de jeton Telegram (secret TELEGRAM_TOKEN absent) : rien n’est envoyé.');
 } else {
@@ -83,7 +99,12 @@ if (!TOKEN) {
     let n = 0;
     for (const tr of fresh) {
       if (state.sent[ME.keyOf(tr)]) continue;
-      const r = await sendIdea(tr); if (r.ok) { state.sent[ME.keyOf(tr)] = today; n++; }
+      const r = await sendIdea(tr);
+      if (r.ok) {
+        state.sent[ME.keyOf(tr)] = today; n++;
+        const th = ME.theme(tr.th), H = th.news ? await headlines(th.news) : [];
+        if (H.length) await sendText(newsText(th, H));
+      }
     }
     for (const o of polys) {
       const k = 'poly|' + o.p.id + '|' + Math.floor(today / 7); if (state.sent[k]) continue;
