@@ -68,6 +68,7 @@
     <a href="conso.html">🧩 Consolidations</a>
     <a href="reveil.html">⚡ Réveils & narratives</a>
     <a href="winners.html">🏆 Winners</a>
+    <a href="macro.html">🌍 Idées macro</a>
   </nav>
   <div class="status" id="status">chargement…</div>
 </header>
@@ -305,7 +306,7 @@ function render() {
 $('tf').addEventListener('change', () => { save(); load(); });
 $('reload').addEventListener('click', load);
 // dans marketscanner.co : les liens du menu changent de page du site
-try { if (window.top !== window) document.querySelectorAll('.menu a').forEach(a => { a.target = '_top'; a.href = 'https://marketscanner.co/' + {'radar.html': 'radar', 'conso.html': 'consolidations', 'reveil.html': 'reveil', 'winners.html': 'winners'}[a.getAttribute('href')]; }); } catch (e) {}
+try { if (window.top !== window) document.querySelectorAll('.menu a').forEach(a => { a.target = '_top'; const h = a.getAttribute('href'), p = {'radar.html': 'radar', 'conso.html': 'consolidations', 'reveil.html': 'reveil', 'winners.html': 'winners'}[h]; a.href = p ? 'https://marketscanner.co/' + p : 'https://keujaa-png.github.io/bybit-spaghetti/' + h; }); } catch (e) {}
 load();
 // rescan : toutes les 5 min quand les alertes sont actives (même onglet en arrière-plan), sinon toutes les 15 min si la page est visible
 setInterval(() => { if (alertsOn || (!document.hidden && Date.now() - lastLoad > 14 * 60 * 1000)) load(); }, 5 * 60 * 1000);

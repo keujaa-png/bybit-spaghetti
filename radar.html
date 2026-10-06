@@ -61,6 +61,7 @@
     <a href="t3cci.html">📐 T3-CCI</a>
     <a href="reveil.html">⚡ Réveils</a>
     <a href="winners.html">🏆 Winners</a>
+    <a href="macro.html">🌍 Idées macro</a>
   </nav>
   <div class="status" id="status">démarrage…</div>
 </header>
@@ -469,7 +470,7 @@ window.addEventListener('message', e => { if (e.data && e.data.type === 'spaghet
 if (inFrame) {
   window.parent.postMessage({type: 'spaghetti-perm-query'}, '*');
   setTimeout(() => { if (parentPerm === 'unknown') { parentPerm = 'unsupported'; alertBtn(); } }, 4000);
-  document.querySelectorAll('.menu a').forEach(a => { a.target = '_top'; a.href = 'https://marketscanner.co/' + {'conso.html': 'consolidations', 't3cci.html': 't3cci', 'reveil.html': 'reveil', 'winners.html': 'winners'}[a.getAttribute('href')]; });
+  document.querySelectorAll('.menu a').forEach(a => { a.target = '_top'; const h = a.getAttribute('href'), p = {'conso.html': 'consolidations', 't3cci.html': 't3cci', 'reveil.html': 'reveil', 'winners.html': 'winners'}[h]; a.href = p ? 'https://marketscanner.co/' + p : 'https://keujaa-png.github.io/bybit-spaghetti/' + h; });
 }
 alertBtn();
 $('minVol').addEventListener('change', () => { save(); scan(); });

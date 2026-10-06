@@ -1,0 +1,186 @@
+{
+  "v": 1,
+  "updated": "2026-10-06",
+  "rule": {"LB": 60, "CH": 20, "CD": 10, "lag": 0.03, "max": 3, "hold": 20},
+  "themes": [
+    {
+      "id": "fr", "flag": "🇫🇷", "name": "France",
+      "drv": {"k": "spread", "a": "TVC:FR10Y", "b": "TVC:DE10Y", "x": 0.10, "label": "Écart OAT − Bund 10 ans"},
+      "up": {"t": "Dette française sous pression", "w": "L’écart de taux entre la France et l’Allemagne s’ouvre : le marché demande plus cher pour prêter à la France. Ça pèse sur les banques (elles portent de la dette d’État et se financent plus cher), sur l’immobilier (crédit plus cher, ventes de neuf en baisse) et sur les sociétés qui vivent de contrats publics."},
+      "down": {"t": "Détente sur la dette française", "w": "L’écart de taux France − Allemagne se referme : le risque politique et budgétaire recule. Les valeurs domestiques punies (banques, immobilier, concessions) ont de quoi rebondir."},
+      "short": [
+        {"tv": "EURONEXT:BNP", "n": "BNP Paribas", "w": "banque"},
+        {"tv": "EURONEXT:GLE", "n": "Société Générale", "w": "banque"},
+        {"tv": "EURONEXT:ACA", "n": "Crédit Agricole", "w": "banque"},
+        {"tv": "EURONEXT:NXI", "n": "Nexity", "w": "immobilier neuf"},
+        {"tv": "EURONEXT:KOF", "n": "Kaufman & Broad", "w": "immobilier neuf"},
+        {"tv": "EURONEXT:CS", "n": "AXA", "w": "assureur, gros porteur d’OAT"},
+        {"tv": "EURONEXT:AMUN", "n": "Amundi", "w": "gestion d’actifs"},
+        {"tv": "EURONEXT:DG", "n": "Vinci", "w": "concessions, risque politique"},
+        {"tv": "EURONEXT:FGR", "n": "Eiffage", "w": "concessions, BTP"},
+        {"tv": "EURONEXT:ICAD", "n": "Icade", "w": "foncière"},
+        {"tv": "EURONEXT:LI", "n": "Klépierre", "w": "foncière"},
+        {"tv": "EURONEXT:URW", "n": "Unibail-Rodamco-Westfield", "w": "foncière endettée"},
+        {"tv": "EURONEXT:ENGI", "n": "Engie", "w": "services publics, tarifs régulés"},
+        {"tv": "AMEX:EWQ", "n": "EWQ (ETF France)", "w": "indice France en dollars"}
+      ],
+      "long": [],
+      "poly": "france election"
+    },
+    {
+      "id": "it", "flag": "🇮🇹", "name": "Italie",
+      "drv": {"k": "spread", "a": "TVC:IT10Y", "b": "TVC:DE10Y", "x": 0.10, "label": "Écart BTP − Bund 10 ans"},
+      "up": {"t": "Contagion sur la dette italienne", "w": "L’écart de taux Italie − Allemagne s’ouvre. Les banques italiennes détiennent beaucoup de dette d’État : elles baissent en premier quand le BTP est attaqué."},
+      "down": {"t": "Détente sur la dette italienne", "w": "L’écart de taux Italie − Allemagne se referme : bon pour les banques et l’indice italien."},
+      "short": [
+        {"tv": "MIL:UCG", "n": "UniCredit", "w": "banque"},
+        {"tv": "MIL:ISP", "n": "Intesa Sanpaolo", "w": "banque"},
+        {"tv": "MIL:BAMI", "n": "Banco BPM", "w": "banque domestique"},
+        {"tv": "MIL:G", "n": "Generali", "w": "assureur, gros porteur de BTP"},
+        {"tv": "MIL:ENEL", "n": "Enel", "w": "services publics endettés"},
+        {"tv": "AMEX:EWI", "n": "EWI (ETF Italie)", "w": "indice Italie en dollars"}
+      ],
+      "long": [],
+      "poly": "italy"
+    },
+    {
+      "id": "es", "flag": "🇪🇸", "name": "Espagne",
+      "drv": {"k": "spread", "a": "TVC:ES10Y", "b": "TVC:DE10Y", "x": 0.10, "label": "Écart Bono − Bund 10 ans"},
+      "up": {"t": "Stress sur la dette espagnole", "w": "L’écart de taux Espagne − Allemagne s’ouvre (risque politique, budget). Les banques domestiques sont les plus exposées."},
+      "down": {"t": "Détente sur la dette espagnole", "w": "L’écart de taux Espagne − Allemagne se referme : bon pour les banques domestiques."},
+      "short": [
+        {"tv": "BME:SAN", "n": "Santander", "w": "banque"},
+        {"tv": "BME:BBVA", "n": "BBVA", "w": "banque"},
+        {"tv": "BME:CABK", "n": "CaixaBank", "w": "banque domestique"},
+        {"tv": "BME:SAB", "n": "Sabadell", "w": "banque domestique"},
+        {"tv": "AMEX:EWP", "n": "EWP (ETF Espagne)", "w": "indice Espagne en dollars"}
+      ],
+      "long": [],
+      "poly": "spain"
+    },
+    {
+      "id": "us", "flag": "🇺🇸", "name": "Taux américains",
+      "drv": {"k": "yield", "a": "TVC:US10Y", "x": 0.25, "label": "Taux américain à 10 ans"},
+      "up": {"t": "Les taux longs américains montent", "w": "Le 10 ans américain casse à la hausse. Tout ce qui vit du crédit souffre : constructeurs de maisons, immobilier coté, banques régionales, petites capitalisations endettées, services publics."},
+      "down": {"t": "Les taux longs américains baissent", "w": "Le 10 ans américain casse à la baisse : soulagement pour les secteurs sensibles au crédit."},
+      "short": [
+        {"tv": "AMEX:XHB", "n": "XHB (constructeurs de maisons)", "w": "crédit immobilier plus cher"},
+        {"tv": "AMEX:IYR", "n": "IYR (immobilier coté)", "w": "foncières"},
+        {"tv": "AMEX:KRE", "n": "KRE (banques régionales)", "w": "pertes sur obligations, immobilier commercial"},
+        {"tv": "AMEX:IWM", "n": "IWM (petites capitalisations)", "w": "dette à taux variable"},
+        {"tv": "AMEX:XLU", "n": "XLU (services publics)", "w": "concurrencés par les obligations"}
+      ],
+      "long": [],
+      "poly": "fed rate"
+    },
+    {
+      "id": "uk", "flag": "🇬🇧", "name": "Royaume-Uni",
+      "drv": {"k": "yield", "a": "TVC:GB10Y", "x": 0.25, "label": "Taux britannique à 10 ans (gilt)"},
+      "up": {"t": "Les gilts décrochent", "w": "Le taux britannique à 10 ans casse à la hausse. Les prêts immobiliers anglais se refixent vite : les constructeurs de maisons sont touchés en premier."},
+      "down": {"t": "Détente sur les gilts", "w": "Le taux britannique à 10 ans casse à la baisse : bon pour les constructeurs de maisons et les foncières."},
+      "short": [
+        {"tv": "LSE:PSN", "n": "Persimmon", "w": "constructeur de maisons"},
+        {"tv": "LSE:TW.", "n": "Taylor Wimpey", "w": "constructeur de maisons"},
+        {"tv": "LSE:BTRW", "n": "Barratt Redrow", "w": "constructeur de maisons"},
+        {"tv": "LSE:LAND", "n": "Land Securities", "w": "foncière"},
+        {"tv": "AMEX:EWU", "n": "EWU (ETF Royaume-Uni)", "w": "indice britannique en dollars"}
+      ],
+      "long": [],
+      "poly": "uk prime minister"
+    },
+    {
+      "id": "jp", "flag": "🇯🇵", "name": "Japon",
+      "drv": {"k": "yield", "a": "TVC:JP10Y", "x": 0.15, "label": "Taux japonais à 10 ans"},
+      "up": {"t": "Les taux japonais montent", "w": "Le 10 ans japonais casse à la hausse. Les grandes banques japonaises gagnent enfin de l’argent sur leurs prêts après des années de taux zéro."},
+      "down": {"t": "Les taux japonais rebaissent", "w": "Le 10 ans japonais casse à la baisse : moins de marge pour les banques japonaises."},
+      "short": [],
+      "long": [
+        {"tv": "NYSE:MUFG", "n": "Mitsubishi UFJ", "w": "banque japonaise"},
+        {"tv": "NYSE:SMFG", "n": "Sumitomo Mitsui", "w": "banque japonaise"},
+        {"tv": "NYSE:MFG", "n": "Mizuho", "w": "banque japonaise"}
+      ],
+      "poly": "bank of japan"
+    },
+    {
+      "id": "br", "flag": "🇧🇷", "name": "Brésil",
+      "drv": {"k": "yield", "a": "TVC:BR10Y", "x": 0.50, "label": "Taux brésilien à 10 ans"},
+      "up": {"t": "Le risque Brésil remonte", "w": "Le taux brésilien à 10 ans casse à la hausse (budget, politique). Les actions brésiliennes et les banques suivent en général à la baisse."},
+      "down": {"t": "Le risque Brésil recule", "w": "Le taux brésilien à 10 ans casse à la baisse : le marché parie sur plus de discipline budgétaire. Banques et grandes valeurs brésiliennes en profitent."},
+      "short": [
+        {"tv": "AMEX:EWZ", "n": "EWZ (ETF Brésil)", "w": "indice Brésil en dollars"},
+        {"tv": "NYSE:ITUB", "n": "Itaú Unibanco", "w": "banque"},
+        {"tv": "NYSE:BBD", "n": "Bradesco", "w": "banque"},
+        {"tv": "NYSE:PBR", "n": "Petrobras", "w": "société contrôlée par l’État"},
+        {"tv": "NYSE:VALE", "n": "Vale", "w": "mines"}
+      ],
+      "long": [],
+      "poly": "brazil"
+    },
+    {
+      "id": "oil", "flag": "🛢️", "name": "Pétrole",
+      "drv": {"k": "price", "a": "ICEEUR:BRN1!", "x": 0.10, "label": "Baril de Brent"},
+      "up": {"t": "Le pétrole casse à la hausse", "w": "Le Brent monte de plus de 10 % en un mois sur un plus haut de 3 mois. Les producteurs encaissent ; les compagnies aériennes et les pays importateurs (Inde) paient la facture."},
+      "down": {"t": "Le pétrole décroche", "w": "Le Brent perd plus de 10 % en un mois sur un plus bas de 3 mois. Les compagnies aériennes et les pays importateurs respirent ; les producteurs perdent leur marge."},
+      "short": [
+        {"tv": "AMEX:JETS", "n": "JETS (compagnies aériennes)", "w": "kérosène plus cher"},
+        {"tv": "EURONEXT:AF", "n": "Air France-KLM", "w": "kérosène plus cher"},
+        {"tv": "XETR:LHA", "n": "Lufthansa", "w": "kérosène plus cher"},
+        {"tv": "LSE:IAG", "n": "IAG (British Airways, Iberia)", "w": "kérosène plus cher"},
+        {"tv": "CBOE:INDA", "n": "INDA (ETF Inde)", "w": "gros importateur de pétrole"}
+      ],
+      "long": [
+        {"tv": "AMEX:XLE", "n": "XLE (énergie US)", "w": "producteurs"},
+        {"tv": "NYSE:XOM", "n": "ExxonMobil", "w": "producteur"},
+        {"tv": "EURONEXT:TTE", "n": "TotalEnergies", "w": "producteur"},
+        {"tv": "AMEX:XOP", "n": "XOP (exploration-production)", "w": "producteurs les plus sensibles au prix"}
+      ],
+      "poly": "oil price"
+    }
+  ],
+  "polys": [
+    {
+      "id": "br-elec", "flag": "🗳️", "name": "Présidentielle au Brésil (second tour le 25 octobre)",
+      "slug": "brazil-presidential-election", "outcome": "Bolsonaro",
+      "t": "Flávio Bolsonaro favori au Brésil",
+      "w": "Le marché préfère le candidat de droite, jugé plus strict sur le budget. Quand ses chances montent sur Polymarket, les actions brésiliennes et le real suivent.",
+      "long": [
+        {"tv": "AMEX:EWZ", "n": "EWZ (ETF Brésil)", "w": "indice Brésil en dollars"},
+        {"tv": "NYSE:ITUB", "n": "Itaú Unibanco", "w": "banque"},
+        {"tv": "NYSE:BBD", "n": "Bradesco", "w": "banque"},
+        {"tv": "NYSE:PBR", "n": "Petrobras", "w": "société contrôlée par l’État"},
+        {"tv": "NYSE:VALE", "n": "Vale", "w": "mines"}
+      ],
+      "short": []
+    }
+  ],
+  "polytags": ["politics", "economy", "geopolitics"],
+  "polymap": [
+    {"re": "brazil|lula|bolsonaro", "tk": ["AMEX:EWZ", "NYSE:PBR", "NYSE:ITUB"]},
+    {"re": "france|french|macron|le pen|bardella|m[eé]lenchon", "tk": ["AMEX:EWQ", "EURONEXT:BNP", "EURONEXT:GLE"]},
+    {"re": "fed |fomc|federal reserve|rate cut|rate hike|interest rate", "tk": ["NASDAQ:TLT", "AMEX:KRE", "AMEX:XHB"]},
+    {"re": "recession|unemployment|gdp", "tk": ["AMEX:IWM", "NASDAQ:TLT", "AMEX:XLU"]},
+    {"re": "inflation|cpi", "tk": ["NASDAQ:TLT", "AMEX:GLD"]},
+    {"re": "iran|hormuz|opec|oil|crude", "tk": ["ICEEUR:BRN1!", "AMEX:XLE", "AMEX:JETS"]},
+    {"re": "israel|gaza|hezbollah|lebanon", "tk": ["ICEEUR:BRN1!", "AMEX:GLD"]},
+    {"re": "ukraine|russia|putin|ceasefire|zelensky", "tk": ["XETR:RHM", "AMEX:EWG", "EURONEXT:TTE"]},
+    {"re": "china|taiwan|xi jinping", "tk": ["AMEX:FXI", "NYSE:TSM", "NASDAQ:SMH"]},
+    {"re": "tariff|trade deal|trade war", "tk": ["AMEX:FXI", "AMEX:EWW", "AMEX:IWM"]},
+    {"re": "japan|boj|takaichi|yen", "tk": ["AMEX:EWJ", "NYSE:MUFG", "FX:USDJPY"]},
+    {"re": "uk |britain|starmer|farage|bank of england", "tk": ["AMEX:EWU", "FX:GBPUSD", "LSE:PSN"]},
+    {"re": "germany|german|merz|afd", "tk": ["AMEX:EWG", "XETR:RHM"]},
+    {"re": "italy|meloni", "tk": ["AMEX:EWI", "MIL:UCG"]},
+    {"re": "spain|sanchez|s[aá]nchez", "tk": ["AMEX:EWP", "BME:SAN"]},
+    {"re": "ecb|lagarde|euro ", "tk": ["FX:EURUSD", "MIL:UCG", "EURONEXT:BNP"]},
+    {"re": "argentina|milei", "tk": ["AMEX:ARGT", "NYSE:YPF", "NASDAQ:GGAL"]},
+    {"re": "mexico|sheinbaum", "tk": ["AMEX:EWW", "FX:USDMXN"]},
+    {"re": "venezuela|maduro", "tk": ["ICEEUR:BRN1!", "NYSE:CVX"]},
+    {"re": "colombia|petro", "tk": ["NYSE:EC", "AMEX:GXG"]},
+    {"re": "chile|kast", "tk": ["AMEX:ECH", "NYSE:SQM"]},
+    {"re": "turkey|erdogan", "tk": ["NASDAQ:TUR", "FX_IDC:USDTRY"]},
+    {"re": "korea", "tk": ["AMEX:EWY"]},
+    {"re": "india|modi", "tk": ["CBOE:INDA"]},
+    {"re": "gold", "tk": ["AMEX:GLD", "AMEX:GDX"]},
+    {"re": "nvidia|openai|artificial intelligence| ai ", "tk": ["NASDAQ:NVDA", "NASDAQ:SMH"]},
+    {"re": "shutdown|debt ceiling|trump|congress|senate|house", "tk": ["NASDAQ:TLT", "AMEX:IWM"]}
+  ]
+}
