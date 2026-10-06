@@ -1,7 +1,7 @@
 {
   "v": 1,
   "updated": "2026-10-06",
-  "rule": {"LB": 60, "CH": 20, "CD": 10, "lag": 0.03, "max": 3, "hold": 20},
+  "rule": {"LB": 60, "CH": 20, "CD": 10, "lag": 0.03, "max": 2, "hold": 20},
   "themes": [
     {
       "id": "fr", "flag": "🇫🇷", "name": "France",
