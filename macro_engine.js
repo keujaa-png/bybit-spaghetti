@@ -94,7 +94,10 @@
     let i = -1; for (let k = L.t.length - 1; k >= 0; k--) if (L.t[k] <= day) { i = k; break; }
     if (i < 60) return null;
     const sm = sma(L.c, 50, i), r20 = s * (L.c[i] / L.c[i - 20] - 1), conf = s * (L.c[i] - sm) > 0;
-    return {sym, s, i, e: i + 1 < L.t.length ? i + 1 : null, r20, conf, lag: !conf && r20 < ME.RULE.lag};
+    // début de tendance : le titre a repassé sa moyenne 50 séances il y a moins de 10 séances, sans être déjà loin
+    let cross = false; for (let k = 1; k <= 10 && i - k >= 50; k++) if (s * (L.c[i - k] - sma(L.c, 50, i - k)) <= 0) { cross = true; break; }
+    const dist = s * (L.c[i] / sm - 1);
+    return {sym, s, i, e: i + 1 < L.t.length ? i + 1 : null, r20, conf, dist, lag: !conf && r20 < ME.RULE.lag, start: conf && cross && r20 < 0.08 && dist < 0.04};
   };
   const fwd = ME.fwd = (tr, N) => {
     const L = ME.FULL[tr.sym]; if (tr.e == null) return null;
@@ -114,7 +117,9 @@
       for (const sig of S) {
         const legs = [...th.short.map(l => [l, -sig.sg]), ...th.long.map(l => [l, sig.sg])], ep = [];
         for (const [l, s] of legs) { if (l.liq === false) continue; const st = legState(l.tv, s, sig.day); if (st) ep.push(Object.assign(st, {th: th.id, fam: th.fam, day: sig.day, sig, leg: l})); }
-        const pick = ep.filter(x => x.lag).sort((a, b) => a.r20 - b.r20).slice(0, ME.RULE.max);
+        let pick = ep.filter(x => x.lag).sort((a, b) => a.r20 - b.r20).slice(0, ME.RULE.max);
+        pick.forEach(x => { x.kind = 'lag'; });
+        if (!pick.length) { pick = ep.filter(x => x.start).sort((a, b) => a.dist - b.dist).slice(0, ME.RULE.max); pick.forEach(x => { x.kind = 'start'; }); }
         if (th.alert === false) ME.ECO.push(...pick); else { ME.ALL.push(...ep); ME.PICK.push(...pick); }
       }
     }
@@ -159,7 +164,7 @@
     return {
       title: side.t, ctx: side.w,
       trig: `${th.drv.label} à ${f(tr.sig.v)}, soit ${drvChg(th, tr.sig.ch)} en ${p.ch} : ${tr.sig.sg > 0 ? 'plus haut' : 'plus bas'} de ${p.lb} le ${dstr(tr.day)}.`,
-      why: `${tr.leg.n} (${tr.leg.w}) n’a pas encore réagi : ${pct(raw)} sur 20 séances, et le titre est encore ${tr.s < 0 ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances.`,
+      why: tr.kind === 'start' ? `${tr.leg.n} (${tr.leg.w}) vient de démarrer : le titre est repassé ${tr.s < 0 ? 'sous' : 'au-dessus de'} sa moyenne 50 séances il y a moins de 10 séances (${pct(raw)} sur 20 séances), sans être déjà loin.` : `${tr.leg.n} (${tr.leg.w}) n’a pas encore réagi : ${pct(raw)} sur 20 séances, et le titre est encore ${tr.s < 0 ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances.`,
       plan: `Entrée à l’ouverture suivante, sortie après ${ME.RULE.hold} séances (environ ${Math.round(ME.RULE.hold / 21)} mois). L’idée ne tient plus si l’indicateur revient vers ${f(tr.sig.ref)}.`
     };
   };
@@ -172,7 +177,7 @@
     const lb = th.rule ? R.LB + ' mois' : Math.round(R.LB / 20) + ' mois';
     return `${th.flag} <b>${e(side.t)}</b>\n${tr.s > 0 ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(tr.leg.n)}</b> · ${e(ME.short(tr.sym))}\n\n` +
       `${e(th.drv.label)} : ${f(tr.sig.v)} (${drvChg(th, tr.sig.ch)} en ${ME.per(th).ch}), ${tr.sig.sg > 0 ? 'plus haut' : 'plus bas'} de ${lb}.\n` +
-      `Le titre n’a pas encore réagi : ${pct(tr.s * tr.r20)} en 20 séances.\n` +
+      (tr.kind === 'start' ? `Début de tendance : le titre vient de repasser ${tr.s < 0 ? 'sous' : 'au-dessus de'} sa moyenne 50 séances (${pct(tr.s * tr.r20)} en 20 séances).\n` : `Le titre n’a pas encore réagi : ${pct(tr.s * tr.r20)} en 20 séances.\n`) +
       `Horizon : environ ${Math.round(ME.RULE.hold / 20)} mois. Invalidation : retour de l’indicateur vers ${f(tr.sig.ref)}.\n` +
       `<a href="${ME.tvUrl(tr.sym)}">Chart TradingView</a>`;
   };

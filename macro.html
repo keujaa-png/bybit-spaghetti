@@ -83,7 +83,7 @@
 </div>
 
 <section class="sec">
-  <div class="sech"><h2>💡 Nouvelles idées (10 derniers jours)</h2><span class="hint">Peu d’idées, c’est voulu : une idée sort seulement quand un indicateur casse un plus haut ou plus bas de 6 mois, et seulement sur le titre lié le plus en retard. Horizon : environ 3 mois.</span></div>
+  <div class="sech"><h2>💡 Nouvelles idées (10 derniers jours)</h2><span class="hint">Peu d’idées, c’est voulu : une idée sort seulement quand un indicateur casse un plus haut ou plus bas de 6 mois, sur le titre lié le plus en retard ou, à défaut, sur celui qui démarre tout juste. Horizon : environ 3 mois.</span></div>
   <div class="grid" id="ideas"></div>
   <div class="hint" style="margin:12px 0 6px">Idées plus anciennes encore ouvertes (sortie prévue 60 séances après l’entrée) :</div>
   <div class="tw"><table>
@@ -93,7 +93,7 @@
 </section>
 
 <section class="sec">
-  <div class="sech"><h2>🧭 Tableau macro</h2><span class="hint">Chaque thème suit un indicateur. « Signal » = il vient de casser. Les titres en jaune sont les retardataires (ceux que le système propose) ; les autres ont déjà bougé. Les thèmes « contexte » ne déclenchent pas d’alerte. Les titres grisés s’échangent moins de 20 M$ par jour : ils ne sont jamais proposés.</span></div>
+  <div class="sech"><h2>🧭 Tableau macro</h2><span class="hint">Chaque thème suit un indicateur. « Signal » = il vient de casser. Les titres en jaune sont ceux que le système peut proposer (retardataires ou tout début de tendance) ; les autres ont déjà bougé. Les thèmes « contexte » ne déclenchent pas d’alerte. Les titres grisés s’échangent moins de 20 M$ par jour : ils ne sont jamais proposés.</span></div>
   <div class="grid" id="themes"></div>
 </section>
 
@@ -126,6 +126,7 @@
     <ol>
       <li><b>Le déclencheur.</b> Un indicateur (écart de taux France − Allemagne, taux à 10 ans, pétrole, cuivre, cacao, dollar, bitcoin…) fait un plus haut ou un plus bas de 6 mois (120 séances), avec un mouvement d’au moins le seuil du thème sur 20 séances.</li>
       <li><b>Le tri.</b> Parmi les titres liés au thème, le système garde ceux qui n’ont <b>pas encore réagi</b> : encore du mauvais côté de leur moyenne 50 séances, et moins de 3 % de mouvement dans le sens de l’idée sur 20 séances. Il n’en garde qu’un par signal : le plus en retard.</li>
+      <li><b>Sinon, le début de tendance.</b> S’il n’y a aucun retardataire, le système propose le titre qui vient juste de démarrer : il a repassé sa moyenne 50 séances il y a moins de 10 séances, a bougé de moins de 8 % en 20 séances et reste à moins de 4 % de cette moyenne. Un titre déjà loin n’est jamais proposé.</li>
       <li><b>Pourquoi pas les titres déjà partis ?</b> Le backtest montre que vendre ce qui a déjà chuté (ou acheter ce qui a déjà monté) ne rapporte rien de plus que le hasard. Ce sont les retardataires qui rattrapent.</li>
       <li><b>Les thèmes « contexte ».</b> Les données économiques mensuelles (ventes au détail en Chine, ISM, Ifo…) sont affichées pour information, mais n’envoient pas d’alerte : sur 5 ans, leurs signaux sont trop irréguliers (deux années sur cinq perdantes).</li>
       <li><b>Le plan testé.</b> Entrée à l’ouverture suivante, sortie après 60 séances, soit environ 3 mois. L’idée ne tient plus si l’indicateur revient à son niveau d’il y a 20 séances.</li>
@@ -134,7 +135,7 @@
   </div>
 </section>
 
-<script src="macro_engine.js?v=4"></script>
+<script src="macro_engine.js?v=5"></script>
 <script>
 const $ = id => document.getElementById(id);
 const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
@@ -175,7 +176,7 @@ function renderIdeas() {
   for (const tr of fresh) {
     const th = ME.theme(tr.th), tx = ME.ideaText(th, tr), r = ME.result(tr);
     const el = document.createElement('div'); el.className = 'card';
-    el.innerHTML = `<div class="ih"><span class="side ${tr.s > 0 ? 'L' : 'S'}">${tr.s > 0 ? 'ACHAT' : 'VENTE'}</span><b>${esc(tr.leg.n)}</b><span class="mut">${esc(tr.sym)}</span>${ME.isNew(tr) ? '<span class="chip new">nouvelle</span>' : ''}</div>
+    el.innerHTML = `<div class="ih"><span class="side ${tr.s > 0 ? 'L' : 'S'}">${tr.s > 0 ? 'ACHAT' : 'VENTE'}</span><b>${esc(tr.leg.n)}</b><span class="mut">${esc(tr.sym)}</span>${ME.isNew(tr) ? '<span class="chip new">nouvelle</span>' : ''}<span class="chip">${tr.kind === 'start' ? 'début de tendance' : 'retardataire'}</span></div>
       <div class="mut" style="margin-top:4px">${th.flag} ${esc(tx.title)} · signal du ${dstr(tr.day)}${r ? ` · depuis l’entrée (${nf(r.entry, 2)}) : <b class="${cls(r.ret)}">${pct(r.ret)}</b> en ${r.bars} séance${r.bars > 1 ? 's' : ''}` : ' · entrée à la prochaine ouverture'}</div>
       <canvas></canvas>
       <p class="mut">${esc(tx.ctx)}</p>
@@ -203,7 +204,7 @@ function renderThemes() {
       <div style="margin-top:4px">${esc(th.drv.label)} : <b>${f(v)}</b> · ${p.ch} : <b class="${cls(ch)}">${ME.drvChg(th, ch)}</b> <span class="mut">(seuil ± ${ME.drvX(th)})</span></div>
       <canvas></canvas>
       <p class="mut">${esc(act ? (act.sg > 0 ? th.up : th.down).w : 'Pas de cassure récente. Sens des titres ci-dessous : celui du mouvement en cours.')}</p>
-      <div class="legs">${legs.map(o => `<a class="leg${act && th.alert !== false && o.st.lag && o.l.liq !== false ? ' lag' : ''}"${o.l.liq === false ? ' style="opacity:.45"' : ''} href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n + ' · ' + o.l.w + (o.l.liq === false ? ' · trop peu liquide : jamais proposé' : ''))}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>`;
+      <div class="legs">${legs.map(o => `<a class="leg${act && th.alert !== false && (o.st.lag || o.st.start) && o.l.liq !== false ? ' lag' : ''}"${o.l.liq === false ? ' style="opacity:.45"' : ''} href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n + ' · ' + o.l.w + (o.l.liq === false ? ' · trop peu liquide : jamais proposé' : ''))}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>`;
     box.appendChild(el);
     const d0 = Math.max(0, n - (th.rule ? 48 : 130));
     spark(el.querySelector('canvas'), D.t.slice(d0), D.v.slice(d0), {fmt: f, marks: act && act.i >= d0 ? [{i: act.i - d0, v: act.v, color: '#f0a030', label: 'signal'}] : []});
@@ -223,7 +224,8 @@ function renderBT() {
   let y = '';
   for (let yr = new Date(first * 864e5).getUTCFullYear(); yr <= new Date().getUTCFullYear(); yr++) y += row(yr, S(ME.PICK, Date.UTC(yr, 0, 1) / 864e5, Date.UTC(yr + 1, 0, 1) / 864e5));
   $('btYears').innerHTML = y;
-  $('btFams').innerHTML = Object.entries(ME.PB.fams || {}).map(([k, name]) => row(esc(name) + (k === 'eco' ? ' <span class="mut">(non envoyées)</span>' : ''), S((k === 'eco' ? ME.ECO : ME.PICK).filter(x => x.fam === k), 0))).join('');
+  $('btFams').innerHTML = Object.entries(ME.PB.fams || {}).map(([k, name]) => row(esc(name) + (k === 'eco' ? ' <span class="mut">(non envoyées)</span>' : ''), S((k === 'eco' ? ME.ECO : ME.PICK).filter(x => x.fam === k), 0))).join('') +
+    row('<b>Type : retardataire</b>', S(ME.PICK.filter(x => x.kind !== 'start'), 0)) + row('<b>Type : début de tendance</b>', S(ME.PICK.filter(x => x.kind === 'start'), 0));
   const rows = ME.PICK.filter(x => x.day >= m3).sort((a, b) => b.day - a.day).map(tr => {
     const th = ME.theme(tr.th), r = ME.result(tr);
     return `<tr><td>${dstr(tr.day)}</td><td>${th.flag} ${esc((tr.sig.sg > 0 ? th.up : th.down).t)}</td><td><a href="${tvUrl(tr.sym)}" target="_blank" rel="noopener">${esc(tr.leg.n)}</a></td><td class="${tr.s > 0 ? 'up' : 'down'}">${tr.s > 0 ? 'achat' : 'vente'}</td>` +
