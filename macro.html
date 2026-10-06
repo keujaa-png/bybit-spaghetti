@@ -215,10 +215,10 @@ function renderBT() {
   $('btCards').innerHTML =
     card('Les idées envoyées · 3 derniers mois', S(ME.PICK, m3), 'Toutes ces idées sont encore ouvertes (sortie à 3 mois) : ce résultat n’est pas définitif.') +
     card('Les idées envoyées · 12 derniers mois', S(ME.PICK, T - 365)) +
-    card(`Les idées envoyées · ${yrs} ans`, S(ME.PICK, 0), 'La règle a été choisie sur 2025-2026. Les années d’avant ne l’ont donc pas « vue » : c’est le test le plus honnête.') +
+    card(`Les idées envoyées · ${yrs} ans`, S(ME.PICK, 0), 'Attention : la durée (cassure de 6 mois, sortie à 3 mois) a été choisie en regardant ces 5 ans. Le chiffre est donc flatteur ; le vrai test, ce sont les prochains mois.') +
     card(`Si on prenait tous les titres du thème · ${yrs} ans`, S(ME.ALL, 0), 'L’idée « naïve » : l’indicateur casse, je prends tout le thème.') +
     card(`Seulement les titres déjà partis · ${yrs} ans`, S(ME.ALL.filter(x => !x.lag), 0), 'Courir après ce qui a déjà bougé rapporte moins. C’est pour ça qu’ils sont écartés.') +
-    card(`Données économiques mensuelles · ${yrs} ans`, S(ME.ECO, 0), 'Ventes au détail chinoises, ISM, Ifo, confiance des ménages… Pas mieux que le hasard : affichées pour le contexte, jamais envoyées.');
+    card(`Données économiques mensuelles · ${yrs} ans`, S(ME.ECO, 0), 'Ventes au détail chinoises, ISM, Ifo, confiance des ménages… Résultat trop irrégulier (deux années sur cinq perdantes, peu de signaux) : affichées pour le contexte, pas envoyées.');
   const row = (label, s) => `<tr><td>${label}</td>` + (s ? `<td class="r">${s.n}</td><td class="r">${nf(100 * s.win, 0)} %</td><td class="r ${cls(s.avg)}">${pct(s.avg)}</td><td class="r ${cls(s.exc)}"><b>${sg(100 * s.exc)} pt</b></td>` : '<td class="r mut" colspan="4">aucune idée</td>') + '</tr>';
   let y = '';
   for (let yr = new Date(first * 864e5).getUTCFullYear(); yr <= new Date().getUTCFullYear(); yr++) y += row(yr, S(ME.PICK, Date.UTC(yr, 0, 1) / 864e5, Date.UTC(yr + 1, 0, 1) / 864e5));
