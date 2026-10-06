@@ -170,8 +170,6 @@ async function aiIdeas() {
     'OPEC production decision', 'mine strike supply', 'export ban commodity', 'Red Sea Suez Panama canal shipping', 'refinery outage', 'sanctions oil metals', 'port strike',
     // actions : faits propres à une société ou à un secteur
     'raises full-year guidance', 'profit warning shares', 'record order backlog', 'regulator approval shares jump', 'antitrust ruling', 'pricing power demand surge sector', 'capex cut industry',
-    // ce que disent et déclarent les grands fonds
-    'Druckenmiller', 'Duquesne Family Office 13F', 'hedge funds 13F new positions', 'Citadel commodities', 'macro hedge funds positioning',
     // monde
     'Bank of Japan yen', 'ECB decision', 'Federal Reserve outlook', 'India economy rupee', 'Brazil fiscal real', 'Mexico peso trade', 'Australia RBA iron ore', 'Korea Taiwan semiconductor exports', 'export controls chips', 'Middle East conflict oil',
     ...ME.PB.themes.map(t => t.news).filter(Boolean)];
@@ -202,7 +200,14 @@ Ce qu'exige une idée de desk :
 - Ça peut être une idée sur une seule action : résultats ou prévisions qui changent la trajectoire, carnet de commandes, décision d'un régulateur, changement de prix ou de demande dans son secteur. Même exigence : un fait daté, pas encore dans le prix.
 - Un instrument très liquide et négociable chez Interactive Brokers, partout dans le monde : action, ETF pays ou secteur, ETF de matière première (par exemple WEAT, CORN, SOYB, UNG, USO, GLD, SLV, CPER, DBA) quand c'est l'expression la plus propre. Prends de préférence un titre du tableau ; sinon donne son symbole TradingView exact (PLACE:TICKER).
 - Ne répète aucune de ces idées déjà envoyées : ${recent.join(', ') || 'aucune'}.
-Méthode, à la manière des grands fonds macro et multi-stratégies (Duquesne, Citadel) : pars de la liquidité et des banques centrales, regarde 6 à 18 mois devant et non le présent, cherche le point où le consensus se trompe, concentre-toi sur très peu de paris à forte asymétrie, et coupe vite quand le fait de départ ne tient plus. Tu peux utiliser ce que ces fonds ont déclaré publiquement (positions 13F, interviews récentes) comme indice, jamais comme seule raison : un 13F a 45 jours de retard et ne montre que les achats d'actions américaines.
+Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
+1. Régime : où en sont la liquidité, les banques centrales, le crédit et le dollar, et dans quel sens ça bouge.
+2. Ce qui est dans les prix : le consensus, le positionnement probable, ce que le titre a déjà fait.
+3. Ton écart avec le consensus : le point précis où tu penses que le marché se trompe, et pourquoi tu le verrais avant lui (un fait récent qu'il sous-estime, un effet de second tour, un délai de transmission).
+4. Le catalyseur et son calendrier : ce qui forcera le marché à réviser, et quand, à 6-18 mois.
+5. L'expression la plus propre : l'instrument qui porte la thèse avec le moins de risques parasites.
+6. L'asymétrie : gain si tu as raison, perte si tu as tort, et le fait précis qui te fait couper.
+Si une étape manque, il n'y a pas d'idée.
 Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds, 5 est rare. En dessous de 4, l'idée ne sera pas envoyée, donc ne force rien.
 Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON, vide s'il n'y a rien. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const user = `TITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTITRES DU TABLEAU\n${[...uni.values()].join('\n')}`;
