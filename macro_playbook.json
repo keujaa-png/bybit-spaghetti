@@ -1,186 +1,1805 @@
 {
-  "v": 1,
-  "updated": "2026-10-06",
-  "rule": {"LB": 60, "CH": 20, "CD": 10, "lag": 0.03, "max": 2, "hold": 20},
-  "themes": [
+ "v": 3,
+ "updated": "2026-10-06",
+ "rule": {
+  "LB": 120,
+  "CH": 20,
+  "CD": 20,
+  "lag": 0.03,
+  "max": 1,
+  "hold": 60
+ },
+ "themes": [
+  {
+   "id": "fr",
+   "flag": "🇫🇷",
+   "name": "France",
+   "drv": {
+    "k": "spread",
+    "a": "TVC:FR10Y",
+    "b": "TVC:DE10Y",
+    "x": 0.1,
+    "label": "Écart OAT − Bund 10 ans"
+   },
+   "up": {
+    "t": "Dette française sous pression",
+    "w": "L’écart de taux entre la France et l’Allemagne s’ouvre : le marché demande plus cher pour prêter à la France. Ça pèse sur les banques (elles portent de la dette d’État et se financent plus cher), sur l’immobilier (crédit plus cher, ventes de neuf en baisse) et sur les sociétés qui vivent de contrats publics."
+   },
+   "down": {
+    "t": "Détente sur la dette française",
+    "w": "L’écart de taux France − Allemagne se referme : le risque politique et budgétaire recule. Les valeurs domestiques punies (banques, immobilier, concessions) ont de quoi rebondir."
+   },
+   "short": [
     {
-      "id": "fr", "flag": "🇫🇷", "name": "France",
-      "drv": {"k": "spread", "a": "TVC:FR10Y", "b": "TVC:DE10Y", "x": 0.10, "label": "Écart OAT − Bund 10 ans"},
-      "up": {"t": "Dette française sous pression", "w": "L’écart de taux entre la France et l’Allemagne s’ouvre : le marché demande plus cher pour prêter à la France. Ça pèse sur les banques (elles portent de la dette d’État et se financent plus cher), sur l’immobilier (crédit plus cher, ventes de neuf en baisse) et sur les sociétés qui vivent de contrats publics."},
-      "down": {"t": "Détente sur la dette française", "w": "L’écart de taux France − Allemagne se referme : le risque politique et budgétaire recule. Les valeurs domestiques punies (banques, immobilier, concessions) ont de quoi rebondir."},
-      "short": [
-        {"tv": "EURONEXT:BNP", "n": "BNP Paribas", "w": "banque"},
-        {"tv": "EURONEXT:GLE", "n": "Société Générale", "w": "banque"},
-        {"tv": "EURONEXT:ACA", "n": "Crédit Agricole", "w": "banque"},
-        {"tv": "EURONEXT:NXI", "n": "Nexity", "w": "immobilier neuf"},
-        {"tv": "EURONEXT:KOF", "n": "Kaufman & Broad", "w": "immobilier neuf"},
-        {"tv": "EURONEXT:CS", "n": "AXA", "w": "assureur, gros porteur d’OAT"},
-        {"tv": "EURONEXT:AMUN", "n": "Amundi", "w": "gestion d’actifs"},
-        {"tv": "EURONEXT:DG", "n": "Vinci", "w": "concessions, risque politique"},
-        {"tv": "EURONEXT:FGR", "n": "Eiffage", "w": "concessions, BTP"},
-        {"tv": "EURONEXT:ICAD", "n": "Icade", "w": "foncière"},
-        {"tv": "EURONEXT:LI", "n": "Klépierre", "w": "foncière"},
-        {"tv": "EURONEXT:URW", "n": "Unibail-Rodamco-Westfield", "w": "foncière endettée"},
-        {"tv": "EURONEXT:ENGI", "n": "Engie", "w": "services publics, tarifs régulés"},
-        {"tv": "AMEX:EWQ", "n": "EWQ (ETF France)", "w": "indice France en dollars"}
-      ],
-      "long": [],
-      "poly": "france election"
+     "tv": "EURONEXT:BNP",
+     "n": "BNP Paribas",
+     "w": "banque"
     },
     {
-      "id": "it", "flag": "🇮🇹", "name": "Italie",
-      "drv": {"k": "spread", "a": "TVC:IT10Y", "b": "TVC:DE10Y", "x": 0.10, "label": "Écart BTP − Bund 10 ans"},
-      "up": {"t": "Contagion sur la dette italienne", "w": "L’écart de taux Italie − Allemagne s’ouvre. Les banques italiennes détiennent beaucoup de dette d’État : elles baissent en premier quand le BTP est attaqué."},
-      "down": {"t": "Détente sur la dette italienne", "w": "L’écart de taux Italie − Allemagne se referme : bon pour les banques et l’indice italien."},
-      "short": [
-        {"tv": "MIL:UCG", "n": "UniCredit", "w": "banque"},
-        {"tv": "MIL:ISP", "n": "Intesa Sanpaolo", "w": "banque"},
-        {"tv": "MIL:BAMI", "n": "Banco BPM", "w": "banque domestique"},
-        {"tv": "MIL:G", "n": "Generali", "w": "assureur, gros porteur de BTP"},
-        {"tv": "MIL:ENEL", "n": "Enel", "w": "services publics endettés"},
-        {"tv": "AMEX:EWI", "n": "EWI (ETF Italie)", "w": "indice Italie en dollars"}
-      ],
-      "long": [],
-      "poly": "italy"
+     "tv": "EURONEXT:GLE",
+     "n": "Société Générale",
+     "w": "banque"
     },
     {
-      "id": "es", "flag": "🇪🇸", "name": "Espagne",
-      "drv": {"k": "spread", "a": "TVC:ES10Y", "b": "TVC:DE10Y", "x": 0.10, "label": "Écart Bono − Bund 10 ans"},
-      "up": {"t": "Stress sur la dette espagnole", "w": "L’écart de taux Espagne − Allemagne s’ouvre (risque politique, budget). Les banques domestiques sont les plus exposées."},
-      "down": {"t": "Détente sur la dette espagnole", "w": "L’écart de taux Espagne − Allemagne se referme : bon pour les banques domestiques."},
-      "short": [
-        {"tv": "BME:SAN", "n": "Santander", "w": "banque"},
-        {"tv": "BME:BBVA", "n": "BBVA", "w": "banque"},
-        {"tv": "BME:CABK", "n": "CaixaBank", "w": "banque domestique"},
-        {"tv": "BME:SAB", "n": "Sabadell", "w": "banque domestique"},
-        {"tv": "AMEX:EWP", "n": "EWP (ETF Espagne)", "w": "indice Espagne en dollars"}
-      ],
-      "long": [],
-      "poly": "spain"
+     "tv": "EURONEXT:ACA",
+     "n": "Crédit Agricole",
+     "w": "banque"
     },
     {
-      "id": "us", "flag": "🇺🇸", "name": "Taux américains",
-      "drv": {"k": "yield", "a": "TVC:US10Y", "x": 0.25, "label": "Taux américain à 10 ans"},
-      "up": {"t": "Les taux longs américains montent", "w": "Le 10 ans américain casse à la hausse. Tout ce qui vit du crédit souffre : constructeurs de maisons, immobilier coté, banques régionales, petites capitalisations endettées, services publics."},
-      "down": {"t": "Les taux longs américains baissent", "w": "Le 10 ans américain casse à la baisse : soulagement pour les secteurs sensibles au crédit."},
-      "short": [
-        {"tv": "AMEX:XHB", "n": "XHB (constructeurs de maisons)", "w": "crédit immobilier plus cher"},
-        {"tv": "AMEX:IYR", "n": "IYR (immobilier coté)", "w": "foncières"},
-        {"tv": "AMEX:KRE", "n": "KRE (banques régionales)", "w": "pertes sur obligations, immobilier commercial"},
-        {"tv": "AMEX:IWM", "n": "IWM (petites capitalisations)", "w": "dette à taux variable"},
-        {"tv": "AMEX:XLU", "n": "XLU (services publics)", "w": "concurrencés par les obligations"}
-      ],
-      "long": [],
-      "poly": "fed rate"
+     "tv": "EURONEXT:NXI",
+     "n": "Nexity",
+     "w": "immobilier neuf"
     },
     {
-      "id": "uk", "flag": "🇬🇧", "name": "Royaume-Uni",
-      "drv": {"k": "yield", "a": "TVC:GB10Y", "x": 0.25, "label": "Taux britannique à 10 ans (gilt)"},
-      "up": {"t": "Les gilts décrochent", "w": "Le taux britannique à 10 ans casse à la hausse. Les prêts immobiliers anglais se refixent vite : les constructeurs de maisons sont touchés en premier."},
-      "down": {"t": "Détente sur les gilts", "w": "Le taux britannique à 10 ans casse à la baisse : bon pour les constructeurs de maisons et les foncières."},
-      "short": [
-        {"tv": "LSE:PSN", "n": "Persimmon", "w": "constructeur de maisons"},
-        {"tv": "LSE:TW.", "n": "Taylor Wimpey", "w": "constructeur de maisons"},
-        {"tv": "LSE:BTRW", "n": "Barratt Redrow", "w": "constructeur de maisons"},
-        {"tv": "LSE:LAND", "n": "Land Securities", "w": "foncière"},
-        {"tv": "AMEX:EWU", "n": "EWU (ETF Royaume-Uni)", "w": "indice britannique en dollars"}
-      ],
-      "long": [],
-      "poly": "uk prime minister"
+     "tv": "EURONEXT:KOF",
+     "n": "Kaufman & Broad",
+     "w": "immobilier neuf"
     },
     {
-      "id": "jp", "flag": "🇯🇵", "name": "Japon",
-      "drv": {"k": "yield", "a": "TVC:JP10Y", "x": 0.15, "label": "Taux japonais à 10 ans"},
-      "up": {"t": "Les taux japonais montent", "w": "Le 10 ans japonais casse à la hausse. Les grandes banques japonaises gagnent enfin de l’argent sur leurs prêts après des années de taux zéro."},
-      "down": {"t": "Les taux japonais rebaissent", "w": "Le 10 ans japonais casse à la baisse : moins de marge pour les banques japonaises."},
-      "short": [],
-      "long": [
-        {"tv": "NYSE:MUFG", "n": "Mitsubishi UFJ", "w": "banque japonaise"},
-        {"tv": "NYSE:SMFG", "n": "Sumitomo Mitsui", "w": "banque japonaise"},
-        {"tv": "NYSE:MFG", "n": "Mizuho", "w": "banque japonaise"}
-      ],
-      "poly": "bank of japan"
+     "tv": "EURONEXT:CS",
+     "n": "AXA",
+     "w": "assureur, gros porteur d’OAT"
     },
     {
-      "id": "br", "flag": "🇧🇷", "name": "Brésil",
-      "drv": {"k": "yield", "a": "TVC:BR10Y", "x": 0.50, "label": "Taux brésilien à 10 ans"},
-      "up": {"t": "Le risque Brésil remonte", "w": "Le taux brésilien à 10 ans casse à la hausse (budget, politique). Les actions brésiliennes et les banques suivent en général à la baisse."},
-      "down": {"t": "Le risque Brésil recule", "w": "Le taux brésilien à 10 ans casse à la baisse : le marché parie sur plus de discipline budgétaire. Banques et grandes valeurs brésiliennes en profitent."},
-      "short": [
-        {"tv": "AMEX:EWZ", "n": "EWZ (ETF Brésil)", "w": "indice Brésil en dollars"},
-        {"tv": "NYSE:ITUB", "n": "Itaú Unibanco", "w": "banque"},
-        {"tv": "NYSE:BBD", "n": "Bradesco", "w": "banque"},
-        {"tv": "NYSE:PBR", "n": "Petrobras", "w": "société contrôlée par l’État"},
-        {"tv": "NYSE:VALE", "n": "Vale", "w": "mines"}
-      ],
-      "long": [],
-      "poly": "brazil"
+     "tv": "EURONEXT:AMUN",
+     "n": "Amundi",
+     "w": "gestion d’actifs"
     },
     {
-      "id": "oil", "flag": "🛢️", "name": "Pétrole",
-      "drv": {"k": "price", "a": "ICEEUR:BRN1!", "x": 0.10, "label": "Baril de Brent"},
-      "up": {"t": "Le pétrole casse à la hausse", "w": "Le Brent monte de plus de 10 % en un mois sur un plus haut de 3 mois. Les producteurs encaissent ; les compagnies aériennes et les pays importateurs (Inde) paient la facture."},
-      "down": {"t": "Le pétrole décroche", "w": "Le Brent perd plus de 10 % en un mois sur un plus bas de 3 mois. Les compagnies aériennes et les pays importateurs respirent ; les producteurs perdent leur marge."},
-      "short": [
-        {"tv": "AMEX:JETS", "n": "JETS (compagnies aériennes)", "w": "kérosène plus cher"},
-        {"tv": "EURONEXT:AF", "n": "Air France-KLM", "w": "kérosène plus cher"},
-        {"tv": "XETR:LHA", "n": "Lufthansa", "w": "kérosène plus cher"},
-        {"tv": "LSE:IAG", "n": "IAG (British Airways, Iberia)", "w": "kérosène plus cher"},
-        {"tv": "CBOE:INDA", "n": "INDA (ETF Inde)", "w": "gros importateur de pétrole"}
-      ],
-      "long": [
-        {"tv": "AMEX:XLE", "n": "XLE (énergie US)", "w": "producteurs"},
-        {"tv": "NYSE:XOM", "n": "ExxonMobil", "w": "producteur"},
-        {"tv": "EURONEXT:TTE", "n": "TotalEnergies", "w": "producteur"},
-        {"tv": "AMEX:XOP", "n": "XOP (exploration-production)", "w": "producteurs les plus sensibles au prix"}
-      ],
-      "poly": "oil price"
+     "tv": "EURONEXT:DG",
+     "n": "Vinci",
+     "w": "concessions, risque politique"
+    },
+    {
+     "tv": "EURONEXT:FGR",
+     "n": "Eiffage",
+     "w": "concessions, BTP"
+    },
+    {
+     "tv": "EURONEXT:ICAD",
+     "n": "Icade",
+     "w": "foncière"
+    },
+    {
+     "tv": "EURONEXT:LI",
+     "n": "Klépierre",
+     "w": "foncière"
+    },
+    {
+     "tv": "EURONEXT:URW",
+     "n": "Unibail-Rodamco-Westfield",
+     "w": "foncière endettée"
+    },
+    {
+     "tv": "EURONEXT:ENGI",
+     "n": "Engie",
+     "w": "services publics, tarifs régulés"
+    },
+    {
+     "tv": "AMEX:EWQ",
+     "n": "EWQ (ETF France)",
+     "w": "indice France en dollars"
     }
-  ],
-  "polys": [
+   ],
+   "long": [],
+   "poly": "france election",
+   "fam": "souverain"
+  },
+  {
+   "id": "it",
+   "flag": "🇮🇹",
+   "name": "Italie",
+   "drv": {
+    "k": "spread",
+    "a": "TVC:IT10Y",
+    "b": "TVC:DE10Y",
+    "x": 0.1,
+    "label": "Écart BTP − Bund 10 ans"
+   },
+   "up": {
+    "t": "Contagion sur la dette italienne",
+    "w": "L’écart de taux Italie − Allemagne s’ouvre. Les banques italiennes détiennent beaucoup de dette d’État : elles baissent en premier quand le BTP est attaqué."
+   },
+   "down": {
+    "t": "Détente sur la dette italienne",
+    "w": "L’écart de taux Italie − Allemagne se referme : bon pour les banques et l’indice italien."
+   },
+   "short": [
     {
-      "id": "br-elec", "flag": "🗳️", "name": "Présidentielle au Brésil (second tour le 25 octobre)",
-      "slug": "brazil-presidential-election", "outcome": "Bolsonaro",
-      "t": "Flávio Bolsonaro favori au Brésil",
-      "w": "Le marché préfère le candidat de droite, jugé plus strict sur le budget. Quand ses chances montent sur Polymarket, les actions brésiliennes et le real suivent.",
-      "long": [
-        {"tv": "AMEX:EWZ", "n": "EWZ (ETF Brésil)", "w": "indice Brésil en dollars"},
-        {"tv": "NYSE:ITUB", "n": "Itaú Unibanco", "w": "banque"},
-        {"tv": "NYSE:BBD", "n": "Bradesco", "w": "banque"},
-        {"tv": "NYSE:PBR", "n": "Petrobras", "w": "société contrôlée par l’État"},
-        {"tv": "NYSE:VALE", "n": "Vale", "w": "mines"}
-      ],
-      "short": []
+     "tv": "MIL:UCG",
+     "n": "UniCredit",
+     "w": "banque"
+    },
+    {
+     "tv": "MIL:ISP",
+     "n": "Intesa Sanpaolo",
+     "w": "banque"
+    },
+    {
+     "tv": "MIL:BAMI",
+     "n": "Banco BPM",
+     "w": "banque domestique"
+    },
+    {
+     "tv": "MIL:G",
+     "n": "Generali",
+     "w": "assureur, gros porteur de BTP"
+    },
+    {
+     "tv": "MIL:ENEL",
+     "n": "Enel",
+     "w": "services publics endettés"
+    },
+    {
+     "tv": "AMEX:EWI",
+     "n": "EWI (ETF Italie)",
+     "w": "indice Italie en dollars"
     }
-  ],
-  "polytags": ["politics", "economy", "geopolitics"],
-  "polymap": [
-    {"re": "brazil|lula|bolsonaro", "tk": ["AMEX:EWZ", "NYSE:PBR", "NYSE:ITUB"]},
-    {"re": "france|french|macron|le pen|bardella|m[eé]lenchon", "tk": ["AMEX:EWQ", "EURONEXT:BNP", "EURONEXT:GLE"]},
-    {"re": "fed |fomc|federal reserve|rate cut|rate hike|interest rate", "tk": ["NASDAQ:TLT", "AMEX:KRE", "AMEX:XHB"]},
-    {"re": "recession|unemployment|gdp", "tk": ["AMEX:IWM", "NASDAQ:TLT", "AMEX:XLU"]},
-    {"re": "inflation|cpi", "tk": ["NASDAQ:TLT", "AMEX:GLD"]},
-    {"re": "iran|hormuz|opec|oil|crude", "tk": ["ICEEUR:BRN1!", "AMEX:XLE", "AMEX:JETS"]},
-    {"re": "israel|gaza|hezbollah|lebanon", "tk": ["ICEEUR:BRN1!", "AMEX:GLD"]},
-    {"re": "ukraine|russia|putin|ceasefire|zelensky", "tk": ["XETR:RHM", "AMEX:EWG", "EURONEXT:TTE"]},
-    {"re": "china|taiwan|xi jinping", "tk": ["AMEX:FXI", "NYSE:TSM", "NASDAQ:SMH"]},
-    {"re": "tariff|trade deal|trade war", "tk": ["AMEX:FXI", "AMEX:EWW", "AMEX:IWM"]},
-    {"re": "japan|boj|takaichi|yen", "tk": ["AMEX:EWJ", "NYSE:MUFG", "FX:USDJPY"]},
-    {"re": "uk |britain|starmer|farage|bank of england", "tk": ["AMEX:EWU", "FX:GBPUSD", "LSE:PSN"]},
-    {"re": "germany|german|merz|afd", "tk": ["AMEX:EWG", "XETR:RHM"]},
-    {"re": "italy|meloni", "tk": ["AMEX:EWI", "MIL:UCG"]},
-    {"re": "spain|sanchez|s[aá]nchez", "tk": ["AMEX:EWP", "BME:SAN"]},
-    {"re": "ecb|lagarde|euro ", "tk": ["FX:EURUSD", "MIL:UCG", "EURONEXT:BNP"]},
-    {"re": "argentina|milei", "tk": ["AMEX:ARGT", "NYSE:YPF", "NASDAQ:GGAL"]},
-    {"re": "mexico|sheinbaum", "tk": ["AMEX:EWW", "FX:USDMXN"]},
-    {"re": "venezuela|maduro", "tk": ["ICEEUR:BRN1!", "NYSE:CVX"]},
-    {"re": "colombia|petro", "tk": ["NYSE:EC", "AMEX:GXG"]},
-    {"re": "chile|kast", "tk": ["AMEX:ECH", "NYSE:SQM"]},
-    {"re": "turkey|erdogan", "tk": ["NASDAQ:TUR", "FX_IDC:USDTRY"]},
-    {"re": "korea", "tk": ["AMEX:EWY"]},
-    {"re": "india|modi", "tk": ["CBOE:INDA"]},
-    {"re": "gold", "tk": ["AMEX:GLD", "AMEX:GDX"]},
-    {"re": "nvidia|openai|artificial intelligence| ai ", "tk": ["NASDAQ:NVDA", "NASDAQ:SMH"]},
-    {"re": "shutdown|debt ceiling|trump|congress|senate|house", "tk": ["NASDAQ:TLT", "AMEX:IWM"]}
-  ]
+   ],
+   "long": [],
+   "poly": "italy",
+   "fam": "souverain"
+  },
+  {
+   "id": "es",
+   "flag": "🇪🇸",
+   "name": "Espagne",
+   "drv": {
+    "k": "spread",
+    "a": "TVC:ES10Y",
+    "b": "TVC:DE10Y",
+    "x": 0.1,
+    "label": "Écart Bono − Bund 10 ans"
+   },
+   "up": {
+    "t": "Stress sur la dette espagnole",
+    "w": "L’écart de taux Espagne − Allemagne s’ouvre (risque politique, budget). Les banques domestiques sont les plus exposées."
+   },
+   "down": {
+    "t": "Détente sur la dette espagnole",
+    "w": "L’écart de taux Espagne − Allemagne se referme : bon pour les banques domestiques."
+   },
+   "short": [
+    {
+     "tv": "BME:SAN",
+     "n": "Santander",
+     "w": "banque"
+    },
+    {
+     "tv": "BME:BBVA",
+     "n": "BBVA",
+     "w": "banque"
+    },
+    {
+     "tv": "BME:CABK",
+     "n": "CaixaBank",
+     "w": "banque domestique"
+    },
+    {
+     "tv": "BME:SAB",
+     "n": "Sabadell",
+     "w": "banque domestique"
+    },
+    {
+     "tv": "AMEX:EWP",
+     "n": "EWP (ETF Espagne)",
+     "w": "indice Espagne en dollars"
+    }
+   ],
+   "long": [],
+   "poly": "spain",
+   "fam": "souverain"
+  },
+  {
+   "id": "us",
+   "flag": "🇺🇸",
+   "name": "Taux américains",
+   "drv": {
+    "k": "yield",
+    "a": "TVC:US10Y",
+    "x": 0.25,
+    "label": "Taux américain à 10 ans"
+   },
+   "up": {
+    "t": "Les taux longs américains montent",
+    "w": "Le 10 ans américain casse à la hausse. Tout ce qui vit du crédit souffre : constructeurs de maisons, immobilier coté, banques régionales, petites capitalisations endettées, services publics."
+   },
+   "down": {
+    "t": "Les taux longs américains baissent",
+    "w": "Le 10 ans américain casse à la baisse : soulagement pour les secteurs sensibles au crédit."
+   },
+   "short": [
+    {
+     "tv": "AMEX:XHB",
+     "n": "XHB (constructeurs de maisons)",
+     "w": "crédit immobilier plus cher"
+    },
+    {
+     "tv": "AMEX:IYR",
+     "n": "IYR (immobilier coté)",
+     "w": "foncières"
+    },
+    {
+     "tv": "AMEX:KRE",
+     "n": "KRE (banques régionales)",
+     "w": "pertes sur obligations, immobilier commercial"
+    },
+    {
+     "tv": "AMEX:IWM",
+     "n": "IWM (petites capitalisations)",
+     "w": "dette à taux variable"
+    },
+    {
+     "tv": "AMEX:XLU",
+     "n": "XLU (services publics)",
+     "w": "concurrencés par les obligations"
+    }
+   ],
+   "long": [],
+   "poly": "fed rate",
+   "fam": "souverain"
+  },
+  {
+   "id": "uk",
+   "flag": "🇬🇧",
+   "name": "Royaume-Uni",
+   "drv": {
+    "k": "yield",
+    "a": "TVC:GB10Y",
+    "x": 0.25,
+    "label": "Taux britannique à 10 ans (gilt)"
+   },
+   "up": {
+    "t": "Les gilts décrochent",
+    "w": "Le taux britannique à 10 ans casse à la hausse. Les prêts immobiliers anglais se refixent vite : les constructeurs de maisons sont touchés en premier."
+   },
+   "down": {
+    "t": "Détente sur les gilts",
+    "w": "Le taux britannique à 10 ans casse à la baisse : bon pour les constructeurs de maisons et les foncières."
+   },
+   "short": [
+    {
+     "tv": "LSE:PSN",
+     "n": "Persimmon",
+     "w": "constructeur de maisons"
+    },
+    {
+     "tv": "LSE:TW.",
+     "n": "Taylor Wimpey",
+     "w": "constructeur de maisons"
+    },
+    {
+     "tv": "LSE:BTRW",
+     "n": "Barratt Redrow",
+     "w": "constructeur de maisons"
+    },
+    {
+     "tv": "LSE:LAND",
+     "n": "Land Securities",
+     "w": "foncière"
+    },
+    {
+     "tv": "AMEX:EWU",
+     "n": "EWU (ETF Royaume-Uni)",
+     "w": "indice britannique en dollars"
+    }
+   ],
+   "long": [],
+   "poly": "uk prime minister",
+   "fam": "souverain"
+  },
+  {
+   "id": "jp",
+   "flag": "🇯🇵",
+   "name": "Japon",
+   "drv": {
+    "k": "yield",
+    "a": "TVC:JP10Y",
+    "x": 0.15,
+    "label": "Taux japonais à 10 ans"
+   },
+   "up": {
+    "t": "Les taux japonais montent",
+    "w": "Le 10 ans japonais casse à la hausse. Les grandes banques japonaises gagnent enfin de l’argent sur leurs prêts après des années de taux zéro."
+   },
+   "down": {
+    "t": "Les taux japonais rebaissent",
+    "w": "Le 10 ans japonais casse à la baisse : moins de marge pour les banques japonaises."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:MUFG",
+     "n": "Mitsubishi UFJ",
+     "w": "banque japonaise"
+    },
+    {
+     "tv": "NYSE:SMFG",
+     "n": "Sumitomo Mitsui",
+     "w": "banque japonaise"
+    },
+    {
+     "tv": "NYSE:MFG",
+     "n": "Mizuho",
+     "w": "banque japonaise"
+    }
+   ],
+   "poly": "bank of japan",
+   "fam": "souverain"
+  },
+  {
+   "id": "br",
+   "flag": "🇧🇷",
+   "name": "Brésil",
+   "drv": {
+    "k": "yield",
+    "a": "TVC:BR10Y",
+    "x": 0.5,
+    "label": "Taux brésilien à 10 ans"
+   },
+   "up": {
+    "t": "Le risque Brésil remonte",
+    "w": "Le taux brésilien à 10 ans casse à la hausse (budget, politique). Les actions brésiliennes et les banques suivent en général à la baisse."
+   },
+   "down": {
+    "t": "Le risque Brésil recule",
+    "w": "Le taux brésilien à 10 ans casse à la baisse : le marché parie sur plus de discipline budgétaire. Banques et grandes valeurs brésiliennes en profitent."
+   },
+   "short": [
+    {
+     "tv": "AMEX:EWZ",
+     "n": "EWZ (ETF Brésil)",
+     "w": "indice Brésil en dollars"
+    },
+    {
+     "tv": "NYSE:ITUB",
+     "n": "Itaú Unibanco",
+     "w": "banque"
+    },
+    {
+     "tv": "NYSE:BBD",
+     "n": "Bradesco",
+     "w": "banque"
+    },
+    {
+     "tv": "NYSE:PBR",
+     "n": "Petrobras",
+     "w": "société contrôlée par l’État"
+    },
+    {
+     "tv": "NYSE:VALE",
+     "n": "Vale",
+     "w": "mines"
+    }
+   ],
+   "long": [],
+   "poly": "brazil",
+   "fam": "souverain"
+  },
+  {
+   "id": "oil",
+   "flag": "🛢️",
+   "name": "Pétrole",
+   "drv": {
+    "k": "price",
+    "a": "ICEEUR:BRN1!",
+    "x": 0.1,
+    "label": "Baril de Brent"
+   },
+   "up": {
+    "t": "Le pétrole casse à la hausse",
+    "w": "Le Brent monte de plus de 10 % en un mois sur un plus haut de 6 mois. Les producteurs encaissent ; les compagnies aériennes et les pays importateurs (Inde) paient la facture."
+   },
+   "down": {
+    "t": "Le pétrole décroche",
+    "w": "Le Brent perd plus de 10 % en un mois sur un plus bas de 6 mois. Les compagnies aériennes et les pays importateurs respirent ; les producteurs perdent leur marge."
+   },
+   "short": [
+    {
+     "tv": "AMEX:JETS",
+     "n": "JETS (compagnies aériennes)",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "EURONEXT:AF",
+     "n": "Air France-KLM",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "XETR:LHA",
+     "n": "Lufthansa",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "LSE:IAG",
+     "n": "IAG (British Airways, Iberia)",
+     "w": "kérosène plus cher"
+    },
+    {
+     "tv": "CBOE:INDA",
+     "n": "INDA (ETF Inde)",
+     "w": "gros importateur de pétrole"
+    }
+   ],
+   "long": [
+    {
+     "tv": "AMEX:XLE",
+     "n": "XLE (énergie US)",
+     "w": "producteurs"
+    },
+    {
+     "tv": "NYSE:XOM",
+     "n": "ExxonMobil",
+     "w": "producteur"
+    },
+    {
+     "tv": "EURONEXT:TTE",
+     "n": "TotalEnergies",
+     "w": "producteur"
+    },
+    {
+     "tv": "AMEX:XOP",
+     "n": "XOP (exploration-production)",
+     "w": "producteurs les plus sensibles au prix"
+    }
+   ],
+   "poly": "oil price",
+   "fam": "matieres"
+  },
+  {
+   "id": "cn-conso",
+   "fam": "eco",
+   "flag": "🇨🇳",
+   "name": "Consommation chinoise",
+   "drv": {
+    "k": "abs",
+    "a": "ECONOMICS:CNRSYY",
+    "x": 1.0,
+    "label": "Ventes au détail en Chine (sur un an)",
+    "unit": "%",
+    "dec": 1,
+    "pub": 17
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "La consommation chinoise repart",
+    "w": "Les ventes au détail en Chine accélèrent, au plus haut d’un an. Le luxe européen et les casinos de Macao vivent du client chinois : ils en profitent."
+   },
+   "down": {
+    "t": "La consommation chinoise cale",
+    "w": "Les ventes au détail en Chine ralentissent, au plus bas d’un an. Le client chinois achète moins : le luxe européen, les cosmétiques et les casinos de Macao sont en première ligne."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "EURONEXT:MC",
+     "n": "LVMH",
+     "w": "luxe, un quart des ventes en Asie"
+    },
+    {
+     "tv": "EURONEXT:KER",
+     "n": "Kering",
+     "w": "luxe, Gucci très exposé à la Chine"
+    },
+    {
+     "tv": "EURONEXT:RMS",
+     "n": "Hermès",
+     "w": "luxe"
+    },
+    {
+     "tv": "SIX:CFR",
+     "n": "Richemont",
+     "w": "joaillerie, montres"
+    },
+    {
+     "tv": "LSE:BRBY",
+     "n": "Burberry",
+     "w": "luxe très exposé à la Chine"
+    },
+    {
+     "tv": "SIX:UHR",
+     "n": "Swatch Group",
+     "w": "montres, très exposé à la Chine"
+    },
+    {
+     "tv": "MIL:MONC",
+     "n": "Moncler",
+     "w": "luxe"
+    },
+    {
+     "tv": "NYSE:EL",
+     "n": "Estée Lauder",
+     "w": "cosmétiques, duty free asiatique"
+    },
+    {
+     "tv": "NYSE:LVS",
+     "n": "Las Vegas Sands",
+     "w": "casinos de Macao"
+    },
+    {
+     "tv": "NASDAQ:WYNN",
+     "n": "Wynn Resorts",
+     "w": "casinos de Macao"
+    }
+   ],
+   "poly": "china",
+   "alert": false
+  },
+  {
+   "id": "cn-bourse",
+   "fam": "marche",
+   "flag": "🇨🇳",
+   "name": "Bourse chinoise",
+   "drv": {
+    "k": "price",
+    "a": "TVC:HSI",
+    "x": 0.08,
+    "label": "Indice Hang Seng (Hong Kong)"
+   },
+   "up": {
+    "t": "La Bourse chinoise casse à la hausse",
+    "w": "Le Hang Seng gagne plus de 8 % en un mois sur un plus haut de 6 mois : l’effet richesse revient chez les ménages chinois. Le luxe et Macao suivent en général."
+   },
+   "down": {
+    "t": "La Bourse chinoise décroche",
+    "w": "Le Hang Seng perd plus de 8 % en un mois sur un plus bas de 6 mois : les ménages chinois se sentent moins riches et coupent d’abord dans le luxe."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "EURONEXT:MC",
+     "n": "LVMH",
+     "w": "luxe, un quart des ventes en Asie"
+    },
+    {
+     "tv": "EURONEXT:KER",
+     "n": "Kering",
+     "w": "luxe, Gucci très exposé à la Chine"
+    },
+    {
+     "tv": "EURONEXT:RMS",
+     "n": "Hermès",
+     "w": "luxe"
+    },
+    {
+     "tv": "SIX:CFR",
+     "n": "Richemont",
+     "w": "joaillerie, montres"
+    },
+    {
+     "tv": "LSE:BRBY",
+     "n": "Burberry",
+     "w": "luxe très exposé à la Chine"
+    },
+    {
+     "tv": "SIX:UHR",
+     "n": "Swatch Group",
+     "w": "montres, très exposé à la Chine"
+    },
+    {
+     "tv": "MIL:MONC",
+     "n": "Moncler",
+     "w": "luxe"
+    },
+    {
+     "tv": "NYSE:EL",
+     "n": "Estée Lauder",
+     "w": "cosmétiques, duty free asiatique"
+    },
+    {
+     "tv": "NYSE:LVS",
+     "n": "Las Vegas Sands",
+     "w": "casinos de Macao"
+    },
+    {
+     "tv": "NASDAQ:WYNN",
+     "n": "Wynn Resorts",
+     "w": "casinos de Macao"
+    }
+   ],
+   "poly": "china"
+  },
+  {
+   "id": "cn-pmi",
+   "fam": "eco",
+   "flag": "🏭",
+   "name": "Industrie chinoise",
+   "drv": {
+    "k": "abs",
+    "a": "ECONOMICS:CNBCOI",
+    "x": 0.8,
+    "label": "Indice PMI manufacturier chinois",
+    "unit": "pt",
+    "dec": 1,
+    "pub": 2
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "L’industrie chinoise accélère",
+    "w": "Le PMI chinois est au plus haut d’un an. La Chine achète la moitié des métaux du monde : les groupes miniers en profitent."
+   },
+   "down": {
+    "t": "L’industrie chinoise ralentit",
+    "w": "Le PMI chinois est au plus bas d’un an : moins de demande de métaux, mauvais pour les groupes miniers."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "LSE:RIO",
+     "n": "Rio Tinto",
+     "w": "minerai de fer"
+    },
+    {
+     "tv": "NYSE:BHP",
+     "n": "BHP",
+     "w": "minerai de fer, cuivre"
+    },
+    {
+     "tv": "LSE:GLEN",
+     "n": "Glencore",
+     "w": "métaux, négoce"
+    },
+    {
+     "tv": "NYSE:VALE",
+     "n": "Vale",
+     "w": "minerai de fer"
+    },
+    {
+     "tv": "NYSE:FCX",
+     "n": "Freeport-McMoRan",
+     "w": "cuivre"
+    }
+   ],
+   "poly": "china",
+   "alert": false
+  },
+  {
+   "id": "us-ism",
+   "fam": "eco",
+   "flag": "🇺🇸",
+   "name": "Industrie américaine",
+   "drv": {
+    "k": "abs",
+    "a": "ECONOMICS:USBCOI",
+    "x": 2.0,
+    "label": "Indice ISM manufacturier (États-Unis)",
+    "unit": "pt",
+    "dec": 1,
+    "pub": 3
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "L’industrie américaine accélère",
+    "w": "L’ISM manufacturier est au plus haut d’un an : les commandes repartent. Bon pour les industrielles, le transport et les petites capitalisations."
+   },
+   "down": {
+    "t": "L’industrie américaine ralentit",
+    "w": "L’ISM manufacturier est au plus bas d’un an : les commandes reculent. Les industrielles et le transport sont les premiers touchés."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "AMEX:XLI",
+     "n": "XLI (industrielles US)",
+     "w": "secteur industriel"
+    },
+    {
+     "tv": "NYSE:CAT",
+     "n": "Caterpillar",
+     "w": "engins de chantier"
+    },
+    {
+     "tv": "NYSE:UNP",
+     "n": "Union Pacific",
+     "w": "fret ferroviaire"
+    },
+    {
+     "tv": "NYSE:FDX",
+     "n": "FedEx",
+     "w": "transport de colis"
+    },
+    {
+     "tv": "AMEX:IWM",
+     "n": "IWM (petites capitalisations)",
+     "w": "sensibles au cycle"
+    }
+   ],
+   "poly": "recession",
+   "alert": false
+  },
+  {
+   "id": "de-ifo",
+   "fam": "eco",
+   "flag": "🇩🇪",
+   "name": "Industrie allemande",
+   "drv": {
+    "k": "abs",
+    "a": "ECONOMICS:DEBCOI",
+    "x": 2.0,
+    "label": "Climat des affaires Ifo (Allemagne)",
+    "unit": "pt",
+    "dec": 1,
+    "pub": 2
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "Le moral des industriels allemands remonte",
+    "w": "L’indice Ifo est au plus haut d’un an. Bon pour les cycliques allemandes : industrie, chimie, automobile."
+   },
+   "down": {
+    "t": "Le moral des industriels allemands chute",
+    "w": "L’indice Ifo est au plus bas d’un an. Mauvais pour les cycliques allemandes : industrie, chimie, automobile."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "XETR:SIE",
+     "n": "Siemens",
+     "w": "industrie"
+    },
+    {
+     "tv": "XETR:BAS",
+     "n": "BASF",
+     "w": "chimie"
+    },
+    {
+     "tv": "XETR:VOW3",
+     "n": "Volkswagen",
+     "w": "automobile"
+    },
+    {
+     "tv": "XETR:BMW",
+     "n": "BMW",
+     "w": "automobile"
+    },
+    {
+     "tv": "XETR:MBG",
+     "n": "Mercedes-Benz",
+     "w": "automobile"
+    },
+    {
+     "tv": "AMEX:EWG",
+     "n": "EWG (ETF Allemagne)",
+     "w": "indice allemand en dollars"
+    }
+   ],
+   "poly": "germany",
+   "alert": false
+  },
+  {
+   "id": "kr-exp",
+   "fam": "eco",
+   "flag": "🇰🇷",
+   "name": "Exportations coréennes (puces)",
+   "drv": {
+    "k": "abs",
+    "a": "ECONOMICS:KREXPYY",
+    "x": 10,
+    "label": "Exportations de la Corée du Sud (sur un an)",
+    "unit": "%",
+    "dec": 1,
+    "pub": 2
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "Les exportations coréennes s’envolent",
+    "w": "La Corée publie ses exportations dès le 1er du mois : c’est le premier indicateur mondial sur la demande de puces mémoire. Un plus haut d’un an est bon pour les semi-conducteurs."
+   },
+   "down": {
+    "t": "Les exportations coréennes chutent",
+    "w": "Les exportations coréennes sont au plus bas d’un an : la demande de puces mémoire se retourne. Mauvais pour les semi-conducteurs."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NASDAQ:SMH",
+     "n": "SMH (semi-conducteurs)",
+     "w": "secteur des puces"
+    },
+    {
+     "tv": "NASDAQ:MU",
+     "n": "Micron",
+     "w": "mémoire"
+    },
+    {
+     "tv": "NYSE:TSM",
+     "n": "TSMC",
+     "w": "fondeur"
+    },
+    {
+     "tv": "NASDAQ:NVDA",
+     "n": "Nvidia",
+     "w": "puces IA"
+    },
+    {
+     "tv": "AMEX:EWY",
+     "n": "EWY (ETF Corée)",
+     "w": "Samsung et SK Hynix pèsent lourd"
+    }
+   ],
+   "poly": "nvidia",
+   "alert": false
+  },
+  {
+   "id": "us-logement",
+   "fam": "eco",
+   "flag": "🏠",
+   "name": "Logement américain",
+   "drv": {
+    "k": "price",
+    "a": "ECONOMICS:USHST",
+    "x": 0.08,
+    "label": "Mises en chantier aux États-Unis",
+    "unit": "k",
+    "pub": 20
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "La construction américaine repart",
+    "w": "Les mises en chantier sont au plus haut d’un an. Bon pour les constructeurs de maisons et les enseignes de bricolage."
+   },
+   "down": {
+    "t": "La construction américaine cale",
+    "w": "Les mises en chantier sont au plus bas d’un an. Mauvais pour les constructeurs de maisons et les enseignes de bricolage."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:DHI",
+     "n": "D.R. Horton",
+     "w": "constructeur de maisons"
+    },
+    {
+     "tv": "NYSE:LEN",
+     "n": "Lennar",
+     "w": "constructeur de maisons"
+    },
+    {
+     "tv": "NYSE:HD",
+     "n": "Home Depot",
+     "w": "bricolage"
+    },
+    {
+     "tv": "NYSE:LOW",
+     "n": "Lowe’s",
+     "w": "bricolage"
+    },
+    {
+     "tv": "AMEX:XHB",
+     "n": "XHB (constructeurs de maisons)",
+     "w": "secteur"
+    }
+   ],
+   "poly": "housing",
+   "alert": false
+  },
+  {
+   "id": "us-conso",
+   "fam": "eco",
+   "flag": "🛍️",
+   "name": "Moral du consommateur américain",
+   "drv": {
+    "k": "abs",
+    "a": "ECONOMICS:USCCI",
+    "x": 5.0,
+    "label": "Confiance du consommateur américain",
+    "unit": "pt",
+    "dec": 1,
+    "pub": 2
+   },
+   "rule": {
+    "LB": 12,
+    "CH": 3,
+    "CD": 2
+   },
+   "up": {
+    "t": "Le consommateur américain reprend confiance",
+    "w": "La confiance du consommateur est au plus haut d’un an. Bon pour la distribution, les loisirs et les voyages."
+   },
+   "down": {
+    "t": "Le consommateur américain perd confiance",
+    "w": "La confiance du consommateur est au plus bas d’un an : les achats non indispensables sont coupés en premier (habillement, loisirs, voyages)."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "AMEX:XLY",
+     "n": "XLY (consommation cyclique)",
+     "w": "secteur"
+    },
+    {
+     "tv": "AMEX:XRT",
+     "n": "XRT (distribution)",
+     "w": "magasins"
+    },
+    {
+     "tv": "NYSE:NKE",
+     "n": "Nike",
+     "w": "habillement"
+    },
+    {
+     "tv": "NYSE:CCL",
+     "n": "Carnival",
+     "w": "croisières"
+    },
+    {
+     "tv": "NYSE:DAL",
+     "n": "Delta Air Lines",
+     "w": "voyages"
+    }
+   ],
+   "poly": "recession",
+   "alert": false
+  },
+  {
+   "id": "cuivre",
+   "fam": "matieres",
+   "flag": "🟠",
+   "name": "Cuivre",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:HG1!",
+    "x": 0.1,
+    "label": "Cuivre (contrat à terme)"
+   },
+   "up": {
+    "t": "Le cuivre casse à la hausse",
+    "w": "Le cuivre gagne plus de 10 % en un mois. Chaque dollar de hausse tombe presque entièrement dans la marge des producteurs."
+   },
+   "down": {
+    "t": "Le cuivre décroche",
+    "w": "Le cuivre perd plus de 10 % en un mois : les marges des producteurs fondent."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:FCX",
+     "n": "Freeport-McMoRan",
+     "w": "producteur de cuivre"
+    },
+    {
+     "tv": "NYSE:SCCO",
+     "n": "Southern Copper",
+     "w": "producteur de cuivre"
+    },
+    {
+     "tv": "LSE:ANTO",
+     "n": "Antofagasta",
+     "w": "producteur de cuivre"
+    },
+    {
+     "tv": "AMEX:COPX",
+     "n": "COPX (mines de cuivre)",
+     "w": "secteur"
+    },
+    {
+     "tv": "LSE:GLEN",
+     "n": "Glencore",
+     "w": "cuivre, négoce"
+    }
+   ],
+   "poly": "copper"
+  },
+  {
+   "id": "fer",
+   "fam": "matieres",
+   "flag": "⛏️",
+   "name": "Minerai de fer",
+   "drv": {
+    "k": "price",
+    "a": "SGX:FEF1!",
+    "x": 0.1,
+    "label": "Minerai de fer (Singapour)"
+   },
+   "up": {
+    "t": "Le minerai de fer casse à la hausse",
+    "w": "Le minerai de fer gagne plus de 10 % en un mois : la sidérurgie chinoise achète. Bon pour les grands mineurs."
+   },
+   "down": {
+    "t": "Le minerai de fer décroche",
+    "w": "Le minerai de fer perd plus de 10 % en un mois : la construction chinoise ralentit. Mauvais pour les grands mineurs."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "LSE:RIO",
+     "n": "Rio Tinto",
+     "w": "minerai de fer"
+    },
+    {
+     "tv": "NYSE:BHP",
+     "n": "BHP",
+     "w": "minerai de fer"
+    },
+    {
+     "tv": "NYSE:VALE",
+     "n": "Vale",
+     "w": "minerai de fer"
+    }
+   ],
+   "poly": "china"
+  },
+  {
+   "id": "or",
+   "fam": "matieres",
+   "flag": "🥇",
+   "name": "Or",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:GC1!",
+    "x": 0.08,
+    "label": "Or (contrat à terme)"
+   },
+   "up": {
+    "t": "L’or casse à la hausse",
+    "w": "L’or gagne plus de 8 % en un mois. Les mines d’or ont des coûts fixes : leur bénéfice monte bien plus vite que le métal."
+   },
+   "down": {
+    "t": "L’or décroche",
+    "w": "L’or perd plus de 8 % en un mois : le bénéfice des mines d’or baisse bien plus vite que le métal."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "AMEX:GDX",
+     "n": "GDX (mines d’or)",
+     "w": "secteur"
+    },
+    {
+     "tv": "NYSE:NEM",
+     "n": "Newmont",
+     "w": "mine d’or"
+    },
+    {
+     "tv": "NYSE:B",
+     "n": "Barrick",
+     "w": "mine d’or"
+    },
+    {
+     "tv": "NYSE:AEM",
+     "n": "Agnico Eagle",
+     "w": "mine d’or"
+    },
+    {
+     "tv": "NYSE:PAAS",
+     "n": "Pan American Silver",
+     "w": "argent et or"
+    }
+   ],
+   "poly": "gold"
+  },
+  {
+   "id": "gaz-us",
+   "fam": "matieres",
+   "flag": "🔥",
+   "name": "Gaz naturel américain",
+   "drv": {
+    "k": "price",
+    "a": "NYMEX:NG1!",
+    "x": 0.2,
+    "label": "Gaz naturel (Henry Hub)"
+   },
+   "up": {
+    "t": "Le gaz américain s’envole",
+    "w": "Le gaz naturel gagne plus de 20 % en un mois. Les producteurs de gaz encaissent directement."
+   },
+   "down": {
+    "t": "Le gaz américain s’effondre",
+    "w": "Le gaz naturel perd plus de 20 % en un mois : les producteurs de gaz voient leur marge disparaître."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:EQT",
+     "n": "EQT",
+     "w": "premier producteur de gaz US"
+    },
+    {
+     "tv": "NASDAQ:EXE",
+     "n": "Expand Energy",
+     "w": "producteur de gaz"
+    },
+    {
+     "tv": "NYSE:AR",
+     "n": "Antero Resources",
+     "w": "producteur de gaz"
+    }
+   ],
+   "poly": "natural gas"
+  },
+  {
+   "id": "gaz-eu",
+   "fam": "matieres",
+   "flag": "🇪🇺",
+   "name": "Gaz européen",
+   "drv": {
+    "k": "price",
+    "a": "ICEENDEX:TFM1!",
+    "x": 0.2,
+    "label": "Gaz européen (TTF)"
+   },
+   "up": {
+    "t": "Le gaz européen s’envole",
+    "w": "Le gaz TTF gagne plus de 20 % en un mois. La chimie et les engrais européens brûlent du gaz : leurs coûts explosent. Le norvégien Equinor, lui, le vend."
+   },
+   "down": {
+    "t": "Le gaz européen retombe",
+    "w": "Le gaz TTF perd plus de 20 % en un mois : soulagement pour la chimie et les engrais européens."
+   },
+   "short": [
+    {
+     "tv": "XETR:BAS",
+     "n": "BASF",
+     "w": "chimie, gros consommateur de gaz"
+    },
+    {
+     "tv": "XETR:EVK",
+     "n": "Evonik",
+     "w": "chimie"
+    },
+    {
+     "tv": "OSL:YAR",
+     "n": "Yara",
+     "w": "engrais, fabriqués avec du gaz"
+    }
+   ],
+   "long": [
+    {
+     "tv": "OSL:EQNR",
+     "n": "Equinor",
+     "w": "premier fournisseur de gaz de l’Europe"
+    }
+   ],
+   "poly": "russia gas"
+  },
+  {
+   "id": "cereales",
+   "fam": "matieres",
+   "flag": "🌽",
+   "name": "Céréales",
+   "drv": {
+    "k": "price",
+    "a": "CBOT:ZC1!",
+    "x": 0.1,
+    "label": "Maïs (Chicago)"
+   },
+   "up": {
+    "t": "Les céréales cassent à la hausse",
+    "w": "Le maïs gagne plus de 10 % en un mois. Les agriculteurs gagnent plus et achètent machines et engrais ; les éleveurs paient l’aliment plus cher."
+   },
+   "down": {
+    "t": "Les céréales décrochent",
+    "w": "Le maïs perd plus de 10 % en un mois : les agriculteurs coupent leurs achats de machines et d’engrais ; les éleveurs respirent."
+   },
+   "short": [
+    {
+     "tv": "NYSE:TSN",
+     "n": "Tyson Foods",
+     "w": "volaille, l’aliment est son premier coût"
+    }
+   ],
+   "long": [
+    {
+     "tv": "NYSE:DE",
+     "n": "Deere",
+     "w": "machines agricoles"
+    },
+    {
+     "tv": "NYSE:NTR",
+     "n": "Nutrien",
+     "w": "engrais"
+    },
+    {
+     "tv": "NYSE:MOS",
+     "n": "Mosaic",
+     "w": "engrais"
+    },
+    {
+     "tv": "NYSE:CF",
+     "n": "CF Industries",
+     "w": "engrais"
+    },
+    {
+     "tv": "NYSE:ADM",
+     "n": "Archer-Daniels-Midland",
+     "w": "négoce de grains"
+    }
+   ],
+   "poly": "corn wheat"
+  },
+  {
+   "id": "cacao",
+   "fam": "matieres",
+   "flag": "🍫",
+   "name": "Cacao",
+   "drv": {
+    "k": "price",
+    "a": "ICEUS:CC1!",
+    "x": 0.15,
+    "label": "Cacao (New York)"
+   },
+   "up": {
+    "t": "Le cacao s’envole",
+    "w": "Le cacao gagne plus de 15 % en un mois. Les chocolatiers ne peuvent pas répercuter tout de suite : leur marge se fait écraser."
+   },
+   "down": {
+    "t": "Le cacao retombe",
+    "w": "Le cacao perd plus de 15 % en un mois : la marge des chocolatiers se regonfle."
+   },
+   "short": [
+    {
+     "tv": "NYSE:HSY",
+     "n": "Hershey",
+     "w": "chocolatier"
+    },
+    {
+     "tv": "NASDAQ:MDLZ",
+     "n": "Mondelez",
+     "w": "chocolat, biscuits"
+    },
+    {
+     "tv": "SIX:LISP",
+     "n": "Lindt & Sprüngli",
+     "w": "chocolatier"
+    },
+    {
+     "tv": "SIX:BARN",
+     "n": "Barry Callebaut",
+     "w": "transformateur de cacao"
+    }
+   ],
+   "long": [],
+   "poly": "cocoa"
+  },
+  {
+   "id": "cafe",
+   "fam": "matieres",
+   "flag": "☕",
+   "name": "Café",
+   "drv": {
+    "k": "price",
+    "a": "ICEUS:KC1!",
+    "x": 0.15,
+    "label": "Café arabica (New York)"
+   },
+   "up": {
+    "t": "Le café s’envole",
+    "w": "Le café gagne plus de 15 % en un mois : la matière première des chaînes de café et des torréfacteurs coûte plus cher."
+   },
+   "down": {
+    "t": "Le café retombe",
+    "w": "Le café perd plus de 15 % en un mois : bon pour la marge des chaînes de café et des torréfacteurs."
+   },
+   "short": [
+    {
+     "tv": "NASDAQ:SBUX",
+     "n": "Starbucks",
+     "w": "chaîne de cafés"
+    },
+    {
+     "tv": "NYSE:SJM",
+     "n": "J.M. Smucker",
+     "w": "torréfacteur (Folgers)"
+    }
+   ],
+   "long": [],
+   "poly": "coffee"
+  },
+  {
+   "id": "uranium",
+   "fam": "matieres",
+   "flag": "☢️",
+   "name": "Uranium",
+   "drv": {
+    "k": "price",
+    "a": "COMEX:UX1!",
+    "x": 0.1,
+    "label": "Uranium (contrat à terme)"
+   },
+   "up": {
+    "t": "L’uranium casse à la hausse",
+    "w": "L’uranium gagne plus de 10 % en un mois. Les producteurs vendent une partie de leur production au prix du marché : leur bénéfice suit."
+   },
+   "down": {
+    "t": "L’uranium décroche",
+    "w": "L’uranium perd plus de 10 % en un mois : mauvais pour les producteurs."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:CCJ",
+     "n": "Cameco",
+     "w": "producteur d’uranium"
+    },
+    {
+     "tv": "AMEX:URA",
+     "n": "URA (mines d’uranium)",
+     "w": "secteur"
+    },
+    {
+     "tv": "AMEX:UEC",
+     "n": "Uranium Energy",
+     "w": "producteur d’uranium"
+    }
+   ],
+   "poly": "nuclear"
+  },
+  {
+   "id": "btc",
+   "fam": "marche",
+   "flag": "₿",
+   "name": "Bitcoin",
+   "drv": {
+    "k": "price",
+    "a": "BITSTAMP:BTCUSD",
+    "x": 0.15,
+    "label": "Bitcoin"
+   },
+   "up": {
+    "t": "Le bitcoin casse à la hausse",
+    "w": "Le bitcoin gagne plus de 15 % en un mois sur un plus haut de 6 mois. Les actions liées (plateformes, mineurs, trésoreries en bitcoin) amplifient le mouvement, parfois avec retard."
+   },
+   "down": {
+    "t": "Le bitcoin décroche",
+    "w": "Le bitcoin perd plus de 15 % en un mois sur un plus bas de 6 mois. Les actions liées amplifient la baisse, parfois avec retard."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NASDAQ:COIN",
+     "n": "Coinbase",
+     "w": "plateforme d’échange"
+    },
+    {
+     "tv": "NASDAQ:MSTR",
+     "n": "Strategy",
+     "w": "trésorerie en bitcoin"
+    },
+    {
+     "tv": "NASDAQ:MARA",
+     "n": "MARA Holdings",
+     "w": "mineur de bitcoin"
+    },
+    {
+     "tv": "NASDAQ:HOOD",
+     "n": "Robinhood",
+     "w": "courtier, gros volumes crypto"
+    }
+   ],
+   "poly": "bitcoin"
+  },
+  {
+   "id": "yen",
+   "fam": "marche",
+   "flag": "💴",
+   "name": "Yen",
+   "drv": {
+    "k": "price",
+    "a": "FX:USDJPY",
+    "x": 0.04,
+    "label": "Dollar contre yen"
+   },
+   "up": {
+    "t": "Le yen décroche",
+    "w": "Le dollar gagne plus de 4 % face au yen en un mois. Les exportateurs japonais vendent en dollars et comptent en yens : leurs bénéfices gonflent."
+   },
+   "down": {
+    "t": "Le yen remonte fort",
+    "w": "Le dollar perd plus de 4 % face au yen en un mois : les bénéfices des exportateurs japonais fondent une fois convertis."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "NYSE:TM",
+     "n": "Toyota",
+     "w": "exportateur"
+    },
+    {
+     "tv": "NYSE:SONY",
+     "n": "Sony",
+     "w": "exportateur"
+    },
+    {
+     "tv": "NYSE:HMC",
+     "n": "Honda",
+     "w": "exportateur"
+    },
+    {
+     "tv": "AMEX:DXJ",
+     "n": "DXJ (Japon couvert du yen)",
+     "w": "actions japonaises sans le risque yen"
+    }
+   ],
+   "poly": "bank of japan"
+  },
+  {
+   "id": "dollar",
+   "fam": "marche",
+   "flag": "💵",
+   "name": "Dollar",
+   "drv": {
+    "k": "price",
+    "a": "TVC:DXY",
+    "x": 0.03,
+    "label": "Indice dollar (DXY)"
+   },
+   "up": {
+    "t": "Le dollar casse à la hausse",
+    "w": "L’indice dollar gagne plus de 3 % en un mois. Les pays émergents endettés en dollars et leurs Bourses souffrent."
+   },
+   "down": {
+    "t": "Le dollar décroche",
+    "w": "L’indice dollar perd plus de 3 % en un mois : bouffée d’air pour les Bourses émergentes."
+   },
+   "short": [
+    {
+     "tv": "AMEX:EEM",
+     "n": "EEM (pays émergents)",
+     "w": "Bourses émergentes"
+    },
+    {
+     "tv": "AMEX:EWY",
+     "n": "EWY (ETF Corée)",
+     "w": "Bourse émergente"
+    },
+    {
+     "tv": "AMEX:EWT",
+     "n": "EWT (ETF Taïwan)",
+     "w": "Bourse émergente"
+    },
+    {
+     "tv": "AMEX:FXI",
+     "n": "FXI (grandes valeurs chinoises)",
+     "w": "Bourse émergente"
+    },
+    {
+     "tv": "CBOE:INDA",
+     "n": "INDA (ETF Inde)",
+     "w": "Bourse émergente"
+    }
+   ],
+   "long": [],
+   "poly": "fed rate"
+  },
+  {
+   "id": "courbe",
+   "fam": "marche",
+   "flag": "🏦",
+   "name": "Courbe des taux américaine",
+   "drv": {
+    "k": "spread",
+    "a": "TVC:US10Y",
+    "b": "TVC:US02Y",
+    "x": 0.2,
+    "label": "Écart 10 ans − 2 ans américain"
+   },
+   "up": {
+    "t": "La courbe des taux se pentifie",
+    "w": "L’écart entre le 10 ans et le 2 ans américain s’ouvre. Les banques empruntent court et prêtent long : leur marge s’élargit."
+   },
+   "down": {
+    "t": "La courbe des taux s’aplatit",
+    "w": "L’écart entre le 10 ans et le 2 ans américain se referme : la marge des banques se réduit."
+   },
+   "short": [],
+   "long": [
+    {
+     "tv": "AMEX:KBE",
+     "n": "KBE (banques US)",
+     "w": "secteur"
+    },
+    {
+     "tv": "NYSE:JPM",
+     "n": "JPMorgan",
+     "w": "banque"
+    },
+    {
+     "tv": "NYSE:BAC",
+     "n": "Bank of America",
+     "w": "banque la plus sensible aux taux"
+    },
+    {
+     "tv": "NYSE:WFC",
+     "n": "Wells Fargo",
+     "w": "banque"
+    }
+   ],
+   "poly": "fed rate"
+  }
+ ],
+ "polys": [
+  {
+   "id": "br-elec",
+   "flag": "🗳️",
+   "name": "Présidentielle au Brésil (second tour le 25 octobre)",
+   "slug": "brazil-presidential-election",
+   "outcome": "Bolsonaro",
+   "t": "Flávio Bolsonaro favori au Brésil",
+   "w": "Le marché préfère le candidat de droite, jugé plus strict sur le budget. Quand ses chances montent sur Polymarket, les actions brésiliennes et le real suivent.",
+   "long": [
+    {
+     "tv": "AMEX:EWZ",
+     "n": "EWZ (ETF Brésil)",
+     "w": "indice Brésil en dollars"
+    },
+    {
+     "tv": "NYSE:ITUB",
+     "n": "Itaú Unibanco",
+     "w": "banque"
+    },
+    {
+     "tv": "NYSE:BBD",
+     "n": "Bradesco",
+     "w": "banque"
+    },
+    {
+     "tv": "NYSE:PBR",
+     "n": "Petrobras",
+     "w": "société contrôlée par l’État"
+    },
+    {
+     "tv": "NYSE:VALE",
+     "n": "Vale",
+     "w": "mines"
+    }
+   ],
+   "short": []
+  }
+ ],
+ "polytags": [
+  "politics",
+  "economy",
+  "geopolitics"
+ ],
+ "polymap": [
+  {
+   "re": "brazil|lula|bolsonaro",
+   "tk": [
+    "AMEX:EWZ",
+    "NYSE:PBR",
+    "NYSE:ITUB"
+   ]
+  },
+  {
+   "re": "france|french|macron|le pen|bardella|m[eé]lenchon",
+   "tk": [
+    "AMEX:EWQ",
+    "EURONEXT:BNP",
+    "EURONEXT:GLE"
+   ]
+  },
+  {
+   "re": "fed |fomc|federal reserve|rate cut|rate hike|interest rate",
+   "tk": [
+    "NASDAQ:TLT",
+    "AMEX:KRE",
+    "AMEX:XHB"
+   ]
+  },
+  {
+   "re": "recession|unemployment|gdp",
+   "tk": [
+    "AMEX:IWM",
+    "NASDAQ:TLT",
+    "AMEX:XLU"
+   ]
+  },
+  {
+   "re": "inflation|cpi",
+   "tk": [
+    "NASDAQ:TLT",
+    "AMEX:GLD"
+   ]
+  },
+  {
+   "re": "iran|hormuz|opec|oil|crude",
+   "tk": [
+    "ICEEUR:BRN1!",
+    "AMEX:XLE",
+    "AMEX:JETS"
+   ]
+  },
+  {
+   "re": "israel|gaza|hezbollah|lebanon",
+   "tk": [
+    "ICEEUR:BRN1!",
+    "AMEX:GLD"
+   ]
+  },
+  {
+   "re": "ukraine|russia|putin|ceasefire|zelensky",
+   "tk": [
+    "XETR:RHM",
+    "AMEX:EWG",
+    "EURONEXT:TTE"
+   ]
+  },
+  {
+   "re": "china|taiwan|xi jinping",
+   "tk": [
+    "AMEX:FXI",
+    "NYSE:TSM",
+    "NASDAQ:SMH"
+   ]
+  },
+  {
+   "re": "tariff|trade deal|trade war",
+   "tk": [
+    "AMEX:FXI",
+    "AMEX:EWW",
+    "AMEX:IWM"
+   ]
+  },
+  {
+   "re": "japan|boj|takaichi|yen",
+   "tk": [
+    "AMEX:EWJ",
+    "NYSE:MUFG",
+    "FX:USDJPY"
+   ]
+  },
+  {
+   "re": "uk |britain|starmer|farage|bank of england",
+   "tk": [
+    "AMEX:EWU",
+    "FX:GBPUSD",
+    "LSE:PSN"
+   ]
+  },
+  {
+   "re": "germany|german|merz|afd",
+   "tk": [
+    "AMEX:EWG",
+    "XETR:RHM"
+   ]
+  },
+  {
+   "re": "italy|meloni",
+   "tk": [
+    "AMEX:EWI",
+    "MIL:UCG"
+   ]
+  },
+  {
+   "re": "spain|sanchez|s[aá]nchez",
+   "tk": [
+    "AMEX:EWP",
+    "BME:SAN"
+   ]
+  },
+  {
+   "re": "ecb|lagarde|euro ",
+   "tk": [
+    "FX:EURUSD",
+    "MIL:UCG",
+    "EURONEXT:BNP"
+   ]
+  },
+  {
+   "re": "argentina|milei",
+   "tk": [
+    "AMEX:ARGT",
+    "NYSE:YPF",
+    "NASDAQ:GGAL"
+   ]
+  },
+  {
+   "re": "mexico|sheinbaum",
+   "tk": [
+    "AMEX:EWW",
+    "FX:USDMXN"
+   ]
+  },
+  {
+   "re": "venezuela|maduro",
+   "tk": [
+    "ICEEUR:BRN1!",
+    "NYSE:CVX"
+   ]
+  },
+  {
+   "re": "colombia|petro",
+   "tk": [
+    "NYSE:EC",
+    "AMEX:GXG"
+   ]
+  },
+  {
+   "re": "chile|kast",
+   "tk": [
+    "AMEX:ECH",
+    "NYSE:SQM"
+   ]
+  },
+  {
+   "re": "turkey|erdogan",
+   "tk": [
+    "NASDAQ:TUR",
+    "FX_IDC:USDTRY"
+   ]
+  },
+  {
+   "re": "korea",
+   "tk": [
+    "AMEX:EWY"
+   ]
+  },
+  {
+   "re": "india|modi",
+   "tk": [
+    "CBOE:INDA"
+   ]
+  },
+  {
+   "re": "gold",
+   "tk": [
+    "AMEX:GLD",
+    "AMEX:GDX"
+   ]
+  },
+  {
+   "re": "nvidia|openai|artificial intelligence| ai ",
+   "tk": [
+    "NASDAQ:NVDA",
+    "NASDAQ:SMH"
+   ]
+  },
+  {
+   "re": "shutdown|debt ceiling|trump|congress|senate|house",
+   "tk": [
+    "NASDAQ:TLT",
+    "AMEX:IWM"
+   ]
+  }
+ ],
+ "fams": {
+  "souverain": "Taux et dette d’État",
+  "matieres": "Matières premières",
+  "marche": "Devises, Bourse, bitcoin",
+  "eco": "Données économiques mensuelles"
+ }
 }

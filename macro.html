@@ -72,7 +72,7 @@
 
 <div class="card" id="tgPanel">
   <h2>✈️ Alertes sur ton bot Telegram</h2>
-  <div class="hint">Le jeton reste dans ce navigateur (il n’est jamais envoyé ailleurs que chez Telegram). Garde cet onglet ouvert : c’est lui qui envoie les idées.</div>
+  <div class="hint">Le plus simple est le robot GitHub, qui envoie les idées tout seul sans onglet ouvert. Sinon, ici : le jeton reste dans ce navigateur, et cet onglet doit rester ouvert.</div>
   <ol>
     <li>Colle le jeton de ton bot (celui que <b>@BotFather</b> t’a donné).</li>
     <li>Envoie un message quelconque à ton bot dans Telegram, puis clique « Trouver mon chat ».</li>
@@ -83,9 +83,9 @@
 </div>
 
 <section class="sec">
-  <div class="sech"><h2>💡 Nouvelles idées (7 derniers jours)</h2><span class="hint">Peu d’idées, c’est voulu : une idée sort seulement quand un indicateur macro casse un plus haut ou plus bas de 3 mois, et seulement sur les titres liés qui n’ont pas encore réagi.</span></div>
+  <div class="sech"><h2>💡 Nouvelles idées (10 derniers jours)</h2><span class="hint">Peu d’idées, c’est voulu : une idée sort seulement quand un indicateur casse un plus haut ou plus bas de 6 mois, et seulement sur le titre lié le plus en retard. Horizon : environ 3 mois.</span></div>
   <div class="grid" id="ideas"></div>
-  <div class="hint" style="margin:12px 0 6px">Idées plus anciennes encore ouvertes (sortie prévue 20 séances après l’entrée) :</div>
+  <div class="hint" style="margin:12px 0 6px">Idées plus anciennes encore ouvertes (sortie prévue 60 séances après l’entrée) :</div>
   <div class="tw"><table>
     <thead><tr><th>Signal</th><th>Thème</th><th>Titre</th><th>Sens</th><th class="r">Entrée</th><th class="r">Depuis</th><th class="r">Reste</th></tr></thead>
     <tbody id="oldTab"></tbody>
@@ -93,7 +93,7 @@
 </section>
 
 <section class="sec">
-  <div class="sech"><h2>🧭 Tableau macro</h2><span class="hint">Chaque thème suit un indicateur. « Signal » = il vient de casser. Les titres en jaune sont les retardataires (ceux que le système propose) ; les autres ont déjà bougé.</span></div>
+  <div class="sech"><h2>🧭 Tableau macro</h2><span class="hint">Chaque thème suit un indicateur. « Signal » = il vient de casser. Les titres en jaune sont les retardataires (ceux que le système propose) ; les autres ont déjà bougé. Les thèmes « contexte » ne déclenchent pas d’alerte.</span></div>
   <div class="grid" id="themes"></div>
 </section>
 
@@ -107,8 +107,12 @@
 </section>
 
 <section class="sec">
-  <div class="sech"><h2>🧪 Backtest</h2><span class="hint">Recalculé ici à chaque chargement, avec les mêmes règles que les alertes. Entrée à l’ouverture du lendemain du signal, sortie 20 séances plus tard, sans stop, frais non comptés.</span></div>
+  <div class="sech"><h2>🧪 Backtest</h2><span class="hint">Recalculé ici à chaque chargement, avec les mêmes règles que les alertes. Entrée à l’ouverture du lendemain du signal, sortie 60 séances plus tard (environ 3 mois), sans stop, frais non comptés.</span></div>
   <div class="grid3" id="btCards"></div>
+  <div class="grid" style="margin-top:12px">
+    <div class="tw"><table style="min-width:0"><thead><tr><th>Année</th><th class="r">Idées</th><th class="r">Gagnantes</th><th class="r">Gain moyen</th><th class="r">Contre le hasard</th></tr></thead><tbody id="btYears"></tbody></table></div>
+    <div class="tw"><table style="min-width:0"><thead><tr><th>Famille de thèmes</th><th class="r">Idées</th><th class="r">Gagnantes</th><th class="r">Gain moyen</th><th class="r">Contre le hasard</th></tr></thead><tbody id="btFams"></tbody></table></div>
+  </div>
   <div class="hint" style="margin:12px 0 6px">Toutes les idées des 3 derniers mois, dans l’ordre :</div>
   <div class="tw"><table>
     <thead><tr><th>Signal</th><th>Thème</th><th>Titre</th><th>Sens</th><th class="r">Entrée</th><th class="r">Résultat</th><th class="r">Pire moment</th><th>État</th></tr></thead>
@@ -120,251 +124,108 @@
   <div class="sech"><h2>📖 Comment lire cette page</h2></div>
   <div class="card">
     <ol>
-      <li><b>Le déclencheur.</b> Un indicateur macro (écart de taux France − Allemagne, taux à 10 ans, baril de Brent) fait un plus haut ou un plus bas de 60 séances, avec un mouvement d’au moins le seuil du thème sur 20 séances.</li>
-      <li><b>Le tri.</b> Parmi les titres liés au thème, le système garde ceux qui n’ont <b>pas encore réagi</b> : encore du mauvais côté de leur moyenne 50 séances, et moins de 3 % de mouvement dans le sens de l’idée sur 20 séances. Il en garde 2 au maximum par signal.</li>
+      <li><b>Le déclencheur.</b> Un indicateur (écart de taux France − Allemagne, taux à 10 ans, pétrole, cuivre, cacao, dollar, bitcoin…) fait un plus haut ou un plus bas de 6 mois (120 séances), avec un mouvement d’au moins le seuil du thème sur 20 séances.</li>
+      <li><b>Le tri.</b> Parmi les titres liés au thème, le système garde ceux qui n’ont <b>pas encore réagi</b> : encore du mauvais côté de leur moyenne 50 séances, et moins de 3 % de mouvement dans le sens de l’idée sur 20 séances. Il n’en garde qu’un par signal : le plus en retard.</li>
       <li><b>Pourquoi pas les titres déjà partis ?</b> Le backtest montre que vendre ce qui a déjà chuté (ou acheter ce qui a déjà monté) ne rapporte rien de plus que le hasard. Ce sont les retardataires qui rattrapent.</li>
-      <li><b>Le plan testé.</b> Entrée à l’ouverture suivante, sortie après 20 séances. L’idée ne tient plus si l’indicateur revient à son niveau d’il y a 20 séances.</li>
+      <li><b>Les thèmes « contexte ».</b> Les données économiques mensuelles (ventes au détail en Chine, ISM, Ifo…) sont affichées pour information, mais n’envoient pas d’alerte : sur 5 ans, leurs signaux sont trop irréguliers (deux années sur cinq perdantes).</li>
+      <li><b>Le plan testé.</b> Entrée à l’ouverture suivante, sortie après 60 séances, soit environ 3 mois. L’idée ne tient plus si l’indicateur revient à son niveau d’il y a 20 séances.</li>
     </ol>
     <p class="mut">Ce sont des idées à étudier, pas des conseils d’investissement. Les données viennent de TradingView (en différé de 15 minutes pour les actions) et de Polymarket.</p>
   </div>
 </section>
 
+<script src="macro_engine.js?v=3"></script>
 <script>
 const $ = id => document.getElementById(id);
 const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-const nf = (v, d = 1) => v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
-const sg = (v, d = 1) => (v > 0 ? '+' : v < 0 ? '−' : '') + nf(Math.abs(v), d);
-const pct = (v, d = 1) => sg(100 * v, d) + ' %';
+const {nf, sg, pct, dstr, esc, tvUrl, short, today} = ME;
 const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'mut';
-const today = () => Math.floor(Date.now() / 864e5);
-const dstr = day => { const d = new Date(day * 864e5); return String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0'); };
-const tvUrl = s => 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(s);
-const short = s => s.split(':')[1];
 const status = t => { $('status').textContent = t; };
-
-let PB = null, RULE = {LB: 60, CH: 20, CD: 10, lag: 0.03, max: 2, hold: 20};
-let FULL = {}, ALLTR = [], PICK = [], SIGS = {}, POLYCUR = [];
+let POLYCUR = [], loaded = false;
 let TG = LS.get('macro-tg', {token: '', chat: '', on: false});
 
 // ---------- données ----------
 async function loadBase() {
-  const [pb, base] = await Promise.all([
+  const [pb, base, add] = await Promise.all([
     fetch('macro_playbook.json?x=' + Date.now()).then(r => r.json()),
-    fetch('macro_hist.json?x=' + today()).then(r => r.json())
+    fetch('macro_hist.json?x=' + today()).then(r => r.json()),
+    fetch('macro_add.json?x=' + Date.now()).then(r => r.ok ? r.json() : {}).catch(() => ({}))
   ]);
-  PB = pb; RULE = pb.rule || RULE;
-  const add = LS.get('macro-add', {});
-  FULL = {};
-  for (const [s, h] of Object.entries(base.H)) {
-    const m = new Map();
-    h.t.forEach((d, i) => m.set(d, [h.o[i], h.c[i]]));
-    for (const [d, v] of Object.entries(add[s] || {})) m.set(+d, v);
-    setSeries(s, m);
-  }
-}
-function setSeries(s, m) {
-  const a = [...m.entries()].sort((x, y) => x[0] - y[0]);
-  FULL[s] = {t: a.map(x => x[0]), o: a.map(x => x[1][0]), c: a.map(x => x[1][1])};
-}
-function allSyms() {
-  const set = new Set();
-  for (const th of PB.themes) { set.add(th.drv.a); if (th.drv.b) set.add(th.drv.b); for (const l of [...th.short, ...th.long]) set.add(l.tv); }
-  for (const p of PB.polys || []) for (const l of [...p.short, ...p.long]) set.add(l.tv);
-  return [...set];
+  ME.load(pb, base, [add, LS.get('macro-add', {})]); loaded = true;
 }
 async function poll() {
-  const cols = ['close', 'open', 'time', 'close[1]', 'open[1]', 'time[1]', 'close[2]', 'open[2]', 'time[2]'];
-  let j = null;
-  for (const c of [cols, cols.slice(0, 6), cols.slice(0, 3)]) {
-    try {
-      const r = await fetch('https://scanner.tradingview.com/global/scan', {method: 'POST', body: JSON.stringify({symbols: {tickers: allSyms()}, columns: c})});
-      j = await r.json(); if (j && j.data) break;
-    } catch (e) { j = null; }
-  }
-  if (!j || !j.data) return false;
-  const add = LS.get('macro-add', {}), cut = today() - 500;
-  for (const row of j.data) {
-    const s = row.s, d = row.d, A = add[s] = add[s] || {};
-    for (let k = 0; k + 2 < d.length; k += 3) {
-      const c = d[k], o = d[k + 1], t = d[k + 2];
-      if (c == null || t == null) continue;
-      A[Math.floor(t / 86400)] = [o == null ? c : +o.toPrecision(6), +c.toPrecision(6)];
-    }
-    for (const day of Object.keys(A)) if (+day < cut) delete A[day];
-    if (FULL[s]) { const m = new Map(FULL[s].t.map((x, i) => [x, [FULL[s].o[i], FULL[s].c[i]]])); for (const [day, v] of Object.entries(A)) m.set(+day, v); setSeries(s, m); }
-  }
-  LS.set('macro-add', add);
+  const bars = await ME.scan(); if (!bars) return false;
+  const add = LS.get('macro-add', {}), cut = today() - 200;
+  for (const [s, A] of Object.entries(bars)) { const B = add[s] = add[s] || {}; Object.assign(B, A); for (const d of Object.keys(B)) if (+d < cut) delete B[d]; }
+  LS.set('macro-add', add); ME.merge(bars);
   return true;
 }
-
-// ---------- moteur ----------
-const sma = (c, n, i) => { if (i < n - 1) return null; let s = 0; for (let k = i - n + 1; k <= i; k++) s += c[k]; return s / n; };
-function drvSeries(th) {
-  const A = FULL[th.drv.a], T = today(); if (!A) return {t: [], v: []};
-  const t = [], v = [];
-  if (th.drv.k === 'spread') {
-    const B = FULL[th.drv.b]; if (!B) return {t, v};
-    const ib = new Map(B.t.map((d, i) => [d, i]));
-    A.t.forEach((d, i) => { if (d < T && ib.has(d)) { t.push(d); v.push(A.c[i] - B.c[ib.get(d)]); } });
-  } else A.t.forEach((d, i) => { if (d < T) { t.push(d); v.push(A.c[i]); } });
-  return {t, v};
-}
-function signals(th) {
-  const {t, v} = drvSeries(th), out = [], last = {1: -99, '-1': -99};
-  for (let i = Math.max(RULE.LB, RULE.CH); i < v.length; i++) {
-    let hi = -1e9, lo = 1e9;
-    for (let k = i - RULE.LB + 1; k <= i; k++) { if (v[k] > hi) hi = v[k]; if (v[k] < lo) lo = v[k]; }
-    const ch = th.drv.k === 'price' ? v[i] / v[i - RULE.CH] - 1 : v[i] - v[i - RULE.CH];
-    let s = 0;
-    if (v[i] >= hi && ch >= th.drv.x) s = 1; else if (v[i] <= lo && ch <= -th.drv.x) s = -1;
-    if (s && i - last[s] > RULE.CD) { last[s] = i; out.push({day: t[i], sg: s, v: v[i], ch, ref: v[i - RULE.CH], i}); }
-  }
-  return out;
-}
-function legState(sym, s, day) {
-  const L = FULL[sym]; if (!L) return null;
-  let i = -1; for (let k = L.t.length - 1; k >= 0; k--) if (L.t[k] <= day) { i = k; break; }
-  if (i < 60) return null;
-  const sm = sma(L.c, 50, i), r20 = s * (L.c[i] / L.c[i - 20] - 1), conf = s * (L.c[i] - sm) > 0;
-  const e = i + 1 < L.t.length ? i + 1 : null;
-  return {sym, s, i, e, r20, conf, lag: !conf && r20 < RULE.lag};
-}
-function fwd(tr, N) {
-  const L = FULL[tr.sym]; if (tr.e == null) return null;
-  const x = Math.min(tr.e + N, L.c.length - 1);
-  return x - tr.e >= 2 ? tr.s * (L.c[x] / L.o[tr.e] - 1) : null;
-}
-function result(tr) {
-  const L = FULL[tr.sym]; if (tr.e == null) return null;
-  const x = Math.min(tr.e + RULE.hold, L.c.length - 1);
-  let worst = 0; for (let k = tr.e; k <= x; k++) { const r = tr.s * (L.c[k] / L.o[tr.e] - 1); if (r < worst) worst = r; }
-  return {ret: tr.s * (L.c[x] / L.o[tr.e] - 1), bars: x - tr.e, entry: L.o[tr.e], eday: L.t[tr.e], worst, open: x - tr.e < RULE.hold};
-}
-function compute() {
-  ALLTR = []; PICK = []; SIGS = {};
-  for (const th of PB.themes) {
-    const S = SIGS[th.id] = signals(th);
-    for (const sig of S) {
-      const legs = [...th.short.map(l => [l, -sig.sg]), ...th.long.map(l => [l, sig.sg])], ep = [];
-      for (const [l, s] of legs) { const st = legState(l.tv, s, sig.day); if (st) ep.push({...st, th: th.id, day: sig.day, sig, leg: l}); }
-      ALLTR.push(...ep);
-      PICK.push(...ep.filter(x => x.lag).sort((a, b) => a.r20 - b.r20).slice(0, RULE.max));
-    }
-  }
-}
-const baseCache = {};
-function baseline(sym, s, N, from) {
-  const k = sym + s + N + from; if (k in baseCache) return baseCache[k];
-  const L = FULL[sym]; let a = 0, n = 0;
-  for (let i = 60; i + N < L.c.length; i++) { if (L.t[i] < from) continue; a += s * (L.c[i + N] / L.o[i] - 1); n++; }
-  return baseCache[k] = n ? a / n : 0;
-}
-function stats(T, from, to = 1e9) {
-  const N = RULE.hold, R = T.filter(x => x.day >= from && x.day < to).map(x => ({x, f: fwd(x, N)})).filter(o => o.f != null);
-  if (!R.length) return null;
-  const mean = a => a.reduce((p, q) => p + q, 0) / a.length;
-  return {n: R.length, ep: new Set(R.map(o => o.x.th + o.x.day)).size, win: R.filter(o => o.f > 0).length / R.length, avg: mean(R.map(o => o.f)), exc: mean(R.map(o => o.f - baseline(o.x.sym, o.x.s, N, from)))};
-}
-
-// ---------- charts ----------
-function panel(ctx, X, Y, W, H, t, lines, o = {}) {
-  let lo = 1e18, hi = -1e18;
-  for (const l of lines) for (const v of l.v) if (v != null) { if (v < lo) lo = v; if (v > hi) hi = v; }
-  const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
-  const n = t.length, px = i => X + 10 + (W - 106) * i / Math.max(1, n - 1), py = v => Y + H - 28 - (H - 66) * (v - lo) / (hi - lo);
-  ctx.fillStyle = '#d7dde5'; ctx.font = '600 22px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(o.title || '', X + 10, Y + 24);
-  ctx.font = '17px system-ui, sans-serif'; ctx.strokeStyle = '#262d36'; ctx.lineWidth = 1; ctx.setLineDash([]);
-  for (let k = 0; k <= 2; k++) { const v = lo + pad + (hi - lo - 2 * pad) * k / 2, y = py(v); ctx.beginPath(); ctx.moveTo(X + 10, y); ctx.lineTo(X + W - 92, y); ctx.stroke(); ctx.fillStyle = '#7f8fa3'; ctx.fillText(o.fmt ? o.fmt(v) : nf(v, 2), X + W - 86, y + 6); }
-  let pm = -1; for (let i = 0; i < n; i++) { const m = new Date(t[i] * 864e5).getUTCMonth(); if (m !== pm) { if (pm >= 0) { ctx.fillStyle = '#7f8fa3'; ctx.fillText(['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'][m], px(i), Y + H - 7); } pm = m; } }
-  for (const l of lines) { ctx.strokeStyle = l.color; ctx.lineWidth = l.w || 2; ctx.setLineDash(l.dash || []); ctx.beginPath(); let st = false; l.v.forEach((v, i) => { if (v == null) return; if (st) ctx.lineTo(px(i), py(v)); else { ctx.moveTo(px(i), py(v)); st = true; } }); ctx.stroke(); }
-  ctx.setLineDash([]);
-  for (const m of o.marks || []) { if (m.i < 0 || m.i >= n) continue; const x = px(m.i), y = py(m.v); ctx.fillStyle = m.color; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fill(); ctx.strokeStyle = '#0e1117'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = m.color; ctx.font = '600 18px system-ui, sans-serif'; ctx.textAlign = x > X + W - 260 ? 'right' : 'left'; ctx.fillText(m.label, x + (ctx.textAlign === 'right' ? -13 : 13), y - 12); ctx.font = '17px system-ui, sans-serif'; ctx.textAlign = 'left'; }
-}
-const drvFmt = th => th.drv.k === 'spread' ? v => nf(100 * v, 0) + ' pb' : th.drv.k === 'yield' ? v => nf(v, 2) + ' %' : v => nf(v, 1);
-const drvChg = (th, ch) => th.drv.k === 'price' ? pct(ch) : sg(100 * ch, 0) + ' pb';
-function ideaChart(cv, th, tr) {
-  cv.width = 900; cv.height = 620; const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, 900, 620);
-  const D = drvSeries(th), di = D.t.indexOf(tr.day), d0 = Math.max(0, D.t.length - 130);
-  panel(ctx, 0, 6, 900, 290, D.t.slice(d0), [{v: D.v.slice(d0), color: '#f0a030', w: 2.5}], {title: th.drv.label, fmt: drvFmt(th), marks: di >= d0 ? [{i: di - d0, v: D.v[di], color: '#f0a030', label: 'signal ' + dstr(tr.day)}] : []});
-  const L = FULL[tr.sym], l0 = Math.max(0, L.t.length - 130), ma = L.c.map((_, i) => sma(L.c, 50, i));
-  const col = tr.s > 0 ? '#26c281' : '#ef5350';
-  panel(ctx, 0, 316, 900, 298, L.t.slice(l0), [{v: ma.slice(l0), color: '#5b6b80', w: 2, dash: [6, 5]}, {v: L.c.slice(l0), color: '#d7dde5', w: 2.5}], {title: tr.leg.n + '  (' + tr.sym + ')', marks: tr.e != null && tr.e >= l0 ? [{i: tr.e - l0, v: L.o[tr.e], color: col, label: (tr.s > 0 ? 'achat ' : 'vente ') + dstr(L.t[tr.e])}] : []});
-}
-function spark(cv, t, v, color, mark) {
+function spark(cv, t, v, o) {
   cv.width = 640; cv.height = 210; const ctx = cv.getContext('2d'); ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, 640, 210);
-  panel(ctx, 0, 0, 640, 210, t, [{v, color}], mark || {});
+  ME.panel(ctx, 0, 0, 640, 210, t, [{v, color: '#f0a030', w: 2.5}], o || {});
 }
-
-// ---------- textes ----------
-function ideaText(th, tr) {
-  const side = tr.sig.sg > 0 ? th.up : th.down, raw = tr.s * tr.r20, f = drvFmt(th);
-  const trig = `${th.drv.label} à ${f(tr.sig.v)}, soit ${drvChg(th, tr.sig.ch)} en 20 séances : ${tr.sig.sg > 0 ? 'plus haut' : 'plus bas'} de 60 séances le ${dstr(tr.day)}.`;
-  const why = `${tr.leg.n} (${tr.leg.w}) n’a pas encore réagi : ${pct(raw)} sur 20 séances, et le titre est encore ${tr.s < 0 ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances.`;
-  const plan = `Entrée à l’ouverture suivante, sortie après ${RULE.hold} séances. L’idée ne tient plus si l’indicateur revient vers ${f(tr.sig.ref)}.`;
-  return {title: side.t, ctx: side.w, trig, why, plan};
-}
-function btLine() {
-  const s = stats(PICK, 0); return s ? `Backtest ${Math.round((today() - firstDay()) / 30.4)} mois : ${s.n} idées, ${nf(100 * s.win, 0)} % gagnantes, ${pct(s.avg)} en moyenne (${sg(100 * s.exc)} pt contre le hasard).` : '';
-}
-const firstDay = () => Math.min(...PICK.map(x => x.day));
 
 // ---------- rendu ----------
-function current() {
-  return PICK.filter(tr => { const L = FULL[tr.sym]; return tr.e == null || L.c.length - 1 - tr.e < RULE.hold; }).sort((a, b) => b.day - a.day);
-}
-const isNew = tr => tr.day >= today() - 4;
 function renderIdeas() {
-  const box = $('ideas'), C = current();
-  const fresh = C.filter(tr => tr.day >= today() - 7), old = C.filter(tr => tr.day < today() - 7);
-  $('oldTab').innerHTML = old.map(tr => { const th = PB.themes.find(x => x.id === tr.th), r = result(tr); return `<tr><td>${dstr(tr.day)}</td><td>${th.flag} ${esc((tr.sig.sg > 0 ? th.up : th.down).t)}</td><td><a href="${tvUrl(tr.sym)}" target="_blank" rel="noopener">${esc(tr.leg.n)}</a></td><td class="${tr.s > 0 ? 'up' : 'down'}">${tr.s > 0 ? 'achat' : 'vente'}</td><td class="r">${r ? nf(r.entry, 2) : '–'}</td><td class="r ${r ? cls(r.ret) : 'mut'}"><b>${r ? pct(r.ret) : '–'}</b></td><td class="r mut">${r ? RULE.hold - r.bars : RULE.hold} séances</td></tr>`; }).join('') || '<tr><td colspan="7" class="mut">Aucune.</td></tr>';
-  if (!fresh.length) { box.innerHTML = '<div class="empty">Aucune nouvelle idée cette semaine. Aucun indicateur macro n’a cassé avec des titres encore en retard. C’est normal : le système préfère ne rien envoyer.</div>'; return; }
+  const box = $('ideas'), C = ME.current();
+  const fresh = C.filter(tr => tr.day >= today() - 10), old = C.filter(tr => tr.day < today() - 10);
+  $('oldTab').innerHTML = old.map(tr => { const th = ME.theme(tr.th), r = ME.result(tr); return `<tr><td>${dstr(tr.day)}</td><td>${th.flag} ${esc((tr.sig.sg > 0 ? th.up : th.down).t)}</td><td><a href="${tvUrl(tr.sym)}" target="_blank" rel="noopener">${esc(tr.leg.n)}</a></td><td class="${tr.s > 0 ? 'up' : 'down'}">${tr.s > 0 ? 'achat' : 'vente'}</td><td class="r">${r ? nf(r.entry, 2) : '–'}</td><td class="r ${r ? cls(r.ret) : 'mut'}"><b>${r ? pct(r.ret) : '–'}</b></td><td class="r mut">${r ? ME.RULE.hold - r.bars : ME.RULE.hold} séances</td></tr>`; }).join('') || '<tr><td colspan="7" class="mut">Aucune.</td></tr>';
+  if (!fresh.length) { box.innerHTML = '<div class="empty">Aucune nouvelle idée ces 10 derniers jours. Aucun indicateur n’a cassé avec des titres encore en retard. C’est normal : le système préfère ne rien envoyer.</div>'; return; }
   box.innerHTML = '';
   for (const tr of fresh) {
-    const th = PB.themes.find(x => x.id === tr.th), tx = ideaText(th, tr), r = result(tr);
+    const th = ME.theme(tr.th), tx = ME.ideaText(th, tr), r = ME.result(tr);
     const el = document.createElement('div'); el.className = 'card';
-    el.innerHTML = `<div class="ih"><span class="side ${tr.s > 0 ? 'L' : 'S'}">${tr.s > 0 ? 'ACHAT' : 'VENTE'}</span><b>${esc(tr.leg.n)}</b><span class="mut">${esc(tr.sym)}</span>${isNew(tr) ? '<span class="chip new">nouvelle</span>' : ''}</div>
+    el.innerHTML = `<div class="ih"><span class="side ${tr.s > 0 ? 'L' : 'S'}">${tr.s > 0 ? 'ACHAT' : 'VENTE'}</span><b>${esc(tr.leg.n)}</b><span class="mut">${esc(tr.sym)}</span>${ME.isNew(tr) ? '<span class="chip new">nouvelle</span>' : ''}</div>
       <div class="mut" style="margin-top:4px">${th.flag} ${esc(tx.title)} · signal du ${dstr(tr.day)}${r ? ` · depuis l’entrée (${nf(r.entry, 2)}) : <b class="${cls(r.ret)}">${pct(r.ret)}</b> en ${r.bars} séance${r.bars > 1 ? 's' : ''}` : ' · entrée à la prochaine ouverture'}</div>
       <canvas></canvas>
+      <p class="mut">${esc(tx.ctx)}</p>
       <p><b>Déclencheur.</b> ${esc(tx.trig)}</p><p><b>Pourquoi ce titre.</b> ${esc(tx.why)}</p><p><b>Plan testé.</b> ${esc(tx.plan)}</p>
       <p><a href="${tvUrl(tr.sym)}" target="_blank" rel="noopener">Ouvrir ${esc(short(tr.sym))} dans TradingView</a></p>`;
-    box.appendChild(el); ideaChart(el.querySelector('canvas'), th, tr);
+    box.appendChild(el); ME.ideaChart(el.querySelector('canvas'), th, tr);
   }
 }
 function renderThemes() {
   const box = $('themes'); box.innerHTML = '';
-  for (const th of PB.themes) {
-    const D = drvSeries(th); if (D.v.length < 30) continue;
-    const n = D.v.length, v = D.v[n - 1], ch = th.drv.k === 'price' ? v / D.v[n - 1 - RULE.CH] - 1 : v - D.v[n - 1 - RULE.CH], f = drvFmt(th);
-    const last = (SIGS[th.id] || []).slice(-1)[0], act = last && n - 1 - last.i < RULE.hold ? last : null;
-    const x = th.drv.k === 'price' ? nf(100 * th.drv.x, 0) + ' %' : nf(100 * th.drv.x, 0) + ' pb';
+  const items = [];
+  for (const th of ME.PB.themes) {
+    const D = ME.drvSeries(th), R = ME.ruleOf(th); if (D.v.length <= R.CH + 2) continue;
+    const n = D.v.length, last = (ME.SIGS[th.id] || []).slice(-1)[0];
+    const act = last && (th.rule ? n - 1 - last.i < 2 : n - 1 - last.i < ME.RULE.hold) ? last : null;
+    items.push({th, D, R, n, act});
+  }
+  items.sort((a, b) => (b.act ? b.act.day : 0) - (a.act ? a.act.day : 0) || (a.th.alert === false) - (b.th.alert === false));
+  for (const {th, D, R, n, act} of items) {
+    const v = D.v[n - 1], ch = ME.chg(th, v, D.v[n - 1 - R.CH]), f = ME.drvFmt(th), p = ME.per(th);
     const dir = act ? act.sg : (ch >= 0 ? 1 : -1);
-    const legs = [...th.short.map(l => [l, -dir]), ...th.long.map(l => [l, dir])].map(([l, s]) => { const st = legState(l.tv, s, D.t[n - 1]); return st ? {l, s, st} : null; }).filter(Boolean);
+    const legs = [...th.short.map(l => [l, -dir]), ...th.long.map(l => [l, dir])].map(([l, s]) => { const st = ME.legState(l.tv, s, today()); return st ? {l, s, st} : null; }).filter(Boolean);
     const el = document.createElement('div'); el.className = 'card';
-    el.innerHTML = `<div class="ih">${th.flag} <b>${esc(th.name)}</b>${act ? `<span class="chip new">signal ${dstr(act.day)}</span>` : '<span class="chip">calme</span>'}</div>
-      <div style="margin-top:4px">${esc(th.drv.label)} : <b>${f(v)}</b> · 20 séances : <b class="${th.drv.k === 'price' ? cls(ch) : (ch > 0 ? 'warn' : 'mut')}">${drvChg(th, ch)}</b> <span class="mut">(seuil ± ${x})</span></div>
+    el.innerHTML = `<div class="ih">${th.flag} <b>${esc(th.name)}</b>${act ? `<span class="chip new">signal ${dstr(act.day)}</span>` : '<span class="chip">calme</span>'}${th.alert === false ? '<span class="chip">contexte, pas d’alerte</span>' : ''}</div>
+      <div style="margin-top:4px">${esc(th.drv.label)} : <b>${f(v)}</b> · ${p.ch} : <b class="${cls(ch)}">${ME.drvChg(th, ch)}</b> <span class="mut">(seuil ± ${ME.drvX(th)})</span></div>
       <canvas></canvas>
       <p class="mut">${esc(act ? (act.sg > 0 ? th.up : th.down).w : 'Pas de cassure récente. Sens des titres ci-dessous : celui du mouvement en cours.')}</p>
-      <div class="legs">${legs.map(o => `<a class="leg${act && o.st.lag ? ' lag' : ''}" href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n + ' · ' + o.l.w)}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>`;
+      <div class="legs">${legs.map(o => `<a class="leg${act && th.alert !== false && o.st.lag ? ' lag' : ''}" href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n + ' · ' + o.l.w)}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>`;
     box.appendChild(el);
-    const d0 = Math.max(0, n - 130);
-    spark(el.querySelector('canvas'), D.t.slice(d0), D.v.slice(d0), '#f0a030', {fmt: f, marks: act && act.i >= d0 ? [{i: act.i - d0, v: act.v, color: '#f0a030', label: 'signal'}] : []});
+    const d0 = Math.max(0, n - (th.rule ? 48 : 130));
+    spark(el.querySelector('canvas'), D.t.slice(d0), D.v.slice(d0), {fmt: f, marks: act && act.i >= d0 ? [{i: act.i - d0, v: act.v, color: '#f0a030', label: 'signal'}] : []});
   }
 }
 function renderBT() {
-  const T = today(), m3 = T - 92, first = firstDay(), mid = Math.floor(Date.UTC(2026, 0, 1) / 864e5);
+  const T = today(), m3 = T - 92, first = ME.firstDay(), yrs = nf((T - first) / 365.25, 0), S = ME.stats;
   const card = (title, s, note) => `<div class="card"><div class="mut">${title}</div>${s ? `<div class="big ${cls(s.avg)}">${pct(s.avg)}</div><div class="mut">par idée en moyenne · ${s.n} idées sur ${s.ep} signaux · ${nf(100 * s.win, 0)} % gagnantes · <b class="${cls(s.exc)}">${sg(100 * s.exc)} pt</b> par rapport au hasard</div>` : '<div class="mut">pas assez de données</div>'}${note ? `<div class="mut" style="margin-top:6px">${note}</div>` : ''}</div>`;
-  const months = Math.round((T - first) / 30.4), s25 = stats(PICK, 0, mid);
   $('btCards').innerHTML =
-    card('Les idées envoyées · 3 derniers mois', stats(PICK, m3), 'Les idées des 4 dernières semaines sont encore ouvertes : leur résultat peut changer.') +
-    card(`Les idées envoyées · ${months} mois`, stats(PICK, 0)) +
-    card('Idem, avant 2026 seulement', s25, s25 && s25.exc < 0.005 ? 'Avant 2026, la règle ne faisait pas mieux que le hasard : l’avantage vient surtout de 2026.' : 'L’avantage existe sur les deux périodes, mais avec si peu d’idées le résultat reste fragile.') +
-    card('Idem, année 2026 seulement', stats(PICK, mid)) +
-    card(`Si on prenait tous les titres du thème · ${months} mois`, stats(ALLTR, 0), 'C’est l’idée « naïve » : le taux monte, je vends tout. Aucun avantage.') +
-    card(`Seulement les titres déjà partis · ${months} mois`, stats(ALLTR.filter(x => !x.lag), 0), 'Courir après ce qui a déjà bougé fait moins bien que le hasard. C’est pour ça qu’ils sont écartés.');
-  const rows = PICK.filter(x => x.day >= m3).sort((a, b) => b.day - a.day).map(tr => {
-    const th = PB.themes.find(x => x.id === tr.th), r = result(tr);
+    card('Les idées envoyées · 3 derniers mois', S(ME.PICK, m3), 'Toutes ces idées sont encore ouvertes (sortie à 3 mois) : ce résultat n’est pas définitif.') +
+    card('Les idées envoyées · 12 derniers mois', S(ME.PICK, T - 365)) +
+    card(`Les idées envoyées · ${yrs} ans`, S(ME.PICK, 0), 'La règle a été choisie sur 2025-2026. Les années d’avant ne l’ont donc pas « vue » : c’est le test le plus honnête.') +
+    card(`Si on prenait tous les titres du thème · ${yrs} ans`, S(ME.ALL, 0), 'L’idée « naïve » : l’indicateur casse, je prends tout le thème.') +
+    card(`Seulement les titres déjà partis · ${yrs} ans`, S(ME.ALL.filter(x => !x.lag), 0), 'Courir après ce qui a déjà bougé rapporte moins. C’est pour ça qu’ils sont écartés.') +
+    card(`Données économiques mensuelles · ${yrs} ans`, S(ME.ECO, 0), 'Ventes au détail chinoises, ISM, Ifo, confiance des ménages… Pas mieux que le hasard : affichées pour le contexte, jamais envoyées.');
+  const row = (label, s) => `<tr><td>${label}</td>` + (s ? `<td class="r">${s.n}</td><td class="r">${nf(100 * s.win, 0)} %</td><td class="r ${cls(s.avg)}">${pct(s.avg)}</td><td class="r ${cls(s.exc)}"><b>${sg(100 * s.exc)} pt</b></td>` : '<td class="r mut" colspan="4">aucune idée</td>') + '</tr>';
+  let y = '';
+  for (let yr = new Date(first * 864e5).getUTCFullYear(); yr <= new Date().getUTCFullYear(); yr++) y += row(yr, S(ME.PICK, Date.UTC(yr, 0, 1) / 864e5, Date.UTC(yr + 1, 0, 1) / 864e5));
+  $('btYears').innerHTML = y;
+  $('btFams').innerHTML = Object.entries(ME.PB.fams || {}).map(([k, name]) => row(esc(name) + (k === 'eco' ? ' <span class="mut">(non envoyées)</span>' : ''), S((k === 'eco' ? ME.ECO : ME.PICK).filter(x => x.fam === k), 0))).join('');
+  const rows = ME.PICK.filter(x => x.day >= m3).sort((a, b) => b.day - a.day).map(tr => {
+    const th = ME.theme(tr.th), r = ME.result(tr);
     return `<tr><td>${dstr(tr.day)}</td><td>${th.flag} ${esc((tr.sig.sg > 0 ? th.up : th.down).t)}</td><td><a href="${tvUrl(tr.sym)}" target="_blank" rel="noopener">${esc(tr.leg.n)}</a></td><td class="${tr.s > 0 ? 'up' : 'down'}">${tr.s > 0 ? 'achat' : 'vente'}</td>` +
       (r ? `<td class="r">${nf(r.entry, 2)}</td><td class="r ${cls(r.ret)}"><b>${pct(r.ret)}</b></td><td class="r mut">${pct(r.worst)}</td><td class="mut">${r.open ? 'ouverte, ' + r.bars + ' séance' + (r.bars > 1 ? 's' : '') : 'clôturée'}</td>` : '<td class="r mut">–</td><td class="r mut">–</td><td class="r mut">–</td><td class="mut">entrée à venir</td>') + '</tr>';
   });
@@ -373,33 +234,23 @@ function renderBT() {
 
 // ---------- Polymarket ----------
 const pj = async u => { try { const r = await fetch(u); return await r.json(); } catch (e) { return null; } };
-const price = m => { try { return +JSON.parse(m.outcomePrices)[0]; } catch (e) { return null; } };
 async function loadPoly() {
-  POLYCUR = []; let html = '';
-  for (const p of PB.polys || []) {
-    const ev = await pj('https://gamma-api.polymarket.com/events?slug=' + encodeURIComponent(p.slug));
-    const m = ev && ev[0] && (ev[0].markets || []).find(x => !x.closed && new RegExp(p.outcome, 'i').test((x.groupItemTitle || '') + ' ' + (x.question || '')));
-    if (!m) continue;
-    const pr = price(m), w1 = +m.oneWeekPriceChange || 0, d1 = +m.oneDayPriceChange || 0, hot = pr >= 0.5 && w1 >= 0.15;
-    const legs = [...p.long.map(l => [l, 1]), ...p.short.map(l => [l, -1])].map(([l, s]) => { const st = legState(l.tv, s, today()); return st ? {l, s, st} : null; }).filter(Boolean);
-    POLYCUR.push({p, pr, w1, d1, hot, legs});
-    html += `<div class="card"><div class="ih">${p.flag} <b>${esc(p.name)}</b>${hot ? '<span class="chip new">la cote bouge</span>' : ''}</div>
+  POLYCUR = await ME.polyCurated();
+  $('polyCur').innerHTML = POLYCUR.map(({p, pr, w1, d1, hot, legs}) => `<div class="card"><div class="ih">${p.flag} <b>${esc(p.name)}</b>${hot ? '<span class="chip new">la cote bouge</span>' : ''}</div>
       <div style="margin-top:4px">${esc(p.outcome)} : <b>${nf(100 * pr, 0)} %</b> · 1 jour <span class="${cls(d1)}">${sg(100 * d1, 0)} pt</span> · 1 semaine <span class="${cls(w1)}">${sg(100 * w1, 0)} pt</span></div>
       <p class="mut">${esc(p.w)}</p>
       <div class="legs">${legs.map(o => `<a class="leg${hot && o.st.lag ? ' lag' : ''}" href="${tvUrl(o.l.tv)}" target="_blank" rel="noopener" title="${esc(o.l.n)}">${o.s > 0 ? '▲' : '▼'} ${esc(short(o.l.tv))} <span class="${cls(o.s * o.st.r20)}">${pct(o.s * o.st.r20, 0)}</span></a>`).join('')}</div>
       <p class="mut">${legs.length && legs.every(o => !o.st.lag) ? 'Tous les titres liés ont déjà bougé : rien à proposer, le marché a déjà payé la nouvelle.' : hot ? 'Titres en jaune : pas encore réagi.' : 'Performance sur 20 séances.'}</p>
-      <p><a href="https://polymarket.com/event/${esc(p.slug)}" target="_blank" rel="noopener">Voir le pari sur Polymarket</a></p></div>`;
-  }
-  $('polyCur').innerHTML = html;
+      <p><a href="https://polymarket.com/event/${esc(p.slug)}" target="_blank" rel="noopener">Voir le pari sur Polymarket</a></p></div>`).join('');
   const seen = new Set(), rows = [];
-  for (const tag of PB.polytags || []) {
+  for (const tag of ME.PB.polytags || []) {
     const evs = await pj('https://gamma-api.polymarket.com/events?closed=false&active=true&order=volume24hr&ascending=false&limit=40&tag_slug=' + tag);
     for (const ev of evs || []) for (const m of ev.markets || []) {
       if (m.closed || seen.has(m.id)) continue; seen.add(m.id);
-      const pr = price(m), w1 = +m.oneWeekPriceChange || 0, vol = +m.volume24hr || 0;
+      const pr = ME.polyPrice(m), w1 = +m.oneWeekPriceChange || 0, vol = +m.volume24hr || 0;
       if (pr == null || pr < 0.03 || pr > 0.97 || Math.abs(w1) < 0.10 || vol < 20000) continue;
       const txt = (ev.title + ' ' + (m.question || '') + ' ').toLowerCase(), tk = [];
-      for (const k of PB.polymap || []) if (new RegExp(k.re, 'i').test(txt)) for (const s of k.tk) if (!tk.includes(s)) tk.push(s);
+      for (const k of ME.PB.polymap || []) if (new RegExp(k.re, 'i').test(txt)) for (const s of k.tk) if (!tk.includes(s)) tk.push(s);
       rows.push({ev, m, pr, w1, d1: +m.oneDayPriceChange || 0, vol, tk, sc: Math.abs(w1) * Math.log10(vol)});
     }
   }
@@ -407,7 +258,7 @@ async function loadPoly() {
   $('polyTab').innerHTML = rows.slice(0, 20).map(r => `<tr><td class="wrap"><a href="https://polymarket.com/event/${esc(r.ev.slug)}" target="_blank" rel="noopener">${esc(r.ev.title)}${r.m.groupItemTitle ? ' · <b>' + esc(r.m.groupItemTitle) + '</b>' : ''}</a></td><td class="r">${nf(100 * r.pr, 0)} %</td><td class="r ${cls(r.d1)}">${sg(100 * r.d1, 0)} pt</td><td class="r ${cls(r.w1)}"><b>${sg(100 * r.w1, 0)} pt</b></td><td class="r mut">${nf(r.vol / 1000, 0)} k$</td><td>${r.tk.map(s => `<a class="leg" href="${tvUrl(s)}" target="_blank" rel="noopener">${esc(short(s))}</a>`).join(' ') || '<span class="mut">–</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="mut">Aucun pari n’a bougé de plus de 10 points cette semaine.</td></tr>';
 }
 
-// ---------- Telegram ----------
+// ---------- Telegram (depuis cet onglet) ----------
 const tgApi = m => `https://api.telegram.org/bot${TG.token}/${m}`;
 async function tgSend(text, canvas) {
   if (!TG.token || !TG.chat) return {ok: false, description: 'jeton ou chat manquant'};
@@ -421,29 +272,23 @@ async function tgSend(text, canvas) {
     return await r.json();
   } catch (e) { return {ok: false, description: e.message}; }
 }
-function tgCaption(th, tr) {
-  const tx = ideaText(th, tr);
-  return `🌍 <b>${esc(tx.title)}</b>\n${tr.s > 0 ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${esc(tr.leg.n)}</b> (${esc(tr.sym)})\n\n<b>Déclencheur.</b> ${esc(tx.trig)}\n<b>Pourquoi ce titre.</b> ${esc(tx.why)}\n<b>Plan testé.</b> ${esc(tx.plan)}\n\n${esc(btLine())}\n<a href="${tvUrl(tr.sym)}">Chart TradingView</a> · idée à étudier, pas un conseil`;
-}
 async function tgIdea(tr) {
-  const th = PB.themes.find(x => x.id === tr.th), cv = document.createElement('canvas');
-  ideaChart(cv, th, tr);
-  return tgSend(tgCaption(th, tr), cv);
+  const th = ME.theme(tr.th), cv = document.createElement('canvas');
+  ME.ideaChart(cv, th, tr);
+  let cap = ME.caption(th, tr); if (cap.length > 1020) cap = cap.replace(/<b>Contexte\.<\/b>[^\n]*\n/, '');
+  return tgSend(cap, cv);
 }
-const keyOf = tr => tr.th + '|' + tr.day + '|' + tr.sym;
 async function tgNew() {
   if (!TG.on) return;
   const sent = LS.get('macro-sent', {});
-  for (const tr of current().filter(isNew).reverse()) {
-    if (sent[keyOf(tr)]) continue;
+  for (const tr of ME.current().filter(ME.isNew).reverse()) {
+    if (sent[ME.keyOf(tr)]) continue;
     const r = await tgIdea(tr);
-    if (r && r.ok) { sent[keyOf(tr)] = Date.now(); LS.set('macro-sent', sent); }
+    if (r && r.ok) { sent[ME.keyOf(tr)] = Date.now(); LS.set('macro-sent', sent); }
   }
   for (const o of POLYCUR.filter(x => x.hot)) {
     const k = 'poly|' + o.p.id + '|' + Math.floor(today() / 7); if (sent[k]) continue;
-    const lag = o.legs.filter(x => x.st.lag);
-    const txt = `🗳️ <b>${esc(o.p.t)}</b>\nCote Polymarket : <b>${nf(100 * o.pr, 0)} %</b> (${sg(100 * o.w1, 0)} pt en une semaine).\n${esc(o.p.w)}\n\n` + (lag.length ? 'Titres liés qui n’ont pas encore réagi : ' + lag.map(x => `${x.s > 0 ? '🟢' : '🔴'} <a href="${tvUrl(x.l.tv)}">${esc(x.l.n)}</a> (${pct(x.s * x.st.r20, 0)} sur 20 séances)`).join(', ') + '.' : 'Tous les titres liés ont déjà bougé : rien à proposer, le marché a déjà payé la nouvelle.') + `\n\nNon backtesté · <a href="https://polymarket.com/event/${esc(o.p.slug)}">voir le pari</a>`;
-    const r = await tgSend(txt);
+    const r = await tgSend(ME.polyText(o));
     if (r && r.ok) { sent[k] = Date.now(); LS.set('macro-sent', sent); }
   }
 }
@@ -468,7 +313,7 @@ $('tgSave').onclick = async () => {
   if (r.ok) { TG.on = true; LS.set('macro-tg', TG); tgUI(); $('tgMsg').textContent = 'Activé.'; tgNew(); } else $('tgMsg').textContent = 'Échec : ' + (r.description || 'erreur');
 };
 $('tgTest').onclick = async () => {
-  tgRead(); const tr = PICK.slice().sort((a, b) => b.day - a.day)[0];
+  tgRead(); const tr = ME.PICK.slice().sort((a, b) => b.day - a.day)[0];
   const r = tr ? await tgIdea(tr) : await tgSend('Test : aucune idée dans l’historique.');
   $('tgMsg').textContent = r.ok ? 'Envoyé : regarde Telegram (c’est la dernière idée en date, pour l’exemple).' : 'Échec : ' + (r.description || 'erreur');
 };
@@ -480,11 +325,10 @@ async function run() {
   if (busy) return; busy = true;
   try {
     status('chargement…');
-    if (!PB) await loadBase();
+    if (!loaded) await loadBase();
     const ok = await poll();
-    for (const k in baseCache) delete baseCache[k];
-    compute(); renderIdeas(); renderThemes(); renderBT();
-    status((ok ? 'à jour ' : 'cours du jour indisponibles · ') + new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) + ' · ' + current().length + ' idée(s) en cours');
+    ME.compute(); renderIdeas(); renderThemes(); renderBT();
+    status((ok ? 'à jour ' : 'cours du jour indisponibles · ') + new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) + ' · ' + ME.current().length + ' idée(s) en cours');
     await loadPoly();
     await tgNew();
   } catch (e) { status('erreur : ' + e.message); console.error(e); }
@@ -492,6 +336,7 @@ async function run() {
 }
 $('reload').onclick = run;
 tgUI(); run(); setInterval(run, 30 * 60 * 1000);
+
 </script>
 </body>
 </html>
