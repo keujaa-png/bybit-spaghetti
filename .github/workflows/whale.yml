@@ -1,0 +1,40 @@
+name: Whales Hyperliquid (Telegram)
+
+# Suivi des portefeuilles Hyperliquid listés dans whale_bot.mjs : alerte quand une position
+# est ouverte, fermée, retournée ou change de plus de 20 %. Secrets : TG_BOT_TOKEN, TG_CHAT_ID.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: whale-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Etat (positions du passage precedent)
+        uses: actions/cache/restore@v4
+        with:
+          path: whale_state.json
+          key: whale-state-${{ github.run_id }}
+          restore-keys: whale-state-
+      - name: Positions des whales
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: node whale_bot.mjs
+      - name: Sauvegarde de l'etat
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: whale_state.json
+          key: whale-state-${{ github.run_id }}
