@@ -11,7 +11,8 @@ const WALLETS = (process.env.WHALES || [
   '0x93ab7dbdeb996806454de19c35c8247f4b2511f8',
   '0xec7f9f5b31b8f5da6ac6c0973bbd496e16f9df39',
 ].join(',')).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-const TOKEN = (process.env.TG_BOT_TOKEN || '').trim(), CHAT = (process.env.TG_CHAT_ID || '').trim();
+const TOKEN = (process.env.TG_BOT_TOKEN || '').trim();
+let CHAT = (process.env.TG_CHAT_ID || '').trim();
 const MIN_PCT = +(process.env.WHALE_MIN_PCT || 0.2), MIN_USD = +(process.env.WHALE_MIN_USD || 250000);
 const STATE = 'whale_state.json';
 
@@ -30,11 +31,26 @@ const short = a => a.slice(0, 6) + '…' + a.slice(-4);
 const side = s => s > 0 ? 'LONG' : 'SHORT';
 const icon = s => s > 0 ? '🟢' : '🔴';
 
+let chatTried = false;
+async function findChat() {
+  // le chat id donné est faux : on prend la dernière conversation où quelqu'un a écrit au bot
+  chatTried = true;
+  try {
+    const j = await (await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates`)).json();
+    const u = j.ok && j.result.map(x => x.message || x.channel_post || x.my_chat_member).filter(Boolean).pop();
+    if (u) { CHAT = String(u.chat.id); state.chat = CHAT; console.log('Chat trouvé automatiquement à partir des derniers messages reçus par le bot.'); return true; }
+    console.log(j.ok ? 'Aucun message reçu par le bot : écris-lui « bonjour » dans Telegram.' : 'Lecture des messages du bot impossible : ' + (j.description || 'erreur'));
+  } catch (e) {}
+  return false;
+}
 async function tg(text) {
   if (!TOKEN || !CHAT) { console.log('[à vide] ' + text.replace(/<[^>]+>/g, '').replace(/\n/g, ' ¦ ')); return true; }
   try {
     const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {method: 'POST', body: new URLSearchParams({chat_id: CHAT, text, parse_mode: 'HTML', disable_web_page_preview: 'true'})});
-    const j = await r.json(); if (!j.ok) console.log('Telegram a refusé : ' + (j.description || 'erreur')); return j.ok;
+    const j = await r.json();
+    if (!j.ok && /chat not found|chat_id is empty|PEER_ID_INVALID/i.test(j.description || '') && !chatTried && await findChat()) return tg(text);
+    if (!j.ok) console.log('Telegram a refusé : ' + (j.description || 'erreur'));
+    return j.ok;
   } catch (e) { console.log('Telegram injoignable.'); return false; }
 }
 
@@ -49,6 +65,7 @@ function snapshot(st) {
 
 const state = (() => { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (e) { return {}; } })();
 state.w = state.w || {};
+if (state.chat) CHAT = state.chat;
 let sent = 0;
 for (const addr of WALLETS) {
   const raw = await api({type: 'clearinghouseState', user: addr});
