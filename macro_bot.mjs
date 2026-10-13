@@ -94,7 +94,7 @@ async function opinion(th, tr) {
     const j = jsonOf(await claude(system, user, true));
     if (!j || !j.avis) return '';
     console.log(`  avis IA ${j.conviction}/5 sur ${tr.leg.n} : ${j.avis}`);
-    return `\n🧠 <b>Opus ${ME.esc(j.conviction)}/5</b> : ${ME.esc(String(j.avis).slice(0, 260))}`;
+    return {conv: +j.conviction || 0, line: `\n🧠 <b>Opus ${ME.esc(j.conviction)}/5</b> : ${ME.esc(String(j.avis).slice(0, 260))}`};
   } catch (e) { return ''; }
 }
 
@@ -136,7 +136,10 @@ if (!TOKEN) {
     let n = 0;
     for (const tr of fresh) {
       if (state.sent[ME.keyOf(tr)]) continue;
-      const r = await sendIdea(tr, await opinion(ME.theme(tr.th), tr));
+      const op = await opinion(ME.theme(tr.th), tr);
+      // veto : si le desk IA juge l'idée mauvaise (1 ou 2 sur 5), elle n'est pas envoyée
+      if (op && op.conv && op.conv <= 2) { console.log('  idée écartée par le desk IA (' + op.conv + '/5) : ' + tr.leg.n); state.sent[ME.keyOf(tr)] = today; continue; }
+      const r = await sendIdea(tr, op ? op.line : '');
       if (r.ok) {
         state.sent[ME.keyOf(tr)] = today; n++;
         const th = ME.theme(tr.th), H = th.news ? await headlines(th.news) : [];
