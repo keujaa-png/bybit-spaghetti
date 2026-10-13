@@ -10,7 +10,30 @@ const WALLETS = (process.env.WHALES || [
   '0x237152b038d88f4156a0cd71090462de7e3f0883+0xbd1c84113c6deb5044be0c2221f9e9403811ff0e',
   '0x93ab7dbdeb996806454de19c35c8247f4b2511f8',
   '0xec7f9f5b31b8f5da6ac6c0973bbd496e16f9df39',
+  // les 10 meilleurs traders du classement Hyperliquid (choisis le 13/10/2026 : gros gains cumulés, mois positif, actifs, pas de market makers)
+  '0x77375a8c9d13bf79afb2a87f1b0ac1dfd5f5bf66',
+  '0x880ac484a1743862989a441d6d867238c7aa311c',
+  '0x469e9a7f624b04c24f0e64edf8d8a277e6bf58a5',
+  '0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e',
+  '0x051c2e6d49cf82ebc47f08f9b85800f94fc9693c',
+  '0x7a6d5fc57f6906f337c48fe2763c3a501304f79c',
+  '0xbf49647d017805fcc576ac10f33a788e636f4258',
+  '0xf517639a8872e756ac98d3c65507d2ebc25cc032',
+  '0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f',
+  '0x0871deb34bfd2052b1c10dc4f6c0912a2a47e927',
 ].join(',')).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+const NAMES = {
+  '0x77375a8c9d13bf79afb2a87f1b0ac1dfd5f5bf66': 'Top 1 (+61 M$)',
+  '0x880ac484a1743862989a441d6d867238c7aa311c': 'Top 2 · SilkBtc (+121 M$)',
+  '0x469e9a7f624b04c24f0e64edf8d8a277e6bf58a5': 'Top 3 (+28 M$)',
+  '0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e': 'Top 4 (+27 M$)',
+  '0x051c2e6d49cf82ebc47f08f9b85800f94fc9693c': 'Top 5 (+14 M$)',
+  '0x7a6d5fc57f6906f337c48fe2763c3a501304f79c': 'Top 6 (+15 M$)',
+  '0xbf49647d017805fcc576ac10f33a788e636f4258': 'Top 7 (+32 M$)',
+  '0xf517639a8872e756ac98d3c65507d2ebc25cc032': 'Top 8 · NMTD (+30 M$)',
+  '0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f': 'Top 9 (+12 M$)',
+  '0x0871deb34bfd2052b1c10dc4f6c0912a2a47e927': 'Top 10 · PURRINA (+15 M$)',
+};
 const TOKEN = (process.env.TG_BOT_TOKEN || '').trim();
 let CHAT = (process.env.TG_CHAT_ID || '').trim();
 const MIN_PCT = +(process.env.WHALE_MIN_PCT || 0.2), MIN_USD = +(process.env.WHALE_MIN_USD || 250000);
@@ -85,6 +108,7 @@ const state = (() => { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); 
 state.w = state.w || {};
 if (state.chat) CHAT = state.chat;
 let sent = 0;
+const hellos = [];
 for (const addr of WALLETS) {
   const addrs = addr.split('+');
   const raws = [];
@@ -92,13 +116,13 @@ for (const addr of WALLETS) {
   if (raws.some(r => !r || !r.marginSummary)) { console.log(short(addr) + ' : API indisponible, passage ignoré.'); continue; }
   const now = merge(raws.map(snapshot)), prev = state.w[addr], since = prev ? prev.t : Date.now() - 15 * 60e3;
   const link = addrs.map((a, k) => `<a href="https://hypurrscan.io/address/${a}">${addrs.length > 1 ? 'wallet ' + (k + 1) : 'voir le portefeuille'}</a>`).join(' · ');
-  const head = `🐋 <b>Whale ${short(addr)}</b>`;
+  const head = `🐋 <b>${NAMES[addr] ? esc(NAMES[addr]) + ' · ' + short(addr) : 'Whale ' + short(addr)}</b>`;
   console.log(`${short(addr)} : capital ${usd(now.equity)}, positions ${Object.entries(now.pos).map(([c, p]) => c + ' ' + side(p.szi) + ' ' + usd(p.value)).join(', ') || 'aucune'}`);
   let hello = prev ? prev.hello : false;
   if (!prev || (TOKEN && CHAT && !prev.hello)) {
     // premier passage : on montre simplement où il en est
     const lines = Object.entries(now.pos).map(([c, p]) => `${icon(p.szi)} ${side(p.szi)} <b>${esc(c)}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}${p.liq ? ' · liquidation ' + px(p.liq) : ''} · latent ${usd(p.upnl)}`);
-    if (await tg(`${head} · suivi activé\nCapital ${usd(now.equity)}\n${lines.join('\n') || 'Aucune position ouverte.'}\n${link}`)) { sent++; hello = !!(TOKEN && CHAT); }
+    hellos.push({addr, text: `${head}\nCapital ${usd(now.equity)}\n${lines.join('\n') || 'Aucune position ouverte.'}\n${link}`});
   }
   if (prev) {
     // gains réalisés depuis le passage précédent (pour les fermetures et allègements)
@@ -126,6 +150,16 @@ for (const addr of WALLETS) {
   // pour les petits ajustements, on garde la taille de référence : ils finissent par compter s'ils s'additionnent
   for (const [c, p] of Object.entries(now.pos)) if (p.base && Math.sign(p.base) === Math.sign(p.szi)) { now.pos[c] = {...p, szi: p.base}; delete now.pos[c].base; }
   state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos, hello};
+}
+// état de départ des nouveaux traders suivis : regroupé en un minimum de messages
+if (hellos.length) {
+  let buf = '👀 <b>Suivi activé</b>', group = [];
+  const flush = async () => { if (group.length && await tg(buf)) { sent++; for (const a of group) state.w[a].hello = !!(TOKEN && CHAT); } };
+  for (const h of hellos) {
+    if (buf.length + h.text.length > 3800) { await flush(); buf = '👀 <b>Suivi activé (suite)</b>'; group = []; }
+    buf += '\n\n' + h.text; group.push(h.addr);
+  }
+  await flush();
 }
 fs.writeFileSync(STATE, JSON.stringify(state));
 console.log('Alertes envoyées : ' + sent);
