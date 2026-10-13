@@ -189,7 +189,7 @@ async function aiIdeas() {
   const uni = new Map();
   for (const th of ME.PB.themes) for (const l of [...th.short, ...th.long]) { if (l.liq === false || uni.has(l.tv)) continue; const st = ME.legState(l.tv, 1, today); if (st) uni.set(l.tv, `${l.tv} | ${l.n} | ${l.w} | 20 séances ${ME.pct(st.r20, 0)} | ${st.conf ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances`); }
   const recent = Object.entries(state.ai || {}).filter(([, d]) => d > today - 30).map(([k]) => k);
-  const system = `Tu es le desk global macro d'un hedge fund. Tu écris pour un trader qui prend peu de positions, en swing sur plusieurs mois, et qui ne veut que tes meilleures idées. À partir des titres de presse des derniers jours et du tableau de marché fournis, tu proposes au plus 2 idées, et le plus souvent aucune.
+  const system = `Tu es le desk global macro d'un hedge fund. Tu écris pour un trader qui prend peu de positions, en swing sur plusieurs mois, et qui ne veut que tes meilleures idées. À partir des titres de presse des derniers jours et du tableau de marché fournis, tu classes tes 2 meilleures idées du moment.
 Champ : le monde entier. Banques centrales, dette et budget, élections, guerre commerciale, géopolitique, matières premières (énergie, métaux, agricole) avec leurs facteurs d'offre : météo et climat (El Niño ou La Niña, sécheresse, gel, canicule, ouragan, mousson, niveau des fleuves), grèves, quotas, embargos, routes maritimes. Demande d'un secteur quand elle bascule.
 Ce qu'exige une idée de desk :
 - Un fait daté et vérifiable, trouvé dans les titres fournis ou confirmé par ta recherche web. Pas de rumeur, pas d'analyse technique.
@@ -207,9 +207,9 @@ Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 4. Le catalyseur et son calendrier : ce qui forcera le marché à réviser, et quand, à 6-18 mois.
 5. L'expression la plus propre : l'instrument qui porte la thèse avec le moins de risques parasites.
 6. L'asymétrie : gain si tu as raison, perte si tu as tort, et le fait précis qui te fait couper.
-Si une étape manque, il n'y a pas d'idée.
-Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds, 5 est rare. En dessous de 4, l'idée ne sera pas envoyée, donc ne force rien.
-Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON, vide s'il n'y a rien. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
+Donne toujours tes 2 meilleures idées du moment, même imparfaites, avec une note honnête : c'est la note qui décide de l'envoi, pas toi.
+Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Seules les idées à 4 ou 5 sont envoyées.
+Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const user = `TITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTITRES DU TABLEAU\n${[...uni.values()].join('\n')}`;
   let ideas = jsonOf(await claude(system, user, true));
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
@@ -237,8 +237,9 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
   }
   return n;
 }
-if (AKEY && state.aiDay !== today) {
-  try { const n = await aiIdeas(); state.aiDay = today; console.log('Idées IA envoyées : ' + n); } catch (e) { console.log('IA : erreur, passage ignoré (' + e.message + ').'); }
+// deux lectures des news par jour au plus (une à chaque passage du matin et du soir)
+if (AKEY && Date.now() - (state.aiLast || 0) > 10 * 3600e3) {
+  try { const n = await aiIdeas(); state.aiLast = Date.now(); state.aiDay = today; console.log('Idées IA envoyées : ' + n); } catch (e) { console.log('IA : erreur, passage ignoré (' + e.message + ').'); }
 } else if (!AKEY) console.log('Pas de clé ANTHROPIC_API_KEY : pas d’idées tirées des news.');
 
 for (const k of Object.keys(state.sent)) if (state.sent[k] < today - 120) delete state.sent[k];
