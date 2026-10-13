@@ -5,9 +5,9 @@
 // Secrets : TG_BOT_TOKEN, TG_CHAT_ID. Sans eux, le script tourne à vide et écrit ce qu'il aurait envoyé.
 import fs from 'node:fs';
 
+// Les portefeuilles reliés par « + » appartiennent au même trader : leurs positions sont additionnées, une seule alerte par trade.
 const WALLETS = (process.env.WHALES || [
-  '0x237152b038d88f4156a0cd71090462de7e3f0883',
-  '0xbd1c84113c6deb5044be0c2221f9e9403811ff0e',
+  '0x237152b038d88f4156a0cd71090462de7e3f0883+0xbd1c84113c6deb5044be0c2221f9e9403811ff0e',
   '0x93ab7dbdeb996806454de19c35c8247f4b2511f8',
   '0xec7f9f5b31b8f5da6ac6c0973bbd496e16f9df39',
 ].join(',')).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -27,7 +27,7 @@ const esc = s => String(s).replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '
 const fr = (v, d = 0) => v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
 const usd = v => { const a = Math.abs(v); return (v < 0 ? '−' : '') + (a >= 1e6 ? fr(a / 1e6, 2) + ' M$' : a >= 1e3 ? fr(a / 1e3, 0) + ' k$' : fr(a, 0) + ' $'); };
 const px = v => fr(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4);
-const short = a => a.slice(0, 6) + '…' + a.slice(-4);
+const short = a => a.split('+').map(x => x.slice(0, 6) + '…' + x.slice(-4)).join(' + ');
 const side = s => s > 0 ? 'LONG' : 'SHORT';
 const icon = s => s > 0 ? '🟢' : '🔴';
 
@@ -64,15 +64,34 @@ function snapshot(st) {
   return {equity: +(st.marginSummary || {}).accountValue || 0, pos: out};
 }
 
+// additionne les positions de plusieurs portefeuilles du même trader
+function merge(snaps) {
+  if (snaps.length === 1) return snaps[0];
+  const out = {equity: snaps.reduce((s, x) => s + x.equity, 0), pos: {}};
+  for (const sn of snaps) for (const [c, p] of Object.entries(sn.pos)) {
+    const q = out.pos[c];
+    if (!q) { out.pos[c] = {...p}; continue; }
+    const szi = q.szi + p.szi;
+    out.pos[c] = {szi, value: q.value + p.value * Math.sign(p.szi) * Math.sign(q.szi || 1), upnl: q.upnl + p.upnl, lev: q.lev,
+      entry: Math.sign(q.szi) === Math.sign(p.szi) ? (q.entry * Math.abs(q.szi) + p.entry * Math.abs(p.szi)) / (Math.abs(q.szi) + Math.abs(p.szi)) : q.entry,
+      liq: q.liq && p.liq ? (q.szi > 0 ? Math.max(q.liq, p.liq) : Math.min(q.liq, p.liq)) : (q.liq || p.liq)};
+    out.pos[c].value = Math.abs(out.pos[c].value);
+    if (!szi) delete out.pos[c];
+  }
+  return out;
+}
+
 const state = (() => { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (e) { return {}; } })();
 state.w = state.w || {};
 if (state.chat) CHAT = state.chat;
 let sent = 0;
 for (const addr of WALLETS) {
-  const raw = await api({type: 'clearinghouseState', user: addr});
-  if (!raw || !raw.marginSummary) { console.log(short(addr) + ' : API indisponible, passage ignoré.'); continue; }
-  const now = snapshot(raw), prev = state.w[addr], since = prev ? prev.t : Date.now() - 15 * 60e3;
-  const link = `<a href="https://hypurrscan.io/address/${addr}">voir le portefeuille</a>`;
+  const addrs = addr.split('+');
+  const raws = [];
+  for (const a of addrs) raws.push(await api({type: 'clearinghouseState', user: a}));
+  if (raws.some(r => !r || !r.marginSummary)) { console.log(short(addr) + ' : API indisponible, passage ignoré.'); continue; }
+  const now = merge(raws.map(snapshot)), prev = state.w[addr], since = prev ? prev.t : Date.now() - 15 * 60e3;
+  const link = addrs.map((a, k) => `<a href="https://hypurrscan.io/address/${a}">${addrs.length > 1 ? 'wallet ' + (k + 1) : 'voir le portefeuille'}</a>`).join(' · ');
   const head = `🐋 <b>Whale ${short(addr)}</b>`;
   console.log(`${short(addr)} : capital ${usd(now.equity)}, positions ${Object.entries(now.pos).map(([c, p]) => c + ' ' + side(p.szi) + ' ' + usd(p.value)).join(', ') || 'aucune'}`);
   let hello = prev ? prev.hello : false;
@@ -85,7 +104,7 @@ for (const addr of WALLETS) {
     // gains réalisés depuis le passage précédent (pour les fermetures et allègements)
     let fills = [];
     const changed = Object.keys({...prev.pos, ...now.pos}).filter(c => JSON.stringify((prev.pos[c] || {}).szi) !== JSON.stringify((now.pos[c] || {}).szi));
-    if (changed.length) fills = (await api({type: 'userFillsByTime', user: addr, startTime: since})) || [];
+    if (changed.length) for (const a of addrs) fills = fills.concat((await api({type: 'userFillsByTime', user: a, startTime: since})) || []);
     for (const c of changed) {
       const a = prev.pos[c], b = now.pos[c], f = fills.filter(x => x.coin === c);
       const realized = f.reduce((s, x) => s + (+x.closedPnl || 0), 0);
