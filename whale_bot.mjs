@@ -1,7 +1,8 @@
 // Suivi de portefeuilles Hyperliquid (« whales ») -> alertes Telegram.
 // Lancé toutes les 10 minutes par GitHub Actions (.github/workflows/whale.yml).
 // À chaque passage : positions actuelles (API publique Hyperliquid) comparées au passage précédent.
-// Alerte quand une position d'au moins 2 M$ est ouverte, fermée ou retournée, ou quand elle change de plus de 20 % et d'au moins 2 M$.
+// Alerte quand une position d'au moins 2 M$ est ouverte, fermée ou retournée.
+// Couvre les cryptos et aussi les actions, l'or, le pétrole… (marchés HIP-3 de Hyperliquid, comme xyz:NVDA).
 // Secrets : TG_BOT_TOKEN, TG_CHAT_ID. Sans eux, le script tourne à vide et écrit ce qu'il aurait envoyé.
 import fs from 'node:fs';
 
@@ -37,6 +38,8 @@ const NAMES = {
 const TOKEN = (process.env.TG_BOT_TOKEN || '').trim();
 let CHAT = (process.env.TG_CHAT_ID || '').trim();
 const MIN_PCT = +(process.env.WHALE_MIN_PCT || 0.2), MIN_USD = +(process.env.WHALE_MIN_USD || 2000000);  // seuls les gros trades (2 M$ et plus) déclenchent une alerte
+// renforcements et allègements : coupés par défaut (seuls ouverture, fermeture et retournement alertent) ; WHALE_RESIZE=on pour les remettre
+const RESIZE = /^(on|1|true)$/i.test(process.env.WHALE_RESIZE || 'off');
 const STATE = 'whale_state.json';
 
 const api = async body => {
@@ -46,6 +49,7 @@ const api = async body => {
   }
   return null;
 };
+const nm = c => String(c).split(':').pop();  // xyz:NVDA -> NVDA
 const esc = s => String(s).replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
 const fr = (v, d = 0) => v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
 const usd = v => { const a = Math.abs(v); return (v < 0 ? '−' : '') + (a >= 1e6 ? fr(a / 1e6, 2) + ' M$' : a >= 1e3 ? fr(a / 1e3, 0) + ' k$' : fr(a, 0) + ' $'); };
@@ -78,13 +82,13 @@ async function tg(text) {
   } catch (e) { console.log('Telegram injoignable.'); return false; }
 }
 
-function snapshot(st) {
+function snapshot(sts) {
   const out = {};
-  for (const ap of st.assetPositions || []) {
+  for (const ap of sts.flatMap(st => st.assetPositions || [])) {
     const p = ap.position, szi = +p.szi; if (!szi) continue;
     out[p.coin] = {szi, value: +p.positionValue, entry: +p.entryPx, liq: p.liquidationPx ? +p.liquidationPx : null, lev: p.leverage && p.leverage.value, upnl: +p.unrealizedPnl};
   }
-  return {equity: +(st.marginSummary || {}).accountValue || 0, pos: out};
+  return {equity: sts.reduce((s, st) => s + (+(st.marginSummary || {}).accountValue || 0), 0), pos: out};
 }
 
 // additionne les positions de plusieurs portefeuilles du même trader
@@ -104,24 +108,38 @@ function merge(snaps) {
   return out;
 }
 
+// marchés HIP-3 (actions, matières premières…) : chacun a son propre carnet de positions
+const DEXS = [''].concat(((await api({type: 'perpDexs'})) || []).filter(Boolean).map(d => d.name));
+async function account(a) {
+  const sts = await Promise.all(DEXS.map(d => api(d ? {type: 'clearinghouseState', user: a, dex: d} : {type: 'clearinghouseState', user: a})));
+  if (!sts[0] || !sts[0].marginSummary) return null;
+  return sts.filter(Boolean);
+}
+
 const state = (() => { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (e) { return {}; } })();
 state.w = state.w || {};
 if (state.chat) CHAT = state.chat;
 let sent = 0;
-const hellos = [];
+const hellos = [], stocks = [];
 for (const addr of WALLETS) {
   const addrs = addr.split('+');
   const raws = [];
-  for (const a of addrs) raws.push(await api({type: 'clearinghouseState', user: a}));
-  if (raws.some(r => !r || !r.marginSummary)) { console.log(short(addr) + ' : API indisponible, passage ignoré.'); continue; }
+  for (const a of addrs) raws.push(await account(a));
+  if (raws.some(r => !r)) { console.log(short(addr) + ' : API indisponible, passage ignoré.'); continue; }
   const now = merge(raws.map(snapshot)), prev = state.w[addr], since = prev ? prev.t : Date.now() - 15 * 60e3;
   const link = addrs.map((a, k) => `<a href="https://hypurrscan.io/address/${a}">${addrs.length > 1 ? 'wallet ' + (k + 1) : 'voir le portefeuille'}</a>`).join(' · ');
   const head = `🐋 <b>${NAMES[addr] ? esc(NAMES[addr]) + ' · ' + short(addr) : 'Whale ' + short(addr)}</b>`;
   console.log(`${short(addr)} : capital ${usd(now.equity)}, positions ${Object.entries(now.pos).map(([c, p]) => c + ' ' + side(p.szi) + ' ' + usd(p.value)).join(', ') || 'aucune'}`);
   let hello = prev ? prev.hello : false;
+  if (prev && !prev.hip3 && DEXS.length > 1) {
+    // premier passage avec les actions : leurs positions actuelles servent de point de départ (pas d'alerte « ouvre »)
+    const big = [];
+    for (const [c, p] of Object.entries(now.pos)) if (c.includes(':') && !prev.pos[c]) { prev.pos[c] = p; if (p.value >= MIN_USD) big.push(`${icon(p.szi)} ${side(p.szi)} <b>${esc(nm(c))}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}`); }
+    if (big.length) stocks.push(`${head}\n${big.join('\n')}`);
+  }
   if (!prev || (TOKEN && CHAT && !prev.hello)) {
     // premier passage : on montre simplement où il en est
-    const lines = Object.entries(now.pos).map(([c, p]) => `${icon(p.szi)} ${side(p.szi)} <b>${esc(c)}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}${p.liq ? ' · liquidation ' + px(p.liq) : ''} · latent ${usd(p.upnl)}`);
+    const lines = Object.entries(now.pos).map(([c, p]) => `${icon(p.szi)} ${side(p.szi)} <b>${esc(nm(c))}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}${p.liq ? ' · liquidation ' + px(p.liq) : ''} · latent ${usd(p.upnl)}`);
     hellos.push({addr, text: `${head}\nCapital ${usd(now.equity)}\n${lines.join('\n') || 'Aucune position ouverte.'}\n${link}`});
   }
   if (prev) {
@@ -135,21 +153,21 @@ for (const addr of WALLETS) {
       const vwap = f.length ? f.reduce((s, x) => s + (+x.px) * (+x.sz), 0) / f.reduce((s, x) => s + (+x.sz), 0) : null;
       const at = vwap ? ` vers ${px(vwap)}` : '';
       let msg = null;
-      if (!a && b && b.value >= MIN_USD) msg = `${icon(b.szi)} <b>ouvre un ${side(b.szi)} ${esc(c)}</b>${at}\nTaille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}`;
-      else if (a && !b && a.value >= MIN_USD) msg = `⚪ <b>ferme son ${side(a.szi)} ${esc(c)}</b>${at}\nIl était de ${usd(a.value)} · gain réalisé ${usd(realized)}`;
-      else if (a && b && Math.sign(a.szi) !== Math.sign(b.szi) && Math.max(a.value, b.value) >= MIN_USD) msg = `🔄 <b>retourne ${esc(c)} : ${side(a.szi)} → ${side(b.szi)}</b>${at}\nNouvelle taille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''} · gain réalisé ${usd(realized)}`;
-      else if (a && b && Math.sign(a.szi) === Math.sign(b.szi)) {
+      if (!a && b && b.value >= MIN_USD) msg = `${icon(b.szi)} <b>ouvre un ${side(b.szi)} ${esc(nm(c))}</b>${at}\nTaille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}`;
+      else if (a && !b && a.value >= MIN_USD) msg = `⚪ <b>ferme son ${side(a.szi)} ${esc(nm(c))}</b>${at}\nIl était de ${usd(a.value)} · gain réalisé ${usd(realized)}`;
+      else if (a && b && Math.sign(a.szi) !== Math.sign(b.szi) && Math.max(a.value, b.value) >= MIN_USD) msg = `🔄 <b>retourne ${esc(nm(c))} : ${side(a.szi)} → ${side(b.szi)}</b>${at}\nNouvelle taille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''} · gain réalisé ${usd(realized)}`;
+      else if (RESIZE && a && b && Math.sign(a.szi) === Math.sign(b.szi)) {
         const dSz = Math.abs(b.szi) - Math.abs(a.szi), dUsd = Math.abs(dSz) * (b.value / Math.abs(b.szi));
         if (Math.abs(dSz) / Math.abs(a.szi) >= MIN_PCT && dUsd >= MIN_USD)
-          msg = `${dSz > 0 ? icon(b.szi) + ' <b>renforce' : '🟡 <b>allège'} son ${side(b.szi)} ${esc(c)}</b> de ${usd(dUsd)}${at}\nTaille ${usd(a.value)} → ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}${dSz < 0 ? ' · gain réalisé ' + usd(realized) : ''}`;
+          msg = `${dSz > 0 ? icon(b.szi) + ' <b>renforce' : '🟡 <b>allège'} son ${side(b.szi)} ${esc(nm(c))}</b> de ${usd(dUsd)}${at}\nTaille ${usd(a.value)} → ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}${dSz < 0 ? ' · gain réalisé ' + usd(realized) : ''}`;
       }
       if (msg && await tg(`${head} ${msg}\nCapital ${usd(now.equity)} · ${link}`)) sent++;
-      if (!msg) now.pos[c] = a && b ? {...b, base: (prev.pos[c].base || prev.pos[c].szi)} : now.pos[c];
+      if (!msg && a && b) now.pos[c] = {...b, base: (a.base || a.szi)};
     }
   }
   // pour les petits ajustements, on garde la taille de référence : ils finissent par compter s'ils s'additionnent
-  for (const [c, p] of Object.entries(now.pos)) if (p.base && Math.sign(p.base) === Math.sign(p.szi)) { now.pos[c] = {...p, szi: p.base}; delete now.pos[c].base; }
-  state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos, hello};
+  for (const [c, p] of Object.entries(now.pos)) if (p && p.base && Math.sign(p.base) === Math.sign(p.szi)) { now.pos[c] = {...p, szi: p.base}; delete now.pos[c].base; }
+  state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos, hello, hip3: DEXS.length > 1 || !!(prev && prev.hip3)};
 }
 // état de départ des nouveaux traders suivis : regroupé en un minimum de messages
 if (hellos.length) {
@@ -161,5 +179,6 @@ if (hellos.length) {
   }
   await flush();
 }
+if (stocks.length && !(await tg('📈 <b>Suivi des actions et matières premières activé</b>\nPositions de 2 M$ et plus déjà ouvertes :\n\n' + stocks.join('\n\n')).catch(() => false))) console.log('Message des actions non envoyé.');
 fs.writeFileSync(STATE, JSON.stringify(state));
 console.log('Alertes envoyées : ' + sent);
