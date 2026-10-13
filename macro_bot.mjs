@@ -248,7 +248,7 @@ if (AKEY && Date.now() - (state.aiLast || 0) > 10 * 3600e3) {
 // 5. Thèses sous surveillance (macro_watch.json + thèses ajoutées par le desk IA).
 // Chaque thèse attend un déclencheur sur le chart. Quand il se produit, Opus vérifie l'actualité et le chart :
 // l'idée part sur Telegram seulement s'il la note 4/5 ou plus. Rien n'est envoyé tant qu'il ne se passe rien.
-const WATCH_REVIEWS = +(process.env.WATCH_REVIEWS || 2);   // avis d'Opus au plus par passage (coût)
+const WATCH_REVIEWS = +(process.env.WATCH_REVIEWS || 3);   // avis d'Opus au plus par passage (coût)
 const WATCH_MIN = +(process.env.WATCH_MIN || 4);
 const iso = () => new Date().toISOString().slice(0, 10);
 const dayOf = s => Math.floor(Date.parse(s) / 864e5);
@@ -264,6 +264,7 @@ async function quotes(syms) {
 const yahooOf = tv => {
   const [x, t] = tv.split(':');
   if (x === 'FX') return t + '=X';
+  if (['CBOT', 'COMEX', 'NYMEX', 'CME'].includes(x) && /1!$/.test(t)) return t.replace('1!', '') + '=F';
   const suf = {EURONEXT: '.PA', XETR: '.DE', MIL: '.MI', LSE: '.L', SIX: '.SW', TSE: '.T', HKEX: '.HK', ASX: '.AX', TSX: '.TO', BME: '.MC', OMXSTO: '.ST', OSL: '.OL'}[x];
   if (['NYSE', 'NASDAQ', 'AMEX', 'NYSEARCA', 'CBOE'].includes(x)) return t.replace('.', '-');
   return suf ? t.replace(/\.$/, '') + suf : null;
@@ -300,7 +301,7 @@ Sois sévère : 4 veut dire que tu engagerais le capital du fonds aujourd'hui, 5
 Termine par <json>{"note": 1 à 5, "analyse": "3 phrases courtes en français : ce qui vient de se passer (fait daté), pourquoi le chart confirme ou non, le risque principal", "invalidation": "niveau précis pour couper, 10 mots max", "objectif": "objectif de prix ou de ratio, 8 mots max", "catalyseur": "prochain événement et sa date, 10 mots max"}</json>.`;
   const user = `Thèse : ${w.titre}
 Sens : ${w.sens === 'achat' ? 'ACHAT' : 'VENTE'} ${w.nom} (${w.tv}${w.tv2 ? ', contre ' + (w.sens === 'achat' ? 'vente' : 'achat') + ' de ' + w.tv2 : ''})
-Raisonnement de départ (${w.cree}) : ${w.these}
+Thèse de départ (${w.cree}) : ${w.these}${w.detail ? '\n' + w.detail : ''}
 Signal : ${w.tv2 ? 'le ratio ' + w.tv + ' / ' + w.tv2 + ' (' + v.toFixed(4) + ')' : 'le cours'} ${trigText(w)}.
 Invalidation prévue : ${w.invalidation}
 Cours actuels :
@@ -311,6 +312,12 @@ Date : ${iso()}.`;
 }
 
 async function sendThesis(w, q, v, op) {
+  const r = await sendThesisCard(w, q, v, op);
+  // la thèse d'investissement complète, juste sous le chart
+  if (r.ok && w.detail) { if (TOKEN && CHAT) await sendText(`📋 <b>Thèse : ${ME.esc(w.titre)}</b>\n\n${ME.esc(w.detail)}`.slice(0, 4000)); else console.log('  [à vide] thèse complète : ' + w.detail.replace(/\n/g, ' ¦ ')); }
+  return r;
+}
+async function sendThesisCard(w, q, v, op) {
   const e = ME.esc, buy = w.sens === 'achat';
   const px = w.tv2 ? 'ratio ' + v.toFixed(4) : (+q.close).toPrecision(5) + ' ' + (q.currency || '');
   const cap = `🎯 <b>${e(w.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(w.nom)}</b> · ${e(ME.short(w.tv))}${w.tv2 ? ' / ' + e(ME.short(w.tv2)) : ''} · ${e(px)}\n\n` +
@@ -371,7 +378,7 @@ Pense en effets de second ordre : quand un choc est déjà dans les prix d'un ac
 Exigences : un fait macro daté et vérifiable (cherche sur le web) ; une chaîne de causalité claire ; un actif très liquide et négociable chez Interactive Brokers (action, ETF, devise FX:EURUSD, future) avec son symbole TradingView exact (PLACE:TICKER) ; un déclencheur qui prouve que le marché commence à l'intégrer : "sous" ou "au-dessus" d'un niveau précis proche du cours actuel (moins de 8 % d'écart), "plus_bas_1m" ou "plus_haut_1m". Pour revendre un rebond d'un titre survendu, "au-dessus" de sa moyenne 50 jours.
 Ne propose rien qui ressemble aux thèses déjà suivies : ${live.map(w => w.tv + ' ' + w.sens).join(', ') || 'aucune'}.
 Propose au plus 3 thèses, seulement celles que tu notes 4 ou 5 (4 veut dire que tu engagerais le capital du fonds dès le déclencheur). Zéro est une réponse acceptable.
-Termine par <json>[{"id": "mot-cle-court", "titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "these": "fait daté et mécanisme, 2 phrases courtes en français", "si": "sous" | "au-dessus" | "plus_bas_1m" | "plus_haut_1m", "niveau": nombre ou null, "invalidation": "10 mots max", "mois": nombre, "note": 4 ou 5}]</json>.`;
+Termine par <json>[{"id": "mot-cle-court", "titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "these": "fait daté et mécanisme, 2 phrases courtes en français", "detail": "la thèse d'investissement complète en français, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus, Notre écart, Expression, Catalyseurs (avec dates), Risque", "si": "sous" | "au-dessus" | "plus_bas_1m" | "plus_haut_1m", "niveau": nombre ou null, "invalidation": "10 mots max", "mois": nombre, "note": 4 ou 5}]</json>.`;
   const uni = new Map();
   for (const th of ME.PB.themes) for (const l of [...th.short, ...th.long]) { if (l.liq === false || uni.has(l.tv)) continue; const st = ME.legState(l.tv, 1, today); if (st) uni.set(l.tv, `${l.tv} | ${l.n} | 20 séances ${ME.pct(st.r20, 0)} | ${st.conf ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances`); }
   const user = `Date : ${iso()}.\nTITRES DU TABLEAU (performances récentes)\n${[...uni.values()].join('\n')}`;
