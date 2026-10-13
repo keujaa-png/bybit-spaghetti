@@ -1,7 +1,7 @@
 // Suivi de portefeuilles Hyperliquid (« whales ») -> alertes Telegram.
 // Lancé toutes les 10 minutes par GitHub Actions (.github/workflows/whale.yml).
 // À chaque passage : positions actuelles (API publique Hyperliquid) comparées au passage précédent.
-// Alerte quand une position est ouverte, fermée, retournée, ou change de plus de 20 % (et d'au moins 250 000 $).
+// Alerte quand une position d'au moins 2 M$ est ouverte, fermée ou retournée, ou quand elle change de plus de 20 % et d'au moins 2 M$.
 // Secrets : TG_BOT_TOKEN, TG_CHAT_ID. Sans eux, le script tourne à vide et écrit ce qu'il aurait envoyé.
 import fs from 'node:fs';
 
@@ -36,7 +36,7 @@ const NAMES = {
 };
 const TOKEN = (process.env.TG_BOT_TOKEN || '').trim();
 let CHAT = (process.env.TG_CHAT_ID || '').trim();
-const MIN_PCT = +(process.env.WHALE_MIN_PCT || 0.2), MIN_USD = +(process.env.WHALE_MIN_USD || 250000);
+const MIN_PCT = +(process.env.WHALE_MIN_PCT || 0.2), MIN_USD = +(process.env.WHALE_MIN_USD || 2000000);  // seuls les gros trades (2 M$ et plus) déclenchent une alerte
 const STATE = 'whale_state.json';
 
 const api = async body => {
@@ -135,10 +135,10 @@ for (const addr of WALLETS) {
       const vwap = f.length ? f.reduce((s, x) => s + (+x.px) * (+x.sz), 0) / f.reduce((s, x) => s + (+x.sz), 0) : null;
       const at = vwap ? ` vers ${px(vwap)}` : '';
       let msg = null;
-      if (!a && b) msg = `${icon(b.szi)} <b>ouvre un ${side(b.szi)} ${esc(c)}</b>${at}\nTaille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}`;
-      else if (a && !b) msg = `⚪ <b>ferme son ${side(a.szi)} ${esc(c)}</b>${at}\nIl était de ${usd(a.value)} · gain réalisé ${usd(realized)}`;
-      else if (Math.sign(a.szi) !== Math.sign(b.szi)) msg = `🔄 <b>retourne ${esc(c)} : ${side(a.szi)} → ${side(b.szi)}</b>${at}\nNouvelle taille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''} · gain réalisé ${usd(realized)}`;
-      else {
+      if (!a && b && b.value >= MIN_USD) msg = `${icon(b.szi)} <b>ouvre un ${side(b.szi)} ${esc(c)}</b>${at}\nTaille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}`;
+      else if (a && !b && a.value >= MIN_USD) msg = `⚪ <b>ferme son ${side(a.szi)} ${esc(c)}</b>${at}\nIl était de ${usd(a.value)} · gain réalisé ${usd(realized)}`;
+      else if (a && b && Math.sign(a.szi) !== Math.sign(b.szi) && Math.max(a.value, b.value) >= MIN_USD) msg = `🔄 <b>retourne ${esc(c)} : ${side(a.szi)} → ${side(b.szi)}</b>${at}\nNouvelle taille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''} · gain réalisé ${usd(realized)}`;
+      else if (a && b && Math.sign(a.szi) === Math.sign(b.szi)) {
         const dSz = Math.abs(b.szi) - Math.abs(a.szi), dUsd = Math.abs(dSz) * (b.value / Math.abs(b.szi));
         if (Math.abs(dSz) / Math.abs(a.szi) >= MIN_PCT && dUsd >= MIN_USD)
           msg = `${dSz > 0 ? icon(b.szi) + ' <b>renforce' : '🟡 <b>allège'} son ${side(b.szi)} ${esc(c)}</b> de ${usd(dUsd)}${at}\nTaille ${usd(a.value)} → ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}${dSz < 0 ? ' · gain réalisé ' + usd(realized) : ''}`;
