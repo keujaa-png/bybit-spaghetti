@@ -57,11 +57,13 @@ for (const addr of WALLETS) {
   const link = `<a href="https://hypurrscan.io/address/${addr}">voir le portefeuille</a>`;
   const head = `🐋 <b>Whale ${short(addr)}</b>`;
   console.log(`${short(addr)} : capital ${usd(now.equity)}, positions ${Object.entries(now.pos).map(([c, p]) => c + ' ' + side(p.szi) + ' ' + usd(p.value)).join(', ') || 'aucune'}`);
-  if (!prev) {
+  let hello = prev ? prev.hello : false;
+  if (!prev || (TOKEN && CHAT && !prev.hello)) {
     // premier passage : on montre simplement où il en est
     const lines = Object.entries(now.pos).map(([c, p]) => `${icon(p.szi)} ${side(p.szi)} <b>${esc(c)}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}${p.liq ? ' · liquidation ' + px(p.liq) : ''} · latent ${usd(p.upnl)}`);
-    if (await tg(`${head} · suivi activé\nCapital ${usd(now.equity)}\n${lines.join('\n') || 'Aucune position ouverte.'}\n${link}`)) sent++;
-  } else {
+    if (await tg(`${head} · suivi activé\nCapital ${usd(now.equity)}\n${lines.join('\n') || 'Aucune position ouverte.'}\n${link}`)) { sent++; hello = !!(TOKEN && CHAT); }
+  }
+  if (prev) {
     // gains réalisés depuis le passage précédent (pour les fermetures et allègements)
     let fills = [];
     const changed = Object.keys({...prev.pos, ...now.pos}).filter(c => JSON.stringify((prev.pos[c] || {}).szi) !== JSON.stringify((now.pos[c] || {}).szi));
@@ -86,7 +88,7 @@ for (const addr of WALLETS) {
   }
   // pour les petits ajustements, on garde la taille de référence : ils finissent par compter s'ils s'additionnent
   for (const [c, p] of Object.entries(now.pos)) if (p.base && Math.sign(p.base) === Math.sign(p.szi)) { now.pos[c] = {...p, szi: p.base}; delete now.pos[c].base; }
-  state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos};
+  state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos, hello};
 }
 fs.writeFileSync(STATE, JSON.stringify(state));
 console.log('Alertes envoyées : ' + sent);
