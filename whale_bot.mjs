@@ -40,6 +40,7 @@ async function findChat() {
     const u = j.ok && j.result.map(x => x.message || x.channel_post || x.my_chat_member).filter(Boolean).pop();
     if (u) { CHAT = String(u.chat.id); state.chat = CHAT; console.log('Chat trouvé automatiquement à partir des derniers messages reçus par le bot.'); return true; }
     console.log(j.ok ? 'Aucun message reçu par le bot : écris-lui « bonjour » dans Telegram.' : 'Lecture des messages du bot impossible : ' + (j.description || 'erreur'));
+    try { const me = await (await fetch(`https://api.telegram.org/bot${TOKEN}/getMe`)).json(); if (me.ok) console.log('Ce jeton est celui du bot @' + me.result.username + ' : c’est à lui qu’il faut écrire (bouton Démarrer).'); } catch (e) {}
   } catch (e) {}
   return false;
 }
