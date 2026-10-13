@@ -245,5 +245,161 @@ if (AKEY && Date.now() - (state.aiLast || 0) > 10 * 3600e3) {
   try { const n = await aiIdeas(); state.aiLast = Date.now(); state.aiDay = today; console.log('Idées IA envoyées : ' + n); } catch (e) { console.log('IA : erreur, passage ignoré (' + e.message + ').'); }
 } else if (!AKEY) console.log('Pas de clé ANTHROPIC_API_KEY : pas d’idées tirées des news.');
 
+// 5. Thèses sous surveillance (macro_watch.json + thèses ajoutées par le desk IA).
+// Chaque thèse attend un déclencheur sur le chart. Quand il se produit, Opus vérifie l'actualité et le chart :
+// l'idée part sur Telegram seulement s'il la note 4/5 ou plus. Rien n'est envoyé tant qu'il ne se passe rien.
+const WATCH_REVIEWS = +(process.env.WATCH_REVIEWS || 2);   // avis d'Opus au plus par passage (coût)
+const WATCH_MIN = +(process.env.WATCH_MIN || 4);
+const iso = () => new Date().toISOString().slice(0, 10);
+const dayOf = s => Math.floor(Date.parse(s) / 864e5);
+async function quotes(syms) {
+  const cols = ['close', 'SMA50', 'SMA200', 'RSI', 'Perf.1M', 'Perf.YTD', 'price_52_week_high', 'price_52_week_low', 'High.1M', 'Low.1M', 'description', 'currency'];
+  try {
+    const r = await fetch('https://scanner.tradingview.com/global/scan', {method: 'POST', body: JSON.stringify({symbols: {tickers: syms}, columns: cols})});
+    const out = {};
+    for (const d of (await r.json()).data || []) { const o = {}; cols.forEach((c, i) => o[c] = d.d[i]); out[d.s] = o; }
+    return out;
+  } catch (e) { return {}; }
+}
+const yahooOf = tv => {
+  const [x, t] = tv.split(':');
+  if (x === 'FX') return t + '=X';
+  const suf = {EURONEXT: '.PA', XETR: '.DE', MIL: '.MI', LSE: '.L', SIX: '.SW', TSE: '.T', HKEX: '.HK', ASX: '.AX', TSX: '.TO', BME: '.MC', OMXSTO: '.ST', OSL: '.OL'}[x];
+  if (['NYSE', 'NASDAQ', 'AMEX', 'NYSEARCA', 'CBOE'].includes(x)) return t.replace('.', '-');
+  return suf ? t.replace(/\.$/, '') + suf : null;
+};
+async function history(tv) {
+  const y = yahooOf(tv); if (!y) return null;
+  try {
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(y)}?range=1y&interval=1d`, {headers: {'User-Agent': 'Mozilla/5.0'}});
+    const res = (await r.json()).chart.result[0], c = res.indicators.quote[0].close, t = [], v = [];
+    res.timestamp.forEach((s, i) => { if (c[i] != null) { t.push(Math.floor(s / 86400)); v.push(c[i]); } });
+    return v.length > 60 ? {t, c: v} : null;
+  } catch (e) { return null; }
+}
+function hit(w, q, q2) {
+  if (!q || q.close == null) return null;
+  const v = q2 ? q.close / q2.close : q.close;
+  if (w.si === 'sous') return v < w.niveau ? v : null;
+  if (w.si === 'au-dessus') return v > w.niveau ? v : null;
+  if (w.si === 'plus_bas_1m') return q['Low.1M'] != null && v <= q['Low.1M'] * 1.003 ? v : null;
+  if (w.si === 'plus_haut_1m') return q['High.1M'] != null && v >= q['High.1M'] * 0.997 ? v : null;
+  return null;
+}
+const trigText = w => w.si === 'sous' ? 'passe sous ' + w.niveau : w.si === 'au-dessus' ? 'passe au-dessus de ' + w.niveau : w.si === 'plus_bas_1m' ? 'touche son plus bas d’un mois' : 'touche son plus haut d’un mois';
+const qLine = (tv, q) => q ? `${tv} : ${(+q.close).toPrecision(5)} ${q.currency || ''} | moyenne 50 j ${q.SMA50 ? (+q.SMA50).toPrecision(5) : '?'} | moyenne 200 j ${q.SMA200 ? (+q.SMA200).toPrecision(5) : '?'} | RSI ${q.RSI ? Math.round(q.RSI) : '?'} | 1 mois ${q['Perf.1M'] != null ? q['Perf.1M'].toFixed(1) + ' %' : '?'} | depuis janvier ${q['Perf.YTD'] != null ? q['Perf.YTD'].toFixed(1) + ' %' : '?'} | 52 semaines ${q.price_52_week_low} – ${q.price_52_week_high}` : tv + ' : pas de cours';
+
+async function reviewThesis(w, q, q2, v) {
+  const system = `Tu es le desk global macro d'un hedge fund. Le trader suit une thèse macro et attendait un signal du chart pour entrer. Le signal vient de se produire. Tu décides s'il faut y aller maintenant, pour un swing de plusieurs mois.
+Vérifie sur le web l'actualité des derniers jours sur ce thème et sur ce titre. Puis juge :
+1. La thèse tient-elle encore ? Un fait récent la renforce-t-il ou la casse-t-il (banque centrale, budget, élection, résultats, guerre, pétrole) ?
+2. Le chart : le signal est-il propre (cassure nette, tendance qui démarre) ou le mouvement est-il déjà étiré (RSI extrême, loin de la moyenne 50 jours) ? On n'achète pas un sommet, on ne vend pas un plancher.
+3. Le rapport gain/risque avec une invalidation concrète et proche.
+4. Le prochain catalyseur et sa date.
+Sois sévère : 4 veut dire que tu engagerais le capital du fonds aujourd'hui, 5 est rare, 3 veut dire attendre.
+Termine par <json>{"note": 1 à 5, "analyse": "3 phrases courtes en français : ce qui vient de se passer (fait daté), pourquoi le chart confirme ou non, le risque principal", "invalidation": "niveau précis pour couper, 10 mots max", "objectif": "objectif de prix ou de ratio, 8 mots max", "catalyseur": "prochain événement et sa date, 10 mots max"}</json>.`;
+  const user = `Thèse : ${w.titre}
+Sens : ${w.sens === 'achat' ? 'ACHAT' : 'VENTE'} ${w.nom} (${w.tv}${w.tv2 ? ', contre ' + (w.sens === 'achat' ? 'vente' : 'achat') + ' de ' + w.tv2 : ''})
+Raisonnement de départ (${w.cree}) : ${w.these}
+Signal : ${w.tv2 ? 'le ratio ' + w.tv + ' / ' + w.tv2 + ' (' + v.toFixed(4) + ')' : 'le cours'} ${trigText(w)}.
+Invalidation prévue : ${w.invalidation}
+Cours actuels :
+${qLine(w.tv, q)}${w.tv2 ? '\n' + qLine(w.tv2, q2) : ''}
+Date : ${iso()}.`;
+  const j = jsonOf(await claude(system, user, true));
+  return j && j.note ? j : null;
+}
+
+async function sendThesis(w, q, v, op) {
+  const e = ME.esc, buy = w.sens === 'achat';
+  const px = w.tv2 ? 'ratio ' + v.toFixed(4) : (+q.close).toPrecision(5) + ' ' + (q.currency || '');
+  const cap = `🎯 <b>${e(w.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(w.nom)}</b> · ${e(ME.short(w.tv))}${w.tv2 ? ' / ' + e(ME.short(w.tv2)) : ''} · ${e(px)}\n\n` +
+    `${e(w.these)}\n\n🧠 <b>Opus ${e(op.note)}/5</b> : ${e(op.analyse)}\n\n` +
+    `Je coupe si : ${e(op.invalidation || w.invalidation)}\nObjectif : ${e(op.objectif || '?')} · horizon ${e(w.mois || 4)} mois\nCatalyseur : ${e(op.catalyseur || '?')}\n` +
+    `<a href="${ME.tvUrl(w.tv)}">Chart TradingView</a> · pas un conseil`;
+  const H = w.tv2 ? null : await history(w.tv);
+  if (H && TOKEN && CHAT) {
+    try {
+      const {createCanvas} = await import('@napi-rs/canvas'); const cv = createCanvas(900, 340), ctx = cv.getContext('2d'); ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, 900, 340);
+      const ma = H.c.map((_, i) => ME.sma(H.c, 50, i)), lines = [{v: ma, color: '#5b6b80', w: 2, dash: [6, 5]}, {v: H.c, color: '#d7dde5', w: 2.5}];
+      if (w.niveau && !w.tv2) lines.unshift({v: H.c.map(() => w.niveau), color: buy ? '#3fb950' : '#f85149', w: 1.5, dash: [3, 4]});
+      const n = H.c.length - 1;
+      ME.panel(ctx, 0, 6, 900, 328, H.t, lines, {title: w.nom + '  (' + w.tv + ')', marks: [{i: n, v: H.c[n], color: buy ? '#3fb950' : '#f85149', label: buy ? 'signal achat' : 'signal vente'}]});
+      const fd = new FormData(); fd.append('chat_id', CHAT); fd.append('caption', cap.slice(0, 1020)); fd.append('parse_mode', 'HTML'); fd.append('photo', new Blob([cv.toBuffer('image/png')], {type: 'image/png'}), 'these.png');
+      const r = await tg('sendPhoto', fd); if (r.ok) return r;
+    } catch (err) { console.log('  chart impossible : ' + err.message); }
+  }
+  if (!TOKEN || !CHAT) { console.log('  [à vide] ' + cap.replace(/<[^>]+>/g, '').replace(/\n+/g, ' ¦ ')); return {ok: true}; }
+  return sendText(cap);
+}
+
+async function watchTheses() {
+  const seed = (readJ('macro_watch.json', {theses: []}).theses || []);
+  state.watch = state.watch || {};
+  const S = state.watch;   // id -> {sent, reviewed, note} ; les thèses du desk IA sont dans S[id].w
+  const all = [...seed, ...Object.values(S).filter(x => x.w).map(x => x.w)]
+    .filter(w => !(S[w.id] && S[w.id].sent) && !(w.expire && today > dayOf(w.expire)));
+  if (!all.length) return 0;
+  const Q = await quotes([...new Set(all.flatMap(w => [w.tv, w.tv2].filter(Boolean)))]);
+  let reviews = 0, n = 0;
+  for (const w of all) {
+    const q = Q[w.tv], q2 = w.tv2 ? Q[w.tv2] : null, v = hit(w, q, q2);
+    const st = S[w.id] = S[w.id] || {};
+    console.log(`  thèse ${w.id} : ${q ? (w.tv2 && q2 ? 'ratio ' + (q.close / q2.close).toFixed(4) : q.close) : 'pas de cours'} · ${v != null ? 'SIGNAL (' + trigText(w) + ')' : 'en attente (' + trigText(w) + ')'}`);
+    if (v == null) continue;
+    if (st.reviewed && today - st.reviewed < 5) continue;   // jugée il y a moins de 5 jours : on attend
+    if (!AKEY || reviews >= WATCH_REVIEWS) continue;
+    reviews++;
+    let op = null; try { op = await reviewThesis(w, q, q2, v); } catch (e) {}
+    st.reviewed = today; st.note = op ? +op.note : null;
+    if (!op) { console.log('  avis Opus illisible'); continue; }
+    console.log(`  Opus ${op.note}/5 sur ${w.id} : ${op.analyse}`);
+    if (+op.note < WATCH_MIN) continue;
+    const r = await sendThesis(w, q, v, op);
+    if (r.ok) { st.sent = today; n++; }
+  }
+  return n;
+}
+
+// Une fois par semaine, le desk IA ajoute jusqu'à 3 thèses « prochain domino », avec leur déclencheur sur le chart
+async function newTheses() {
+  state.watch = state.watch || {};
+  const seed = (readJ('macro_watch.json', {theses: []}).theses || []);
+  const live = [...seed, ...Object.values(state.watch).filter(x => x.w).map(x => x.w)].filter(w => !(w.expire && today > dayOf(w.expire)));
+  const system = `Tu es le desk global macro d'un hedge fund. Tu prépares des thèses de swing de plusieurs mois que le trader surveillera, chacune avec un déclencheur précis sur le chart pour entrer.
+Pense en effets de second ordre : quand un choc est déjà dans les prix d'un actif (par exemple l'immobilier français après la hausse de l'OAT), quel est le prochain domino qui n'a pas encore bougé (les banques qui portent cette dette, la devise, les pays voisins, les fournisseurs, les clients) ?
+Exigences : un fait macro daté et vérifiable (cherche sur le web) ; une chaîne de causalité claire ; un actif très liquide et négociable chez Interactive Brokers (action, ETF, devise FX:EURUSD, future) avec son symbole TradingView exact (PLACE:TICKER) ; un déclencheur qui prouve que le marché commence à l'intégrer : "sous" ou "au-dessus" d'un niveau précis proche du cours actuel (moins de 8 % d'écart), "plus_bas_1m" ou "plus_haut_1m". Pour revendre un rebond d'un titre survendu, "au-dessus" de sa moyenne 50 jours.
+Ne propose rien qui ressemble aux thèses déjà suivies : ${live.map(w => w.tv + ' ' + w.sens).join(', ') || 'aucune'}.
+Propose au plus 3 thèses, seulement celles que tu notes 4 ou 5 (4 veut dire que tu engagerais le capital du fonds dès le déclencheur). Zéro est une réponse acceptable.
+Termine par <json>[{"id": "mot-cle-court", "titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "these": "fait daté et mécanisme, 2 phrases courtes en français", "si": "sous" | "au-dessus" | "plus_bas_1m" | "plus_haut_1m", "niveau": nombre ou null, "invalidation": "10 mots max", "mois": nombre, "note": 4 ou 5}]</json>.`;
+  const uni = new Map();
+  for (const th of ME.PB.themes) for (const l of [...th.short, ...th.long]) { if (l.liq === false || uni.has(l.tv)) continue; const st = ME.legState(l.tv, 1, today); if (st) uni.set(l.tv, `${l.tv} | ${l.n} | 20 séances ${ME.pct(st.r20, 0)} | ${st.conf ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances`); }
+  const user = `Date : ${iso()}.\nTITRES DU TABLEAU (performances récentes)\n${[...uni.values()].join('\n')}`;
+  const L = jsonOf(await claude(system, user, true));
+  if (!Array.isArray(L)) { console.log('Desk IA : pas de nouvelle thèse lisible.'); return 0; }
+  let n = 0;
+  for (const w of L.slice(0, 3)) {
+    if (!w || !w.tv || !(w.note >= 4) || !/^(sous|au-dessus|plus_bas_1m|plus_haut_1m)$/.test(w.si || '')) continue;
+    w.tv = String(w.tv).toUpperCase(); w.sens = /achat/i.test(w.sens) ? 'achat' : 'vente';
+    const Q = (await quotes([w.tv]))[w.tv];
+    if (!Q || Q.close == null) { console.log('  thèse écartée, symbole introuvable : ' + w.tv); continue; }
+    if (/^(sous|au-dessus)$/.test(w.si) && !(Math.abs(w.niveau / Q.close - 1) < 0.15)) { console.log('  thèse écartée, niveau trop loin du cours : ' + w.tv); continue; }
+    const ok = await checkSym(w.tv); if (ok && !ok.liquid) { console.log('  thèse écartée, trop peu liquide : ' + w.tv); continue; }
+    w.id = 'ia-' + String(w.id || w.tv).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + today;
+    w.cree = iso(); w.expire = new Date((today + 30 * (w.mois || 4)) * 864e5).toISOString().slice(0, 10);
+    state.watch[w.id] = {w};
+    console.log(`  nouvelle thèse : ${w.sens.toUpperCase()} ${w.nom} (${w.tv}), signal si ${trigText(w)}`);
+    n++;
+  }
+  return n;
+}
+
+try {
+  if (AKEY && today - (state.watchGen || 0) >= 7) { const k = await newTheses(); state.watchGen = today; console.log('Thèses ajoutées par le desk IA : ' + k); }
+  console.log('Thèses sous surveillance :');
+  console.log('Idées de thèses envoyées : ' + await watchTheses());
+} catch (e) { console.log('Thèses : erreur, passage ignoré (' + e.message + ').'); }
+for (const [k, x] of Object.entries(state.watch || {})) if (x.w && x.w.expire && today > dayOf(x.w.expire) + 30) delete state.watch[k];
+
 for (const k of Object.keys(state.sent)) if (state.sent[k] < today - 120) delete state.sent[k];
 fs.writeFileSync('macro_state.json', JSON.stringify(state));

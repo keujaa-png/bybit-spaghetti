@@ -3,6 +3,7 @@
 // À chaque passage : positions actuelles (API publique Hyperliquid) comparées au passage précédent.
 // Alerte quand une position d'au moins 2 M$ est ouverte, fermée ou retournée.
 // Couvre les cryptos et aussi les actions, l'or, le pétrole… (marchés HIP-3 de Hyperliquid, comme xyz:NVDA).
+// Pas de message de suivi : uniquement les nouvelles positions (ouverture, fermeture, retournement).
 // Secrets : TG_BOT_TOKEN, TG_CHAT_ID. Sans eux, le script tourne à vide et écrit ce qu'il aurait envoyé.
 import fs from 'node:fs';
 
@@ -120,7 +121,6 @@ const state = (() => { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); 
 state.w = state.w || {};
 if (state.chat) CHAT = state.chat;
 let sent = 0;
-const hellos = [], stocks = [];
 for (const addr of WALLETS) {
   const addrs = addr.split('+');
   const raws = [];
@@ -130,17 +130,9 @@ for (const addr of WALLETS) {
   const link = addrs.map((a, k) => `<a href="https://hypurrscan.io/address/${a}">${addrs.length > 1 ? 'wallet ' + (k + 1) : 'voir le portefeuille'}</a>`).join(' · ');
   const head = `🐋 <b>${NAMES[addr] ? esc(NAMES[addr]) + ' · ' + short(addr) : 'Whale ' + short(addr)}</b>`;
   console.log(`${short(addr)} : capital ${usd(now.equity)}, positions ${Object.entries(now.pos).map(([c, p]) => c + ' ' + side(p.szi) + ' ' + usd(p.value)).join(', ') || 'aucune'}`);
-  let hello = prev ? prev.hello : false;
   if (prev && !prev.hip3 && DEXS.length > 1) {
     // premier passage avec les actions : leurs positions actuelles servent de point de départ (pas d'alerte « ouvre »)
-    const big = [];
-    for (const [c, p] of Object.entries(now.pos)) if (c.includes(':') && !prev.pos[c]) { prev.pos[c] = p; if (p.value >= MIN_USD) big.push(`${icon(p.szi)} ${side(p.szi)} <b>${esc(nm(c))}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}`); }
-    if (big.length) stocks.push(`${head}\n${big.join('\n')}`);
-  }
-  if (!prev || (TOKEN && CHAT && !prev.hello)) {
-    // premier passage : on montre simplement où il en est
-    const lines = Object.entries(now.pos).map(([c, p]) => `${icon(p.szi)} ${side(p.szi)} <b>${esc(nm(c))}</b> ${usd(p.value)} ×${p.lev} · entrée ${px(p.entry)}${p.liq ? ' · liquidation ' + px(p.liq) : ''} · latent ${usd(p.upnl)}`);
-    hellos.push({addr, text: `${head}\nCapital ${usd(now.equity)}\n${lines.join('\n') || 'Aucune position ouverte.'}\n${link}`});
+    for (const [c, p] of Object.entries(now.pos)) if (c.includes(':') && !prev.pos[c]) prev.pos[c] = p;
   }
   if (prev) {
     // gains réalisés depuis le passage précédent (pour les fermetures et allègements)
@@ -167,18 +159,8 @@ for (const addr of WALLETS) {
   }
   // pour les petits ajustements, on garde la taille de référence : ils finissent par compter s'ils s'additionnent
   for (const [c, p] of Object.entries(now.pos)) if (p && p.base && Math.sign(p.base) === Math.sign(p.szi)) { now.pos[c] = {...p, szi: p.base}; delete now.pos[c].base; }
-  state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos, hello, hip3: DEXS.length > 1 || !!(prev && prev.hip3)};
+  state.w[addr] = {t: Date.now(), equity: now.equity, pos: now.pos, hip3: DEXS.length > 1 || !!(prev && prev.hip3)};
 }
-// état de départ des nouveaux traders suivis : regroupé en un minimum de messages
-if (hellos.length) {
-  let buf = '👀 <b>Suivi activé</b>', group = [];
-  const flush = async () => { if (group.length && await tg(buf)) { sent++; for (const a of group) state.w[a].hello = !!(TOKEN && CHAT); } };
-  for (const h of hellos) {
-    if (buf.length + h.text.length > 3800) { await flush(); buf = '👀 <b>Suivi activé (suite)</b>'; group = []; }
-    buf += '\n\n' + h.text; group.push(h.addr);
-  }
-  await flush();
-}
-if (stocks.length && !(await tg('📈 <b>Suivi des actions et matières premières activé</b>\nPositions de 2 M$ et plus déjà ouvertes :\n\n' + stocks.join('\n\n')).catch(() => false))) console.log('Message des actions non envoyé.');
+// pas de message « Suivi activé » : un trader ajouté démarre en silence, seules ses nouvelles positions alertent
 fs.writeFileSync(STATE, JSON.stringify(state));
 console.log('Alertes envoyées : ' + sent);
