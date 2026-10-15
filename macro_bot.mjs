@@ -203,9 +203,10 @@ Ce qu'exige une idée de desk :
 - Une chaîne de causalité claire jusqu'au titre, et la preuve que le marché ne l'a pas encore payée : sers-toi des performances du tableau et vérifie le cours récent.
 - Une asymétrie : dis ce qui se passe si tu as tort. Si le scénario adverse est aussi probable, pas d'idée.
 - Un effet qui dure des mois, pas des jours.
-- Trois profils sont acceptés : le titre qui n'a pas encore réagi ; le tout début d'une tendance longue (le titre vient de démarrer et le mouvement a de quoi durer des mois) ; ou un chart qui CONSOLIDE après un gros mouvement et s'apprête à repartir dans le sens de la tendance : drapeau baissier après une chute, drapeau haussier dans une tendance haussière (le tableau marque ces cas « CONSOLIDATION »). Dans ce dernier cas, l'entrée est la cassure du range de consolidation, le stop de l'autre côté du range, et il faut une raison de fond pour que le mouvement reprenne. Jamais un titre déjà étiré.
+- Quatre profils sont acceptés : vendre un excès dont le momentum casse (voir le style du trader) ; le titre qui n'a pas encore réagi ; le tout début d'une tendance longue (le titre vient de démarrer et le mouvement a de quoi durer des mois) ; ou un chart qui CONSOLIDE après un gros mouvement et s'apprête à repartir dans le sens de la tendance : drapeau baissier après une chute, drapeau haussier dans une tendance haussière (le tableau marque ces cas « CONSOLIDATION »). Dans ce dernier cas, l'entrée est la cassure du range de consolidation, le stop de l'autre côté du range, et il faut une raison de fond pour que le mouvement reprenne. Jamais d'achat sur un titre déjà étiré, jamais de vente d'un plancher sans cassure.
 - Ça peut être une idée sur une seule action : résultats ou prévisions qui changent la trajectoire, carnet de commandes, décision d'un régulateur, changement de prix ou de demande dans son secteur. Même exigence : un fait daté, pas encore dans le prix.
 - Un instrument très liquide et négociable chez Interactive Brokers, partout dans le monde : action, ETF pays ou secteur, future de taux ou d'indice, devise (FX:EURUSD), crypto (BINANCE:BTCUSDT ou l'ETF IBIT), ETF obligataire ou de matière première, quand c'est l'expression la plus propre. Sers-toi du tableau multi-actifs ; sinon donne le symbole TradingView exact (PLACE:TICKER).
+- Le style du trader (vu dans son portefeuille IBKR) : il aime VENDRE les excès des thèmes à la mode quand leur momentum casse (semi-conducteurs, IA, Corée, souvent via des ETF à levier comme SOXL, NVDL, KORU) et être ACHETEUR des chocs d'offre durables (pétrole, gaz européen TTF). Ces deux familles sont prioritaires quand le fond et le chart s'alignent : un thème étiré dont le momentum casse (cassure de la moyenne 20 ou 50 jours, sommet plus bas, catalyseur qui retourne le récit) est une idée valable, même si le titre a beaucoup monté.
 - Ne répète aucune de ces idées déjà envoyées : ${recent.join(', ') || 'aucune'}.
 Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 1. Régime : où en sont la liquidité, les banques centrales, le crédit et le dollar, et dans quel sens ça bouge.
@@ -222,7 +223,8 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     'CBOT:ZN1!', 'CBOT:ZB1!', 'EUREX:FGBL1!', 'EUREX:FOAT1!', 'EUREX:FBTP1!', 'NASDAQ:TLT', 'AMEX:HYG', 'AMEX:LQD', 'NASDAQ:EMB',
     'FX:EURUSD', 'FX:USDJPY', 'FX:GBPUSD', 'FX:AUDUSD', 'FX:USDCAD', 'FX:USDCHF', 'FX:EURNOK', 'FX:USDMXN', 'FX:USDINR', 'FX:USDCNH', 'FX:USDKRW', 'TVC:DXY',
     'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT', 'BINANCE:SOLUSDT', 'NASDAQ:IBIT', 'NASDAQ:COIN', 'NASDAQ:MSTR',
-    'COMEX:GC1!', 'COMEX:SI1!', 'COMEX:HG1!', 'NYMEX:CL1!', 'NYMEX:NG1!', 'CBOT:ZC1!', 'CBOT:ZW1!',
+    'COMEX:GC1!', 'COMEX:SI1!', 'COMEX:HG1!', 'NYMEX:CL1!', 'ICEEUR:BRN1!', 'NYMEX:NG1!', 'ICEENDEX:TFM1!', 'CBOT:ZC1!', 'CBOT:ZW1!', 'AMEX:UCO',
+    'NASDAQ:SOXX', 'AMEX:SOXL', 'NASDAQ:MU', 'KRX:000660', 'KRX:005930', 'NASDAQ:AVGO', 'NASDAQ:AMD', 'NASDAQ:CRWV', 'NASDAQ:PLTR',
     'NASDAQ:NVDA', 'NASDAQ:AAPL', 'NASDAQ:MSFT', 'NASDAQ:AMZN', 'NASDAQ:META', 'NASDAQ:GOOGL', 'NASDAQ:TSLA', 'NYSE:JPM', 'NYSE:BX', 'NYSE:LLY', 'NYSE:TSM', 'NASDAQ:ASML', 'EURONEXT:MC', 'EURONEXT:BNP', 'XETR:SAP', 'XETR:RHM', 'TSE:7203', 'HKEX:700', 'KRX:KOSPI', 'TVC:NI225', 'XETR:DAX', 'EURONEXT:PX1', 'TVC:HSI', 'NSE:NIFTY', 'TVC:SPX', 'TVC:NDX'];
   let multi = [];
   try {
@@ -306,6 +308,9 @@ async function quotes(syms) {
 }
 function yahooOf(tv) {
   const [x, t] = tv.split(':');
+  const special = {'ICEENDEX:TFM1!': 'TTF=F', 'ICEEUR:BRN1!': 'BZ=F', 'TVC:DXY': 'DX-Y.NYB', 'KRX:KOSPI': '^KS11', 'TVC:NI225': '^N225', 'XETR:DAX': '^GDAXI', 'EURONEXT:PX1': '^FCHI', 'TVC:HSI': '^HSI', 'TVC:SPX': '^GSPC', 'TVC:NDX': '^NDX', 'BINANCE:BTCUSDT': 'BTC-USD', 'BINANCE:ETHUSDT': 'ETH-USD', 'BINANCE:SOLUSDT': 'SOL-USD'};
+  if (special[tv]) return special[tv];
+  if (x === 'KRX') return t + '.KS';
   if (x === 'FX') return t + '=X';
   if (['CBOT', 'COMEX', 'NYMEX', 'CME'].includes(x) && /1!$/.test(t)) return t.replace('1!', '') + '=F';
   const suf = {EURONEXT: '.PA', XETR: '.DE', MIL: '.MI', LSE: '.L', SIX: '.SW', TSE: '.T', HKEX: '.HK', ASX: '.AX', TSX: '.TO', BME: '.MC', OMXSTO: '.ST', OSL: '.OL'}[x];
