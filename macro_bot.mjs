@@ -167,15 +167,19 @@ async function aiIdeas() {
   // titres de presse : à la une (économie, monde) + une recherche par thème
   const feeds = ['https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en', 'https://www.nhc.noaa.gov/index-at.xml'];
   const qs = ['central bank rate decision', 'bond market selloff', 'election markets reaction', 'tariffs trade war', 'China economy stimulus property', 'profit warning sector demand', 'commodity supply shock', 'currency crisis emerging markets', 'sovereign debt downgrade',
-    // météo et climat
-    'El Niño La Niña forecast NOAA', 'drought crop yields', 'heat wave power prices', 'cold snap natural gas demand', 'hurricane Gulf of Mexico energy', 'frost Brazil coffee sugar', 'monsoon India crops', 'Rhine water levels shipping', 'flood mine port closure', 'wildfire lumber', 'harvest forecast USDA',
-    // offre, transport, politique des matières premières
-    'OPEC production decision', 'mine strike supply', 'export ban commodity', 'Red Sea Suez Panama canal shipping', 'refinery outage', 'sanctions oil metals', 'port strike',
+    // matières premières (une part seulement : le desk couvre tous les actifs)
+    'El Niño drought crop yields', 'OPEC production decision', 'mine strike supply', 'Red Sea Suez Hormuz shipping',
+    // taux, crédit, devises
+    'Treasury yields curve steepening', 'credit spreads high yield defaults', 'private credit redemptions', 'bank funding stress', 'dollar index outlook', 'yen intervention', 'euro outlook ECB', 'emerging market currency selloff', 'carry trade unwind',
+    // actions : indices, secteurs, valeurs
+    'stock market rotation sectors', 'earnings season beats misses', 'small caps refinancing', 'semiconductor demand AI capex', 'banks earnings net interest income', 'consumer spending slowdown retailers', 'housing market homebuilders', 'European stocks outlook', 'China stocks policy', 'Japan stocks governance buybacks', 'India stocks foreign outflows', 'IPO M&A wave',
+    // crypto
+    'bitcoin ETF flows', 'crypto regulation stablecoin', 'ethereum outlook',
     // actions : faits propres à une société ou à un secteur
     'raises full-year guidance', 'profit warning shares', 'record order backlog', 'regulator approval shares jump', 'antitrust ruling', 'pricing power demand surge sector', 'capex cut industry',
     // monde
     'Bank of Japan yen', 'ECB decision', 'Federal Reserve outlook', 'India economy rupee', 'Brazil fiscal real', 'Mexico peso trade', 'Australia RBA iron ore', 'Korea Taiwan semiconductor exports', 'export controls chips', 'Middle East conflict oil',
-    ...ME.PB.themes.map(t => t.news).filter(Boolean)];
+    ...ME.PB.themes.map(t => t.news).filter(Boolean).slice(0, 12)];
   const H = [], seen = new Set();
   const push = (x, max) => { let n = 0; for (const m of x.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const g = t => unent(((m[1].match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
@@ -193,15 +197,15 @@ async function aiIdeas() {
   for (const th of ME.PB.themes) for (const l of [...th.short, ...th.long]) { if (l.liq === false || uni.has(l.tv)) continue; const st = ME.legState(l.tv, 1, today); if (st) uni.set(l.tv, `${l.tv} | ${l.n} | ${l.w} | 20 séances ${ME.pct(st.r20, 0)} | ${st.conf ? 'au-dessus' : 'en dessous'} de sa moyenne 50 séances`); }
   const recent = Object.entries(state.ai || {}).filter(([, d]) => d > today - 30).map(([k]) => k);
   const system = `Tu es le desk global macro d'un hedge fund. Tu écris pour un trader qui prend peu de positions, en swing sur plusieurs mois, et qui ne veut que tes meilleures idées. À partir des titres de presse des derniers jours et du tableau de marché fournis, tu classes tes 2 meilleures idées du moment.
-Champ : le monde entier. Banques centrales, dette et budget, élections, guerre commerciale, géopolitique, matières premières (énergie, métaux, agricole) avec leurs facteurs d'offre : météo et climat (El Niño ou La Niña, sécheresse, gel, canicule, ouragan, mousson, niveau des fleuves), grèves, quotas, embargos, routes maritimes. Demande d'un secteur quand elle bascule.
+Champ : le monde entier et TOUS les actifs négociables chez Interactive Brokers : actions (valeurs isolées, secteurs, indices, pays), obligations et taux (futures, ETF obligataires, courbe), crédit, devises, crypto, matières premières. Les matières premières ne sont qu'une classe parmi d'autres : ne les privilégie pas. Tes 2 idées doivent être dans 2 classes d'actifs différentes. Moteurs : banques centrales, dette et budget, élections, guerre commerciale, géopolitique, résultats et prévisions des sociétés, flux, positionnement, offre et demande des matières premières (météo, quotas, routes maritimes).
 Ce qu'exige une idée de desk :
 - Un fait daté et vérifiable, trouvé dans les titres fournis ou confirmé par ta recherche web. Pas de rumeur, pas d'analyse technique.
 - Une chaîne de causalité claire jusqu'au titre, et la preuve que le marché ne l'a pas encore payée : sers-toi des performances du tableau et vérifie le cours récent.
 - Une asymétrie : dis ce qui se passe si tu as tort. Si le scénario adverse est aussi probable, pas d'idée.
 - Un effet qui dure des mois, pas des jours.
-- Deux profils sont acceptés : le titre qui n'a pas encore réagi, ou le tout début d'une tendance longue (le titre vient de démarrer et le mouvement a de quoi durer des mois). Jamais un titre déjà étiré.
+- Trois profils sont acceptés : le titre qui n'a pas encore réagi ; le tout début d'une tendance longue (le titre vient de démarrer et le mouvement a de quoi durer des mois) ; ou un chart qui CONSOLIDE après un gros mouvement et s'apprête à repartir dans le sens de la tendance : drapeau baissier après une chute, drapeau haussier dans une tendance haussière (le tableau marque ces cas « CONSOLIDATION »). Dans ce dernier cas, l'entrée est la cassure du range de consolidation, le stop de l'autre côté du range, et il faut une raison de fond pour que le mouvement reprenne. Jamais un titre déjà étiré.
 - Ça peut être une idée sur une seule action : résultats ou prévisions qui changent la trajectoire, carnet de commandes, décision d'un régulateur, changement de prix ou de demande dans son secteur. Même exigence : un fait daté, pas encore dans le prix.
-- Un instrument très liquide et négociable chez Interactive Brokers, partout dans le monde : action, ETF pays ou secteur, ETF de matière première (par exemple WEAT, CORN, SOYB, UNG, USO, GLD, SLV, CPER, DBA) quand c'est l'expression la plus propre. Prends de préférence un titre du tableau ; sinon donne son symbole TradingView exact (PLACE:TICKER).
+- Un instrument très liquide et négociable chez Interactive Brokers, partout dans le monde : action, ETF pays ou secteur, future de taux ou d'indice, devise (FX:EURUSD), crypto (BINANCE:BTCUSDT ou l'ETF IBIT), ETF obligataire ou de matière première, quand c'est l'expression la plus propre. Sers-toi du tableau multi-actifs ; sinon donne le symbole TradingView exact (PLACE:TICKER).
 - Ne répète aucune de ces idées déjà envoyées : ${recent.join(', ') || 'aucune'}.
 Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 1. Régime : où en sont la liquidité, les banques centrales, le crédit et le dollar, et dans quel sens ça bouge.
@@ -213,7 +217,28 @@ Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 Donne toujours tes 2 meilleures idées du moment, même imparfaites, avec une note honnête : c'est la note qui décide de l'envoi, pas toi.
 Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Seules les idées à 4 ou 5 sont envoyées.
 Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
-  const user = `TITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTITRES DU TABLEAU\n${[...uni.values()].join('\n')}`;
+  const MULTI = ['AMEX:SPY', 'NASDAQ:QQQ', 'AMEX:IWM', 'AMEX:XLF', 'AMEX:XLE', 'AMEX:XLK', 'AMEX:XLV', 'AMEX:XLY', 'AMEX:XLP', 'AMEX:XLI', 'AMEX:XLU', 'AMEX:XHB', 'AMEX:KRE', 'NASDAQ:SMH', 'AMEX:ITA', 'AMEX:JETS', 'AMEX:XRT',
+    'AMEX:EWJ', 'AMEX:EWG', 'AMEX:EWQ', 'AMEX:EWU', 'AMEX:EWI', 'AMEX:EWP', 'AMEX:EWZ', 'AMEX:EWW', 'AMEX:FXI', 'AMEX:KWEB', 'AMEX:EWY', 'AMEX:EWT', 'AMEX:EWA', 'AMEX:EWC', 'AMEX:EZA', 'AMEX:EPOL', 'AMEX:KSA', 'AMEX:EIS', 'AMEX:EIDO', 'AMEX:ARGT',
+    'CBOT:ZN1!', 'CBOT:ZB1!', 'EUREX:FGBL1!', 'EUREX:FOAT1!', 'EUREX:FBTP1!', 'NASDAQ:TLT', 'AMEX:HYG', 'AMEX:LQD', 'NASDAQ:EMB',
+    'FX:EURUSD', 'FX:USDJPY', 'FX:GBPUSD', 'FX:AUDUSD', 'FX:USDCAD', 'FX:USDCHF', 'FX:EURNOK', 'FX:USDMXN', 'FX:USDINR', 'FX:USDCNH', 'FX:USDKRW', 'TVC:DXY',
+    'BINANCE:BTCUSDT', 'BINANCE:ETHUSDT', 'BINANCE:SOLUSDT', 'NASDAQ:IBIT', 'NASDAQ:COIN', 'NASDAQ:MSTR',
+    'COMEX:GC1!', 'COMEX:SI1!', 'COMEX:HG1!', 'NYMEX:CL1!', 'NYMEX:NG1!', 'CBOT:ZC1!', 'CBOT:ZW1!',
+    'NASDAQ:NVDA', 'NASDAQ:AAPL', 'NASDAQ:MSFT', 'NASDAQ:AMZN', 'NASDAQ:META', 'NASDAQ:GOOGL', 'NASDAQ:TSLA', 'NYSE:JPM', 'NYSE:BX', 'NYSE:LLY', 'NYSE:TSM', 'NASDAQ:ASML', 'EURONEXT:MC', 'EURONEXT:BNP', 'XETR:SAP', 'XETR:RHM', 'TSE:7203', 'HKEX:700', 'KRX:KOSPI', 'TVC:NI225', 'XETR:DAX', 'EURONEXT:PX1', 'TVC:HSI', 'NSE:NIFTY', 'TVC:SPX', 'TVC:NDX'];
+  let multi = [];
+  try {
+    const r = await fetch('https://scanner.tradingview.com/global/scan', {method: 'POST', body: JSON.stringify({symbols: {tickers: MULTI}, columns: ['close', 'Perf.1M', 'Perf.3M', 'Perf.YTD', 'SMA50', 'SMA200', 'RSI', 'description', 'Perf.W', 'Volatility.W', 'Volatility.M', 'High.1M', 'Low.1M']})});
+    const f = v => v == null ? '?' : (v > 0 ? '+' : '') + v.toFixed(0) + ' %';
+    multi = ((await r.json()).data || []).map(d => {
+      const [c, m1, m3, y, s50, s200, rsi, desc, w, vw, vm, h1, l1] = d.d;
+      // consolidation : la semaine est calme (volatilité semaine bien sous celle du mois) après un gros mouvement sur 1 à 3 mois
+      const big = Math.max(Math.abs(m1 || 0), Math.abs(m3 || 0) * 0.7), calm = vw != null && vm != null && vw < 0.75 * vm && Math.abs(w || 0) < 3;
+      const pos = h1 > l1 ? Math.round(100 * (c - l1) / (h1 - l1)) : null;
+      const setup = big >= 8 && calm ? ` | CONSOLIDATION après ${((m3 || m1) > 0) ? 'hausse' : 'baisse'} (semaine ${f(w)}, vol. semaine ${vw.toFixed(1)} contre ${vm.toFixed(1)} sur le mois, à ${pos} % du range d'un mois ${(+l1).toPrecision(5)}–${(+h1).toPrecision(5)})` : '';
+      return `${d.s} | ${desc || ''} | ${c != null ? (+c).toPrecision(5) : '?'} | 1 mois ${f(m1)} | 3 mois ${f(m3)} | depuis janvier ${f(y)} | ${c > s50 ? 'au-dessus' : 'sous'} MM50, ${c > s200 ? 'au-dessus' : 'sous'} MM200 | RSI ${rsi ? Math.round(rsi) : '?'}${setup}`;
+    });
+  } catch (e) {}
+  console.log('Tableau multi-actifs : ' + multi.length + ' lignes.');
+  const user = `TABLEAU MULTI-ACTIFS (actions, secteurs, pays, taux, crédit, devises, crypto, matières premières)\n${multi.join('\n')}\n\nTITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTHÈMES SUIVIS PAR LA RÈGLE (surtout matières premières)\n${[...uni.values()].slice(0, 60).join('\n')}`;
   let ideas = jsonOf(await claude(system, user, true));
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
   console.log(`IA (${MODEL}) : ${H.length} titres lus, ${ideas.length} idée(s) proposée(s).`);
