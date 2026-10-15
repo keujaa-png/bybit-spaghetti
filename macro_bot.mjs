@@ -216,7 +216,7 @@ Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 5. L'expression la plus propre : l'instrument qui porte la thèse avec le moins de risques parasites.
 6. L'asymétrie : gain si tu as raison, perte si tu as tort, et le fait précis qui te fait couper.
 Donne toujours tes 2 meilleures idées du moment, même imparfaites, avec une note honnête : c'est la note qui décide de l'envoi, pas toi.
-Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Seules les idées à 4 ou 5 sont envoyées.
+Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Les idées à 4 ou 5 sont envoyées comme idées du desk ; celles à 3 partent marquées « à surveiller ».
 Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const MULTI = ['AMEX:SPY', 'NASDAQ:QQQ', 'AMEX:IWM', 'AMEX:XLF', 'AMEX:XLE', 'AMEX:XLK', 'AMEX:XLV', 'AMEX:XLY', 'AMEX:XLP', 'AMEX:XLI', 'AMEX:XLU', 'AMEX:XHB', 'AMEX:KRE', 'NASDAQ:SMH', 'AMEX:ITA', 'AMEX:JETS', 'AMEX:XRT',
     'AMEX:EWJ', 'AMEX:EWG', 'AMEX:EWQ', 'AMEX:EWU', 'AMEX:EWI', 'AMEX:EWP', 'AMEX:EWZ', 'AMEX:EWW', 'AMEX:FXI', 'AMEX:KWEB', 'AMEX:EWY', 'AMEX:EWT', 'AMEX:EWA', 'AMEX:EWC', 'AMEX:EZA', 'AMEX:EPOL', 'AMEX:KSA', 'AMEX:EIS', 'AMEX:EIDO', 'AMEX:ARGT',
@@ -247,12 +247,16 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
   state.ai = state.ai || {}; let n = 0;
   for (const it of ideas.slice(0, 2)) {
     const buy = /achat/i.test(it.sens || ''), key = String(it.tv || '').toUpperCase() + (buy ? '|achat' : '|vente');
-    if (!it.tv || !(it.confiance >= 4) || recent.includes(key)) { console.log('  écartée : ' + (it.nom || it.tv) + ' (confiance ' + it.confiance + ')'); continue; }
+    // 4-5/5 : envoyées ; 3/5 : envoyées en « à surveiller », 2 par jour au plus (choix de Jack, 15 oct.)
+    const watch = +it.confiance === 3;
+    state.ai3 = state.ai3 && state.ai3.day === today ? state.ai3 : {day: today, n: 0};
+    if (watch && state.ai3.n >= 2) { console.log('  écartée : ' + (it.nom || it.tv) + ' (3/5, déjà 2 « à surveiller » aujourd\'hui)'); continue; }
+    if (!it.tv || !(it.confiance >= 3) || recent.includes(key)) { console.log('  écartée : ' + (it.nom || it.tv) + ' (confiance ' + it.confiance + ')'); continue; }
     const ok = await checkSym(String(it.tv).toUpperCase());
     if (!ok || !ok.liquid) { console.log('  écartée : ' + it.tv + (ok ? ' trop peu liquide' : ' introuvable')); continue; }
     console.log(`  ${buy ? 'ACHAT' : 'VENTE'} ${it.nom} (${ok.tv}) · ${it.titre}`);
     if (!TOKEN || !CHAT) continue;
-    const e = ME.esc, cap = `🧠 <b>${e(it.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))}\n\n${e(it.fait)}\n${e(it.pourquoi)}\nRisque : ${e(it.risque || 'non précisé')}.\nHorizon : environ ${e(it.mois)} mois. Je coupe si : ${e(it.invalidation)}.\n<a href="${ME.tvUrl(ok.tv)}">Chart TradingView</a> · conviction ${e(it.confiance)}/5 · idée du desk IA, non backtestée`;
+    const e = ME.esc, cap = `${watch ? '🟡 <b>À surveiller</b> · ' : '🧠 '}<b>${e(it.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))}\n\n${e(it.fait)}\n${e(it.pourquoi)}\nRisque : ${e(it.risque || 'non précisé')}.\nHorizon : environ ${e(it.mois)} mois. Je coupe si : ${e(it.invalidation)}.\n<a href="${ME.tvUrl(ok.tv)}">Chart TradingView</a> · conviction ${e(it.confiance)}/5 · idée du desk IA, non backtestée`;
     let res = {ok: false};
     let L = ME.FULL[ok.tv] && ME.FULL[ok.tv].c.length > 130 ? ME.FULL[ok.tv] : null;
     if (!L) { const Y = await history(ok.tv); if (Y) L = Y; }
@@ -275,7 +279,7 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     } catch (err) { console.log('  chart impossible : ' + err.message); } } else console.log('  pas d’historique pour le chart de ' + ok.tv);
     if (!res.ok) res = await sendText(cap);
     if (res.ok) {
-      state.ai[key] = today; n++;
+      state.ai[key] = today; n++; if (watch) state.ai3.n++;
       // le mémo complet du desk et les sources, en un seul message sous le chart
       const refs = (it.refs || []).map(i => H[i - 1]).filter(Boolean).slice(0, 2);
       const lvl = [lv.entree != null ? 'Entrée ' + lv.entree : '', lv.stop != null ? 'Stop ' + lv.stop : '', lv.objectif != null ? 'Objectif ' + lv.objectif : ''].filter(Boolean).join(' · ');
