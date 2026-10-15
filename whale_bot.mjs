@@ -1,9 +1,9 @@
 // Suivi de portefeuilles Hyperliquid (« whales ») -> alertes Telegram.
 // Lancé toutes les 10 minutes par GitHub Actions (.github/workflows/whale.yml).
 // À chaque passage : positions actuelles (API publique Hyperliquid) comparées au passage précédent.
-// Alerte quand une position d'au moins 2 M$ est ouverte, fermée ou retournée.
+// Alerte seulement quand un trader entre sur une position d'au moins 2 M$ (ouverture, ou retournement qui ouvre l'autre sens).
 // Couvre les cryptos et aussi les actions, l'or, le pétrole… (marchés HIP-3 de Hyperliquid, comme xyz:NVDA).
-// Pas de message de suivi : uniquement les nouvelles positions (ouverture, fermeture, retournement).
+// Seulement les entrées : une nouvelle position de 2 M$ et plus (ou un retournement, qui ouvre une position dans l'autre sens). Pas de fermeture, pas de suivi.
 // Secrets : TG_BOT_TOKEN, TG_CHAT_ID. Sans eux, le script tourne à vide et écrit ce qu'il aurait envoyé.
 import fs from 'node:fs';
 
@@ -146,8 +146,7 @@ for (const addr of WALLETS) {
       const at = vwap ? ` vers ${px(vwap)}` : '';
       let msg = null;
       if (!a && b && b.value >= MIN_USD) msg = `${icon(b.szi)} <b>ouvre un ${side(b.szi)} ${esc(nm(c))}</b>${at}\nTaille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}`;
-      else if (a && !b && a.value >= MIN_USD) msg = `⚪ <b>ferme son ${side(a.szi)} ${esc(nm(c))}</b>${at}\nIl était de ${usd(a.value)} · gain réalisé ${usd(realized)}`;
-      else if (a && b && Math.sign(a.szi) !== Math.sign(b.szi) && Math.max(a.value, b.value) >= MIN_USD) msg = `🔄 <b>retourne ${esc(nm(c))} : ${side(a.szi)} → ${side(b.szi)}</b>${at}\nNouvelle taille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''} · gain réalisé ${usd(realized)}`;
+      else if (a && b && Math.sign(a.szi) !== Math.sign(b.szi) && b.value >= MIN_USD) msg = `${icon(b.szi)} <b>ouvre un ${side(b.szi)} ${esc(nm(c))}</b>${at} (il était ${side(a.szi).toLowerCase()})\nTaille ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}`;
       else if (RESIZE && a && b && Math.sign(a.szi) === Math.sign(b.szi)) {
         const dSz = Math.abs(b.szi) - Math.abs(a.szi), dUsd = Math.abs(dSz) * (b.value / Math.abs(b.szi));
         if (Math.abs(dSz) / Math.abs(a.szi) >= MIN_PCT && dUsd >= MIN_USD)
