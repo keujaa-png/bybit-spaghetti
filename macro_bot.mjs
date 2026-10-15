@@ -212,7 +212,7 @@ Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 6. L'asymétrie : gain si tu as raison, perte si tu as tort, et le fait précis qui te fait couper.
 Donne toujours tes 2 meilleures idées du moment, même imparfaites, avec une note honnête : c'est la note qui décide de l'envoi, pas toi.
 Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Seules les idées à 4 ou 5 sont envoyées.
-Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
+Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const user = `TITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTITRES DU TABLEAU\n${[...uni.values()].join('\n')}`;
   let ideas = jsonOf(await claude(system, user, true));
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
@@ -227,21 +227,39 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     if (!TOKEN || !CHAT) continue;
     const e = ME.esc, cap = `🧠 <b>${e(it.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))}\n\n${e(it.fait)}\n${e(it.pourquoi)}\nRisque : ${e(it.risque || 'non précisé')}.\nHorizon : environ ${e(it.mois)} mois. Je coupe si : ${e(it.invalidation)}.\n<a href="${ME.tvUrl(ok.tv)}">Chart TradingView</a> · conviction ${e(it.confiance)}/5 · idée du desk IA, non backtestée`;
     let res = {ok: false};
-    const L = ME.FULL[ok.tv];
-    if (L && L.c.length > 130) { try {
-      const {createCanvas} = await import('@napi-rs/canvas'); const cv = createCanvas(900, 340), ctx = cv.getContext('2d'); ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, 900, 340);
-      const l0 = L.t.length - 250 > 0 ? L.t.length - 250 : 0, ma = L.c.map((_, i) => ME.sma(L.c, 50, i));
-      ME.panel(ctx, 0, 6, 900, 328, L.t.slice(l0), [{v: ma.slice(l0), color: '#5b6b80', w: 2, dash: [6, 5]}, {v: L.c.slice(l0), color: '#d7dde5', w: 2.5}], {title: it.nom + '  (' + ok.tv + ')'});
+    let L = ME.FULL[ok.tv] && ME.FULL[ok.tv].c.length > 130 ? ME.FULL[ok.tv] : null;
+    if (!L) { const Y = await history(ok.tv); if (Y) L = Y; }
+    const num = v => (typeof v === 'number' && isFinite(v) ? v : (isFinite(parseFloat(v)) ? parseFloat(v) : null));
+    const lv = {entree: num(it.entree), stop: num(it.stop), objectif: num(it.objectif)};
+    if (L) { try {
+      const {createCanvas} = await import('@napi-rs/canvas'); const cv = createCanvas(900, 380), ctx = cv.getContext('2d'); ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, 900, 380);
+      const l0 = L.t.length - 250 > 0 ? L.t.length - 250 : 0, ma = L.c.map((_, i) => ME.sma(L.c, 50, i)), n0 = L.c.length - l0;
+      const last = L.c[L.c.length - 1], near = v => v != null && v > last * 0.5 && v < last * 2;
+      const lines = [{v: ma.slice(l0), color: '#5b6b80', w: 2, dash: [6, 5]}, {v: L.c.slice(l0), color: '#d7dde5', w: 2.5}];
+      if (near(lv.entree)) lines.push({v: Array(n0).fill(lv.entree), color: '#58a6ff', w: 1.5, dash: [4, 4]});
+      if (near(lv.stop)) lines.push({v: Array(n0).fill(lv.stop), color: '#f85149', w: 1.5, dash: [4, 4]});
+      if (near(lv.objectif)) lines.push({v: Array(n0).fill(lv.objectif), color: '#3fb950', w: 1.5, dash: [4, 4]});
+      ME.panel(ctx, 0, 6, 900, 340, L.t.slice(l0), lines, {title: it.nom + '  (' + ok.tv + ')', marks: [{i: n0 - 1, v: last, color: buy ? '#3fb950' : '#f85149', label: buy ? 'achat' : 'vente'}]});
+      ctx.font = '600 17px system-ui, "DejaVu Sans", sans-serif'; let x = 14;
+      for (const [k, c, lab] of [['entree', '#58a6ff', 'entrée'], ['stop', '#f85149', 'stop'], ['objectif', '#3fb950', 'objectif']]) { if (!near(lv[k])) continue; ctx.fillStyle = c; const t = lab + ' ' + (+lv[k]).toPrecision(5); ctx.fillText(t, x, 370); x += ctx.measureText(t).width + 28; }
       const fd = new FormData(); fd.append('chat_id', CHAT); fd.append('caption', cap.slice(0, 1020)); fd.append('parse_mode', 'HTML'); fd.append('photo', new Blob([cv.toBuffer('image/png')], {type: 'image/png'}), 'idee.png');
       res = await tg('sendPhoto', fd);
-    } catch (err) {} }
+      console.log('  chart ' + (res.ok ? 'envoyé' : 'refusé'));
+    } catch (err) { console.log('  chart impossible : ' + err.message); } } else console.log('  pas d’historique pour le chart de ' + ok.tv);
     if (!res.ok) res = await sendText(cap);
-    if (res.ok) { state.ai[key] = today; n++; const refs = (it.refs || []).map(i => H[i - 1]).filter(Boolean).slice(0, 2); if (refs.length) await sendText('📰 ' + refs.map(h => `<a href="${e(h.link)}">${e(h.title)}</a>`).join('\n📰 ')); }
+    if (res.ok) {
+      state.ai[key] = today; n++;
+      // le mémo complet du desk et les sources, en un seul message sous le chart
+      const refs = (it.refs || []).map(i => H[i - 1]).filter(Boolean).slice(0, 2);
+      const lvl = [lv.entree != null ? 'Entrée ' + lv.entree : '', lv.stop != null ? 'Stop ' + lv.stop : '', lv.objectif != null ? 'Objectif ' + lv.objectif : ''].filter(Boolean).join(' · ');
+      const memo = `📋 <b>Mémo du desk : ${e(it.titre)}</b>\n\n${e(it.detail || (it.fait + '\n' + it.pourquoi))}${lvl ? '\n\n' + e(lvl) : ''}${refs.length ? '\n\n📰 ' + refs.map(h => `<a href="${e(h.link)}">${e(h.title)}</a>`).join('\n📰 ') : ''}`;
+      await sendText(memo.slice(0, 4000));
+    }
   }
   return n;
 }
 // deux lectures des news par jour au plus (une à chaque passage du matin et du soir)
-if (AKEY && Date.now() - (state.aiLast || 0) > 10 * 3600e3) {
+if (AKEY && (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' || Date.now() - (state.aiLast || 0) > 10 * 3600e3)) {
   try { const n = await aiIdeas(); state.aiLast = Date.now(); state.aiDay = today; console.log('Idées IA envoyées : ' + n); } catch (e) { console.log('IA : erreur, passage ignoré (' + e.message + ').'); }
 } else if (!AKEY) console.log('Pas de clé ANTHROPIC_API_KEY : pas d’idées tirées des news.');
 
@@ -261,14 +279,14 @@ async function quotes(syms) {
     return out;
   } catch (e) { return {}; }
 }
-const yahooOf = tv => {
+function yahooOf(tv) {
   const [x, t] = tv.split(':');
   if (x === 'FX') return t + '=X';
   if (['CBOT', 'COMEX', 'NYMEX', 'CME'].includes(x) && /1!$/.test(t)) return t.replace('1!', '') + '=F';
   const suf = {EURONEXT: '.PA', XETR: '.DE', MIL: '.MI', LSE: '.L', SIX: '.SW', TSE: '.T', HKEX: '.HK', ASX: '.AX', TSX: '.TO', BME: '.MC', OMXSTO: '.ST', OSL: '.OL'}[x];
   if (['NYSE', 'NASDAQ', 'AMEX', 'NYSEARCA', 'CBOE'].includes(x)) return t.replace('.', '-');
   return suf ? t.replace(/\.$/, '') + suf : null;
-};
+}
 async function history(tv) {
   const y = yahooOf(tv); if (!y) return null;
   try {
