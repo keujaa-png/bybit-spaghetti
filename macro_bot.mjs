@@ -6,6 +6,9 @@ import './macro_engine.js';
 const ME = globalThis.ME;
 const TOKEN = (process.env.TELEGRAM_TOKEN || '').trim();
 let CHAT = (process.env.TELEGRAM_CHAT_ID || '').trim();
+// alertes courtes : 2-3 lignes (demande de Jack, 15 oct.)
+const cut = (x, n) => { x = String(x || '').replace(/\s+/g, ' ').trim(); if (x.length <= n) return x; const k = x.slice(0, n).lastIndexOf(' '); return x.slice(0, k > n * 0.6 ? k : n) + '…'; };
+const first = x => cut(String(x || '').split(/(?<=[.!?])\s/)[0], 150);
 const readJ = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return d; } };
 const today = ME.today();
 
@@ -50,7 +53,8 @@ async function tg(method, body) {
 const sendText = text => tg('sendMessage', new URLSearchParams({chat_id: CHAT, text, parse_mode: 'HTML', disable_web_page_preview: 'true'}));
 async function sendIdea(tr, extra = '') {
   const th = ME.theme(tr.th);
-  const cap = ME.caption(th, tr) + extra;
+  const tx = ME.ideaText(th, tr);
+  const cap = `${th.flag || '📈'} <b>${tr.s > 0 ? 'ACHAT' : 'VENTE'} ${ME.esc(tr.leg.n)}</b> · ${ME.esc(ME.short(tr.sym))} · ${ME.esc(cut(tx.title, 60))}\n${ME.esc(first(tx.trig))}${extra}\n<a href="${ME.tvUrl(tr.sym)}">chart</a> · règle backtestée`;
   try {
     const {createCanvas} = await import('@napi-rs/canvas');
     const cv = createCanvas(900, 620); ME.ideaChart(cv, th, tr);
@@ -94,7 +98,7 @@ async function opinion(th, tr) {
     const j = jsonOf(await claude(system, user, true));
     if (!j || !j.avis) return '';
     console.log(`  avis IA ${j.conviction}/5 sur ${tr.leg.n} : ${j.avis}`);
-    return {conv: +j.conviction || 0, line: `\n🧠 <b>Opus ${ME.esc(j.conviction)}/5</b> : ${ME.esc(String(j.avis).slice(0, 260))}`};
+    return {conv: +j.conviction || 0, line: `\n🧠 Opus ${ME.esc(j.conviction)}/5 : ${ME.esc(first(j.avis))}`};
   } catch (e) { return ''; }
 }
 
@@ -143,7 +147,7 @@ if (!TOKEN) {
       if (r.ok) {
         state.sent[ME.keyOf(tr)] = today; n++;
         const th = ME.theme(tr.th), H = th.news ? await headlines(th.news) : [];
-        if (H.length) await sendText(newsText(th, H));
+        // (plus de message de presse séparé : alertes courtes)
       }
     }
     for (const o of polys) {
@@ -217,7 +221,7 @@ Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 6. L'asymétrie : gain si tu as raison, perte si tu as tort, et le fait précis qui te fait couper.
 Donne toujours tes 2 meilleures idées du moment, même imparfaites, avec une note honnête : c'est la note qui décide de l'envoi, pas toi.
 Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Les idées à 4 ou 5 sont envoyées comme idées du desk ; celles à 3 partent marquées « à surveiller ».
-Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
+Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "court": "la thèse en UNE phrase de 120 caractères max, en français", "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const MULTI = ['AMEX:SPY', 'NASDAQ:QQQ', 'AMEX:IWM', 'AMEX:XLF', 'AMEX:XLE', 'AMEX:XLK', 'AMEX:XLV', 'AMEX:XLY', 'AMEX:XLP', 'AMEX:XLI', 'AMEX:XLU', 'AMEX:XHB', 'AMEX:KRE', 'NASDAQ:SMH', 'AMEX:ITA', 'AMEX:JETS', 'AMEX:XRT',
     'AMEX:EWJ', 'AMEX:EWG', 'AMEX:EWQ', 'AMEX:EWU', 'AMEX:EWI', 'AMEX:EWP', 'AMEX:EWZ', 'AMEX:EWW', 'AMEX:FXI', 'AMEX:KWEB', 'AMEX:EWY', 'AMEX:EWT', 'AMEX:EWA', 'AMEX:EWC', 'AMEX:EZA', 'AMEX:EPOL', 'AMEX:KSA', 'AMEX:EIS', 'AMEX:EIDO', 'AMEX:ARGT',
     'CBOT:ZN1!', 'CBOT:ZB1!', 'EUREX:FGBL1!', 'EUREX:FOAT1!', 'EUREX:FBTP1!', 'NASDAQ:TLT', 'AMEX:HYG', 'AMEX:LQD', 'NASDAQ:EMB',
@@ -256,7 +260,7 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     if (!ok || !ok.liquid) { console.log('  écartée : ' + it.tv + (ok ? ' trop peu liquide' : ' introuvable')); continue; }
     console.log(`  ${buy ? 'ACHAT' : 'VENTE'} ${it.nom} (${ok.tv}) · ${it.titre}`);
     if (!TOKEN || !CHAT) continue;
-    const e = ME.esc, cap = `${watch ? '🟡 <b>À surveiller</b> · ' : '🧠 '}<b>${e(it.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))}\n\n${e(it.fait)}\n${e(it.pourquoi)}\nRisque : ${e(it.risque || 'non précisé')}.\nHorizon : environ ${e(it.mois)} mois. Je coupe si : ${e(it.invalidation)}.\n<a href="${ME.tvUrl(ok.tv)}">Chart TradingView</a> · conviction ${e(it.confiance)}/5 · idée du desk IA, non backtestée`;
+    const e = ME.esc, cap = `${watch ? '🟡' : '🧠'} <b>${buy ? 'ACHAT' : 'VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))} · ${e(cut(it.titre, 50))} (${e(it.confiance)}/5)\n${e(cut(it.court || it.pourquoi || it.fait, 160))}\n${[it.entree != null ? 'Entrée ' + e(it.entree) : '', it.stop != null ? 'stop ' + e(it.stop) : '', it.objectif != null ? 'objectif ' + e(it.objectif) : ''].filter(Boolean).join(' · ') || 'Coupe si : ' + e(cut(it.invalidation, 60))} · <a href="${ME.tvUrl(ok.tv)}">chart</a>`;
     let res = {ok: false};
     let L = ME.FULL[ok.tv] && ME.FULL[ok.tv].c.length > 130 ? ME.FULL[ok.tv] : null;
     if (!L) { const Y = await history(ok.tv); if (Y) L = Y; }
@@ -280,11 +284,7 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     if (!res.ok) res = await sendText(cap);
     if (res.ok) {
       state.ai[key] = today; n++; if (watch) state.ai3.n++;
-      // le mémo complet du desk et les sources, en un seul message sous le chart
-      const refs = (it.refs || []).map(i => H[i - 1]).filter(Boolean).slice(0, 2);
-      const lvl = [lv.entree != null ? 'Entrée ' + lv.entree : '', lv.stop != null ? 'Stop ' + lv.stop : '', lv.objectif != null ? 'Objectif ' + lv.objectif : ''].filter(Boolean).join(' · ');
-      const memo = `📋 <b>Mémo du desk : ${e(it.titre)}</b>\n\n${e(it.detail || (it.fait + '\n' + it.pourquoi))}${lvl ? '\n\n' + e(lvl) : ''}${refs.length ? '\n\n📰 ' + refs.map(h => `<a href="${e(h.link)}">${e(h.title)}</a>`).join('\n📰 ') : ''}`;
-      await sendText(memo.slice(0, 4000));
+      // pas de mémo séparé : alertes de 3 lignes
     }
   }
   return n;
@@ -366,16 +366,12 @@ Date : ${iso()}.`;
 async function sendThesis(w, q, v, op) {
   const r = await sendThesisCard(w, q, v, op);
   // la thèse d'investissement complète, juste sous le chart
-  if (r.ok && w.detail) { if (TOKEN && CHAT) await sendText(`📋 <b>Thèse : ${ME.esc(w.titre)}</b>\n\n${ME.esc(w.detail)}`.slice(0, 4000)); else console.log('  [à vide] thèse complète : ' + w.detail.replace(/\n/g, ' ¦ ')); }
   return r;
 }
 async function sendThesisCard(w, q, v, op) {
   const e = ME.esc, buy = w.sens === 'achat';
   const px = w.tv2 ? 'ratio ' + v.toFixed(4) : (+q.close).toPrecision(5) + ' ' + (q.currency || '');
-  const cap = `🎯 <b>${e(w.titre)}</b>\n${buy ? '🟢 <b>ACHAT' : '🔴 <b>VENTE'} ${e(w.nom)}</b> · ${e(ME.short(w.tv))}${w.tv2 ? ' / ' + e(ME.short(w.tv2)) : ''} · ${e(px)}\n\n` +
-    `${e(w.these)}\n\n🧠 <b>Opus ${e(op.note)}/5</b> : ${e(op.analyse)}\n\n` +
-    `Je coupe si : ${e(op.invalidation || w.invalidation)}\nObjectif : ${e(op.objectif || '?')} · horizon ${e(w.mois || 4)} mois\nCatalyseur : ${e(op.catalyseur || '?')}\n` +
-    `<a href="${ME.tvUrl(w.tv)}">Chart TradingView</a> · pas un conseil`;
+  const cap = `🎯 <b>${buy ? 'ACHAT' : 'VENTE'} ${e(w.nom)}</b> · ${e(ME.short(w.tv))}${w.tv2 ? ' / ' + e(ME.short(w.tv2)) : ''} · ${e(px)} (Opus ${e(op.note)}/5)\n${e(first(op.analyse))}\nCoupe ${e(cut(op.invalidation || w.invalidation, 50))} · objectif ${e(cut(op.objectif || '?', 30))} · <a href="${ME.tvUrl(w.tv)}">chart</a>`;
   const H = w.tv2 ? null : await history(w.tv);
   if (H && TOKEN && CHAT) {
     try {
