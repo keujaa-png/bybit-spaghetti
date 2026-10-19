@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spaghetti US Equities</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#101720; --panel:#161f2b; --line:#243141; --text:#dfe6ee; --muted:#7f8fa3;
+    --up:#4fd1a0; --down:#f2705a; --accent:#8fb3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.4 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;font-weight:600;margin:0 4px 0 0}
+  header label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;white-space:nowrap}
+  select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:inherit}
+  .status{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--up)} .dot.err{background:var(--down)} .dot.off{background:#f2b35a}
+  main{flex:1;display:grid;grid-template-columns:1fr 470px;min-height:0}
+  #wrap{position:relative;min-width:0;min-height:320px}
+  canvas{display:block;width:100%;height:100%}
+  #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:13px;display:none;white-space:nowrap}
+  aside{border-left:1px solid var(--line);overflow:auto;background:var(--panel)}
+  aside h2{font-size:13px;font-weight:600;margin:0;padding:8px 12px 4px;color:var(--muted);position:sticky;top:0;background:var(--panel)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td,th{padding:4px 8px;text-align:right;white-space:nowrap}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  td:first-child,th:first-child{text-align:left}
+  td.nm{max-width:130px;overflow:hidden;text-overflow:ellipsis;text-align:left;color:var(--muted)}
+  tr.row{cursor:pointer} tr.row:hover,tr.row.hl{background:#1d2938}
+  a{color:var(--text);text-decoration:none} a:hover{color:var(--accent)}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .sw{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  #note{padding:10px 12px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+  @media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:60vh auto}aside{border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Spaghetti US Equities</h1>
+  <label>Top / flop <select id="n"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></label>
+  <label>Capi min <select id="cap"><option value="1e9" selected>1 Md$</option><option value="2e9">2 Md$</option><option value="5e9">5 Md$</option><option value="1e10">10 Md$</option><option value="5e10">50 Md$</option></select></label>
+  <label>Volume min <select id="vol"><option value="0">aucun</option><option value="5e6" selected>5 M$</option><option value="2e7">20 M$</option><option value="1e8">100 M$</option></select></label>
+  <label>Mesure <select id="ref"><option value="open" selected>depuis l'ouverture</option><option value="prev">depuis la veille</option></select></label>
+  <label>Rafraîchir <select id="every"><option value="10">10 s</option><option value="15" selected>15 s</option><option value="30">30 s</option><option value="60">1 min</option></select></label>
+  <span class="status"><span id="dot" class="dot"></span><span id="msg">Chargement…</span></span>
+</header>
+<main>
+  <div id="wrap"><canvas id="cv"></canvas><div id="tip"></div></div>
+  <aside>
+    <h2>🔥 Plus fortes hausses</h2><table><thead><tr><th>Titre</th><th></th><th>Ouv.</th><th>Jour</th><th>Vol. rel.</th><th>Capi</th></tr></thead><tbody id="tUp"></tbody></table>
+    <h2>🧊 Plus fortes baisses</h2><table><thead><tr><th>Titre</th><th></th><th>Ouv.</th><th>Jour</th><th>Vol. rel.</th><th>Capi</th></tr></thead><tbody id="tDn"></tbody></table>
+    <div id="note">Actions US (NYSE, Nasdaq, AMEX, ADR compris) de plus de la capi choisie. Données TradingView (léger différé possible). Le tracé depuis l'ouverture est reconstitué à l'ouverture de la page à partir des bougies 1 min à 4 h, puis enregistré toutes les quelques secondes tant que la page reste ouverte. Heures de New York.</div>
+  </aside>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const SCAN = 'https://scanner.tradingview.com/america/scan';
+const TF = ['1', '3', '5', '15', '30', '45', '60', '120', '180', '240'];
+const COLS = ['name', 'description', 'close', 'open', 'change_from_open', 'change', 'market_cap_basic', 'Value.Traded', 'relative_volume_10d_calc', 'sector', 'time|1', ...TF.flatMap(t => ['time|' + t, 'close[1]|' + t])];
+const STORE = 'us-spaghetti-v1', SET = 'us-spaghetti-set';
+const UPC = ['#4fd1a0', '#3fb8e8', '#9ad65c', '#2fc5b4', '#7fd8ff', '#c3e86b', '#58e0c4', '#6aa8ff', '#a3f0d0', '#5ed37a'];
+const DNC = ['#f2705a', '#f2b35a', '#e8618f', '#ff9a6b', '#d9748f', '#f5c542', '#ff7f7f', '#e88a4c', '#c96fd1', '#f7a1a1'];
+
+// ---------- réglages ----------
+const SETTINGS = ['n', 'cap', 'vol', 'ref', 'every'];
+try { const s = JSON.parse(localStorage.getItem(SET) || '{}'); for (const k of SETTINGS) if (s[k] != null) $(k).value = s[k]; } catch (e) {}
+const opt = () => ({n: +$('n').value, cap: +$('cap').value, vol: +$('vol').value, ref: $('ref').value, every: +$('every').value * 1000});
+for (const k of SETTINGS) $(k).addEventListener('change', () => { try { localStorage.setItem(SET, JSON.stringify(Object.fromEntries(SETTINGS.map(x => [x, $(x).value])))); } catch (e) {} schedule(0); render(); });
+
+// ---------- séance de New York ----------
+function nyParts(t) { const f = new Intl.DateTimeFormat('en-US', {timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short'}).formatToParts(new Date(t)); return Object.fromEntries(f.map(p => [p.type, p.value])); }
+// instant UTC de hh:mm à New York le jour de la séance (gère heure d'été / d'hiver)
+function nyTime(day, hh, mm) { const [y, m, d] = day.split('-').map(Number); let g = Date.UTC(y, m - 1, d, hh, mm); for (let k = 0; k < 2; k++) { const p = nyParts(g); const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute); g += Date.UTC(y, m - 1, d, hh, mm) - asUtc; } return g; }
+const fmtNY = t => { const p = nyParts(t); return p.hour + ':' + p.minute; };
+
+// ---------- données ----------
+let S = {day: null, hist: {}, meta: {}};   // hist : sym -> [[t, prix]] ; meta : dernière ligne du scanner
+try { const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if (s && s.hist) S = s; } catch (e) {}
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
+let lists = {up: [], dn: []}, sessionOpen = null, sessionClose = null, live = false, hl = null;
+
+async function scan(order, n, o) {
+  const body = {columns: COLS, range: [0, n], sort: {sortBy: o.ref === 'open' ? 'change_from_open' : 'change', sortOrder: order}, markets: ['america'],
+    filter: [{left: 'type', operation: 'in_range', right: ['stock', 'dr']}, {left: 'exchange', operation: 'in_range', right: ['NASDAQ', 'NYSE', 'AMEX']},
+      {left: 'market_cap_basic', operation: 'greater', right: o.cap}, {left: 'Value.Traded', operation: 'greater', right: o.vol}, {left: 'close', operation: 'greater', right: 1}]};
+  const r = await fetch(SCAN, {method: 'POST', body: JSON.stringify(body)});
+  const j = await r.json(); if (!j.data) throw new Error('scanner');
+  return j.data.map(d => { const o2 = {sym: d.s}; COLS.forEach((c, i) => o2[c] = d.d[i]); return o2; });
+}
+function ingest(rows) {
+  const now = Date.now();
+  for (const r of rows) {
+    if (!(r.close > 0)) continue;
+    const day = r['time|1'] ? nyParts(r['time|1'] * 1000) : null, dkey = day ? `${day.year}-${day.month}-${day.day}` : null;
+    if (dkey && S.day !== dkey) { S = {day: dkey, hist: {}, meta: {}}; }
+    S.meta[r.sym] = r;
+    let h = S.hist[r.sym];
+    if (!h) {
+      // première vue : on reconstitue le tracé depuis l'ouverture avec les clôtures des bougies précédentes (1 min à 4 h)
+      h = []; const t0 = nyTime(S.day, 9, 30);
+      if (r.open > 0) h.push([t0, r.open]);
+      for (const t of TF) { const tt = r['time|' + t], c = r['close[1]|' + t]; if (tt && c > 0 && tt * 1000 > t0) h.push([tt * 1000, c]); }
+      h.sort((a, b) => a[0] - b[0]);
+      S.hist[r.sym] = h = h.filter((p, i) => !i || p[0] !== h[i - 1][0]);
+    }
+    // point courant : heure de la dernière bougie 1 min (le cours ne bouge pas quand le marché est fermé)
+    const tl = r['time|1'] ? Math.min(now, r['time|1'] * 1000 + 60000) : now;
+    if (!h.length || tl > h[h.length - 1][0]) h.push([tl, r.close]); else h[h.length - 1][1] = r.close;
+  }
+}
+async function poll() {
+  const o = opt();
+  try {
+    const W = Math.max(30, o.n * 3);
+    const [up, dn] = await Promise.all([scan('desc', W, o), scan('asc', W, o)]);
+    ingest(up); ingest(dn);
+    lists = {up: up.slice(0, o.n).map(r => r.sym), dn: dn.slice(0, o.n).map(r => r.sym)};
+    sessionOpen = nyTime(S.day, 9, 30); sessionClose = nyTime(S.day, 16, 0);
+    const last = Math.max(...up.concat(dn).map(r => (r['time|1'] || 0) * 1000));
+    live = Date.now() - last < 5 * 60000;
+    $('dot').className = 'dot ' + (live ? 'on' : 'off');
+    $('msg').textContent = live ? `Séance en cours · ${fmtNY(Date.now())} à New York · mis à jour toutes les ${o.every / 1000} s` : `Marché fermé · séance du ${S.day.split('-').reverse().join('/')}`;
+    save(); render();
+  } catch (e) { $('dot').className = 'dot err'; $('msg').textContent = 'Données indisponibles, nouvel essai…'; }
+  schedule(live ? o.every : 60000);
+}
+let timer = null; function schedule(ms) { clearTimeout(timer); timer = setTimeout(poll, ms); }
+
+// ---------- dessin ----------
+const cv = $('cv'), ctx = cv.getContext('2d');
+let plot = null;
+function series() {
+  const o = opt(), out = [];
+  const add = (sym, i, grp) => {
+    const h = S.hist[sym], m = S.meta[sym]; if (!h || !h.length || !m) return;
+    const base = o.ref === 'open' ? m.open : m.close / (1 + (m.change || 0) / 100);
+    if (!(base > 0)) return;
+    out.push({sym, tk: sym.split(':')[1], m, grp, col: (grp === 'up' ? UPC : DNC)[i % 10], rank: i, pts: h.map(([t, p]) => [t, 100 * (p / base - 1)]), perf: 100 * (m.close / base - 1)});
+  };
+  lists.up.forEach((s, i) => add(s, i, 'up')); lists.dn.forEach((s, i) => add(s, i, 'dn'));
+  return out;
+}
+function niceStep(r) { const p = Math.pow(10, Math.floor(Math.log10(r || 1))), m = r / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
+function render() {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#101720'; ctx.fillRect(0, 0, W, H);
+  const L = series(); renderList(L);
+  if (!L.length || !sessionOpen) return;
+  const tA = sessionOpen, tB = Math.max(Math.min(sessionClose, Math.max(...L.map(s => s.pts[s.pts.length - 1][0]))), tA + 30 * 60000);
+  const vals = L.flatMap(s => s.pts.filter(p => p[0] >= tA - 6e5).map(p => p[1])).concat([0]);
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const left = 54, right = 92, top = 14, bottom = 26;
+  const X = t => left + (W - left - right) * (t - tA) / (tB - tA), Y = v => top + (H - top - bottom) * (1 - (v - lo) / (hi - lo));
+  ctx.font = '12px "IBM Plex Sans", sans-serif'; ctx.lineWidth = 1;
+  const st = niceStep((hi - lo) / 6);
+  for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) { ctx.strokeStyle = Math.abs(v) < 1e-9 ? '#3a4a5e' : '#1c2735'; ctx.beginPath(); ctx.moveTo(left, Y(v)); ctx.lineTo(W - right, Y(v)); ctx.stroke(); ctx.fillStyle = '#7f8fa3'; ctx.fillText((v > 0 ? '+' : '') + (+v.toFixed(1)) + ' %', 6, Y(v) + 4); }
+  for (let t = tA; t <= tB + 1; t += 30 * 60000) { ctx.fillStyle = '#7f8fa3'; const x = X(t); if (x > W - right + 5) break; ctx.fillText(fmtNY(t), x - 14, H - 8); ctx.strokeStyle = '#1c2735'; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, H - bottom); ctx.stroke(); }
+  const ends = [];
+  // les lignes en surbrillance en dernier
+  for (const s of [...L].sort((a, b) => (a.sym === hl) - (b.sym === hl))) {
+    const pts = s.pts.filter(p => p[0] >= tA); if (!pts.length) continue;
+    ctx.strokeStyle = s.col; ctx.globalAlpha = hl && hl !== s.sym ? 0.25 : 1; ctx.lineWidth = s.sym === hl ? 3 : s.rank < 3 ? 2 : 1.5;
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.stroke();
+    const e = pts[pts.length - 1]; ends.push({s, x: X(e[0]), y: Y(e[1])});
+  }
+  ctx.globalAlpha = 1;
+  // étiquettes en bout de ligne, écartées pour ne pas se chevaucher
+  ends.sort((a, b) => a.y - b.y); let prev = -1e9;
+  for (const e of ends) { e.ly = Math.max(e.y, prev + 13); prev = e.ly; }
+  for (let i = ends.length - 1, nxt = H - bottom + 4; i >= 0; i--) { ends[i].ly = Math.min(ends[i].ly, nxt - 13); nxt = ends[i].ly; }
+  ctx.font = '600 11px "IBM Plex Sans", sans-serif';
+  for (const e of ends) { ctx.globalAlpha = hl && hl !== e.s.sym ? 0.35 : 1; ctx.fillStyle = e.s.col; ctx.beginPath(); ctx.arc(e.x, e.y, 2.5, 0, 7); ctx.fill(); ctx.fillStyle = '#dfe6ee'; ctx.fillText(`${e.s.tk} ${e.s.perf > 0 ? '+' : ''}${e.s.perf.toFixed(1)}%`, Math.min(e.x + 6, W - right + 4), e.ly + 4); }
+  ctx.globalAlpha = 1;
+  plot = {L, X, Y, tA, tB, left, right, W, H};
+}
+const pct = v => v == null ? '' : `<span class="${v >= 0 ? 'up' : 'down'}">${v > 0 ? '+' : ''}${(+v).toFixed(1)} %</span>`;
+const capF = v => v >= 1e12 ? (v / 1e12).toFixed(1) + ' T' : v >= 1e9 ? (v / 1e9).toFixed(v >= 1e10 ? 0 : 1) + ' Md' : '';
+function renderList(L) {
+  for (const [grp, el] of [['up', $('tUp')], ['dn', $('tDn')]]) {
+    el.innerHTML = L.filter(s => s.grp === grp).map(s => `<tr class="row${s.sym === hl ? ' hl' : ''}" data-sym="${s.sym}"><td><span class="sw" style="background:${s.col}"></span><a href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent(s.sym)}" target="_blank" rel="noopener">${s.tk}</a></td><td class="nm" title="${(s.m.description || '').replace(/"/g, '')} · ${s.m.sector || ''}">${s.m.description || ''}</td><td>${pct(s.m.change_from_open)}</td><td>${pct(s.m.change)}</td><td>${s.m.relative_volume_10d_calc ? 'x' + s.m.relative_volume_10d_calc.toFixed(1) : ''}</td><td>${capF(s.m.market_cap_basic)}</td></tr>`).join('');
+  }
+}
+document.querySelector('aside').addEventListener('mouseover', e => { const tr = e.target.closest('tr.row'); const s = tr ? tr.dataset.sym : null; if (s !== hl) { hl = s; render(); } });
+document.querySelector('aside').addEventListener('mouseleave', () => { hl = null; render(); });
+// survol du graphique : ligne la plus proche
+cv.addEventListener('mousemove', e => {
+  if (!plot) return; const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (x < plot.left || x > plot.W - plot.right) { $('tip').style.display = 'none'; if (hl) { hl = null; render(); } return; }
+  const t = plot.tA + (x - plot.left) / (plot.W - plot.left - plot.right) * (plot.tB - plot.tA);
+  let best = null, bd = 1e9;
+  for (const s of plot.L) { let p = null; for (const q of s.pts) { if (q[0] <= t) p = q; else break; } if (!p) continue; const d = Math.abs(plot.Y(p[1]) - y); if (d < bd) { bd = d; best = {s, p}; } }
+  if (!best || bd > 30) { $('tip').style.display = 'none'; if (hl) { hl = null; render(); } return; }
+  if (hl !== best.s.sym) { hl = best.s.sym; render(); }
+  const tip = $('tip'); tip.style.display = 'block';
+  tip.innerHTML = `<b>${best.s.tk}</b> ${pct(best.p[1])} · ${fmtNY(best.p[0])} NY<br><span style="color:var(--muted)">${best.s.m.description || ''}</span>`;
+  tip.style.left = Math.min(x + 14, r.width - tip.offsetWidth - 6) + 'px'; tip.style.top = Math.max(4, y - 40) + 'px';
+});
+cv.addEventListener('mouseleave', () => { $('tip').style.display = 'none'; hl = null; render(); });
+cv.addEventListener('click', () => { if (hl) window.open('https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(hl), '_blank', 'noopener'); });
+window.addEventListener('resize', render);
+
+// mise à jour automatique de la page si une nouvelle version est publiée
+const pageUrl = location.href.split('#')[0].split('?')[0]; let pageSig = null;
+const sigOf = t => t.length + ':' + [...t].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0);
+async function checkUpdate() { try { const t = await (await fetch(pageUrl + '?check=' + Date.now(), {cache: 'no-store'})).text(); const s = sigOf(t); if (pageSig === null) { pageSig = s; return; } if (s !== pageSig) location.replace(pageUrl + '?v=' + Date.now()); } catch (e) {} }
+if (location.protocol.startsWith('http')) { checkUpdate(); setInterval(checkUpdate, 5 * 60000); }
+poll();
+</script>
+</body>
+</html>
