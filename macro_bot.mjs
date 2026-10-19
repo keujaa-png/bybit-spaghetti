@@ -1,6 +1,7 @@
 // Robot Telegram des idées macro. Lancé par GitHub Actions (.github/workflows/macro.yml), sans navigateur.
 // Le jeton du bot vient du secret TELEGRAM_TOKEN : il n'est jamais écrit dans le dépôt ni dans les journaux.
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import './macro_engine.js';
 const ME = globalThis.ME;
@@ -15,6 +16,12 @@ const today = ME.today();
 const pb = readJ('macro_playbook.json'), base = readJ('macro_hist.json');
 const add = readJ('macro_add.json', {}), state = readJ('macro_state.json', {sent: {}});
 state.sent = state.sent || {};
+// journal des idées (bilan mensuel du dépôt crypto-scanner) et réglages appris par ce bilan
+const MP = readJ(process.env.MACRO_PARAMS || 'macro_params.json', {});
+function journalIdea(row) { try { const f = process.env.MACRO_JOURNAL || 'macro_calls.jsonl'; fs.mkdirSync(path.dirname(f), {recursive: true}); fs.appendFileSync(f, JSON.stringify(row) + '\n'); } catch (e) {} }
+const RATES = /^(CBOT:Z[TFNB]|CBOT:UB|EUREX:F(GB|OAT|BTP)|ICEEUR:(R|SO3)|NASDAQ:(TLT|EMB)|AMEX:(HYG|LQD|TLT|IEF|SHY|TBT|TMF))/;
+const classOf = tv => RATES.test(tv) ? 'taux et crédit' : /^(FX|FX_IDC|OANDA|TVC:DXY)/.test(tv) ? 'devises' : /^(BINANCE|BYBIT|COINBASE|CRYPTO)/.test(tv) || /IBIT|MSTR|COIN$/.test(tv) ? 'crypto'
+  : /1!$/.test(tv) && /^(NYMEX|COMEX|ICEEUR|ICEENDEX|CBOT|ICEUS|CME)/.test(tv) ? (/^(CME_MINI|CME:ES|CME:NQ)/.test(tv) ? 'indices' : 'matières premières') : /^(TVC|KRX:KOSPI|XETR:DAX|EURONEXT:PX1|NSE:NIFTY)/.test(tv) || /1!$/.test(tv) ? 'indices' : 'actions';
 ME.load(pb, base, [add]);
 
 // 1. cours du jour : on ne garde dans le dépôt que les séances terminées
@@ -255,9 +262,16 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     const watch = +it.confiance === 3;
     state.ai3 = state.ai3 && state.ai3.day === today ? state.ai3 : {day: today, n: 0};
     if (watch && state.ai3.n >= 2) { console.log('  écartée : ' + (it.nom || it.tv) + ' (3/5, déjà 2 « à surveiller » aujourd\'hui)'); continue; }
+    const numv = v => (typeof v === 'number' && isFinite(v) ? v : (isFinite(parseFloat(v)) ? parseFloat(v) : null));
+    const jrow = {id: key + '|' + today, ts: new Date().toISOString(), tv: String(it.tv || '').toUpperCase(), name: it.nom || it.tv, dir: buy ? 1 : -1, entry: numv(it.entree), stop: numv(it.stop), target: numv(it.objectif), sent: false,
+      f: {note: +it.confiance || null, cls: classOf(String(it.tv || '').toUpperCase()), mois: numv(it.mois), titre: it.titre || null}};
+    if (it.tv && !recent.includes(key) && !(it.confiance >= 3)) journalIdea({...jrow, why: 'note'});
     if (!it.tv || !(it.confiance >= 3) || recent.includes(key)) { console.log('  écartée : ' + (it.nom || it.tv) + ' (confiance ' + it.confiance + ')'); continue; }
     const ok = await checkSym(String(it.tv).toUpperCase());
     if (!ok || !ok.liquid) { console.log('  écartée : ' + it.tv + (ok ? ' trop peu liquide' : ' introuvable')); continue; }
+    jrow.tv = ok.tv; jrow.f.cls = classOf(ok.tv);
+    // réglages appris par le bilan mensuel (l'idée reste suivie pour pouvoir rouvrir le filtre)
+    if (+it.confiance < (MP.minNote || 3) || (MP.blocked || []).includes(jrow.f.cls)) { console.log('  écartée par le bilan mensuel : ' + (it.nom || it.tv) + ' (' + (+it.confiance < (MP.minNote || 3) ? 'conviction ' + it.confiance + ' < ' + MP.minNote : 'classe ' + jrow.f.cls + ' coupée') + ')'); journalIdea({...jrow, why: 'ml'}); continue; }
     console.log(`  ${buy ? 'ACHAT' : 'VENTE'} ${it.nom} (${ok.tv}) · ${it.titre}`);
     if (!TOKEN || !CHAT) continue;
     const e = ME.esc, cap = `${watch ? '🟡' : '🧠'} <b>${buy ? 'ACHAT' : 'VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))} · ${e(cut(it.titre, 50))} (${e(it.confiance)}/5)\n${e(cut(it.court || it.pourquoi || it.fait, 160))}\n${[it.entree != null ? 'Entrée ' + e(it.entree) : '', it.stop != null ? 'stop ' + e(it.stop) : '', it.objectif != null ? 'objectif ' + e(it.objectif) : ''].filter(Boolean).join(' · ') || 'Coupe si : ' + e(cut(it.invalidation, 60))} · <a href="${ME.tvUrl(ok.tv)}">chart</a>`;
@@ -282,6 +296,7 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
       console.log('  chart ' + (res.ok ? 'envoyé' : 'refusé'));
     } catch (err) { console.log('  chart impossible : ' + err.message); } } else console.log('  pas d’historique pour le chart de ' + ok.tv);
     if (!res.ok) res = await sendText(cap);
+    journalIdea({...jrow, sent: !!res.ok, why: res.ok ? 'envoyé' : 'telegram'});
     if (res.ok) {
       state.ai[key] = today; n++; if (watch) state.ai3.n++;
       // pas de mémo séparé : alertes de 3 lignes
