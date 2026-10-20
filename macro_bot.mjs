@@ -80,7 +80,7 @@ async function claude(system, user, search) {
   const call = async tools => {
     let messages = [{role: 'user', content: user}], out = '';
     for (let k = 0; k < 4; k++) {
-      const body = {model: MODEL, max_tokens: 6000, system, messages}; if (tools) body.tools = tools;
+      const body = {model: MODEL, max_tokens: 12000, system, messages}; if (tools) body.tools = tools;
       const r = await fetch('https://api.anthropic.com/v1/messages', {method: 'POST', headers: {'x-api-key': AKEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}, body: JSON.stringify(body)});
       const j = await r.json();
       if (!r.ok) return {err: r.status + ' ' + ((j.error && j.error.message) || 'erreur')};
@@ -269,7 +269,13 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
   } catch (e) {}
   console.log('Tableau multi-actifs : ' + multi.length + ' lignes.');
   const user = `TABLEAU MULTI-ACTIFS (actions, secteurs, pays, taux, crédit, devises, crypto, matières premières)\n${multi.join('\n')}\n\nTITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nAGENDA (événements à venir annoncés ces 7 derniers jours, presse anglaise et locale)\n${A.map((h, i) => `[A${i + 1}] ${h.title} — ${h.src}`).join('\n') || 'rien'}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTHÈMES SUIVIS PAR LA RÈGLE (surtout matières premières)\n${[...uni.values()].slice(0, 60).join('\n')}`;
-  let ideas = jsonOf(await claude(system, user, true));
+  const raw = await claude(system, user, true);
+  let ideas = jsonOf(raw);
+  if (!Array.isArray(ideas) && raw.length > 200) {
+    // réponse coupée ou JSON abîmé : un second appel, sans recherche, remet les idées au propre
+    console.log('IA : réponse illisible (' + raw.length + ' caractères, fin : « ' + raw.slice(-160).replace(/\s+/g, ' ') + ' »), reformatage.');
+    ideas = jsonOf(await claude('Tu reformates sans rien inventer. Recopie les idées de trading du texte fourni en un tableau JSON valide (mêmes champs, mêmes valeurs ; une idée coupée en cours de route est complétée seulement si ses champs principaux sont présents, sinon omise), entre <json> et </json>, sans aucun autre texte.', raw.slice(-24000), false));
+  }
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
   console.log(`IA (${MODEL}) : ${H.length} titres lus, ${ideas.length} idée(s) proposée(s).`);
   state.ai = state.ai || {}; let n = 0;
