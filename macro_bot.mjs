@@ -18,6 +18,7 @@ const add = readJ('macro_add.json', {}), state = readJ('macro_state.json', {sent
 state.sent = state.sent || {};
 // journal des idées (bilan mensuel du dépôt crypto-scanner) et réglages appris par ce bilan
 const MP = readJ(process.env.MACRO_PARAMS || 'macro_params.json', {});
+const MIN_CONV = Math.max(4, +MP.minNote || 0);   // seules les idées à 4/5 ou 5/5 partent
 function journalIdea(row) { try { const f = process.env.MACRO_JOURNAL || 'macro_calls.jsonl'; fs.mkdirSync(path.dirname(f), {recursive: true}); fs.appendFileSync(f, JSON.stringify(row) + '\n'); } catch (e) {} }
 const RATES = /^(CBOT:Z[TFNB]|CBOT:UB|EUREX:F(GB|OAT|BTP)|ICEEUR:(R|SO3)|NASDAQ:(TLT|EMB)|AMEX:(HYG|LQD|TLT|IEF|SHY|TBT|TMF))/;
 const classOf = tv => RATES.test(tv) ? 'taux et crédit' : /^(FX|FX_IDC|OANDA|TVC:DXY)/.test(tv) ? 'devises' : /^(BINANCE|BYBIT|COINBASE|CRYPTO)/.test(tv) || /IBIT|MSTR|COIN$/.test(tv) ? 'crypto'
@@ -148,8 +149,8 @@ if (!TOKEN) {
     for (const tr of fresh) {
       if (state.sent[ME.keyOf(tr)]) continue;
       const op = await opinion(ME.theme(tr.th), tr);
-      // veto : si le desk IA juge l'idée mauvaise (1 ou 2 sur 5), elle n'est pas envoyée
-      if (op && op.conv && op.conv <= 2) { console.log('  idée écartée par le desk IA (' + op.conv + '/5) : ' + tr.leg.n); state.sent[ME.keyOf(tr)] = today; continue; }
+      // seules les idées notées 4/5 ou plus par le desk IA partent (choix de Jack, 20 oct.) ; sans avis lisible, rien ne part
+      if (!op || !(op.conv >= MIN_CONV)) { console.log('  idée écartée par le desk IA (' + (op && op.conv ? op.conv + '/5' : 'pas d\'avis') + ') : ' + tr.leg.n); if (op && op.conv) state.sent[ME.keyOf(tr)] = today; continue; }
       const r = await sendIdea(tr, op ? op.line : '');
       if (r.ok) {
         state.sent[ME.keyOf(tr)] = today; n++;
@@ -157,7 +158,7 @@ if (!TOKEN) {
         // (plus de message de presse séparé : alertes courtes)
       }
     }
-    for (const o of polys) {
+    for (const o of (process.env.MACRO_POLY === '1' ? polys : [])) {   // cotes Polymarket : pas notées, coupées (choix de Jack, 20 oct.)
       const k = 'poly|' + o.p.id + '|' + Math.floor(today / 7); if (state.sent[k]) continue;
       const r = await sendText(ME.polyText(o)); if (r.ok) { state.sent[k] = today; n++; }
     }
@@ -200,6 +201,21 @@ async function aiIdeas() {
     seen.add(k); H.push({title, link, src, age}); if (++n >= max) break; } };
   for (const u of feeds) { try { push(await (await fetch(u, {headers: {'User-Agent': 'Mozilla/5.0'}})).text(), 25); } catch (e) {} }
   for (const q of qs) { try { push(await (await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:3d') + '&hl=en-US&gl=US&ceid=US:en', {headers: {'User-Agent': 'Mozilla/5.0'}})).text(), 3); } catch (e) {} }
+  // AGENDA : événements datés à venir, annoncés ces 7 derniers jours (grèves, manifestations, votes, notations, élections, sommets)
+  const A = [], seenA = new Set();
+  const pushA = (x, max, lang) => { let n = 0; for (const m of x.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const g = t => unent(((m[1].match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
+    const src = g('source'); let title = g('title'); if (src && title.endsWith(' - ' + src)) title = title.slice(0, -src.length - 3);
+    const age = (Date.now() - Date.parse(g('pubDate'))) / 864e5, k = title.toLowerCase().slice(0, 60);
+    if (!title || !(age < 8) || seenA.has(k) || seen.has(k)) continue;
+    seenA.add(k); A.push({title: (lang ? '[' + lang + '] ' : '') + title, src, age}); if (++n >= max) break; } };
+  const AGENDA = {
+    en: ['general strike planned', 'nationwide strike next week', 'mass protests planned', 'no-confidence vote scheduled', 'budget vote parliament deadline', 'credit rating review scheduled', 'snap election called', 'election next month polls', 'referendum vote date', 'central bank meeting next week', 'OPEC meeting next week', 'tariff deadline', 'debt ceiling deadline', 'summit next week leaders'],
+    fr: ['grève générale', 'journée de mobilisation intersyndicale', 'manifestations nationales prévues', 'motion de censure vote', 'budget 2027 vote Assemblée', 'agence de notation France révision', 'blocage du pays appel', 'dissolution élections anticipées'],
+    de: ['Generalstreik geplant', 'Misstrauensvotum'], it: ['sciopero generale', 'voto di fiducia governo'], es: ['huelga general convocada', 'moción de censura votación']};
+  const ED = {en: 'hl=en-US&gl=US&ceid=US:en', fr: 'hl=fr&gl=FR&ceid=FR:fr', de: 'hl=de&gl=DE&ceid=DE:de', it: 'hl=it&gl=IT&ceid=IT:it', es: 'hl=es&gl=ES&ceid=ES:es'};
+  for (const [lang, L] of Object.entries(AGENDA)) for (const q of L) { try { pushA(await (await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:7d') + '&' + ED[lang], {headers: {'User-Agent': 'Mozilla/5.0'}})).text(), 3, lang === 'en' ? '' : lang.toUpperCase()); } catch (e) {} }
+  console.log('Agenda : ' + A.length + ' titres sur des événements à venir.');
   if (H.length < 10) { console.log('IA : trop peu de titres de presse (' + H.length + '), passage annulé.'); return 0; }
   // tableau de marché
   const themes = ME.PB.themes.map(th => { const D = ME.drvSeries(th), R = ME.ruleOf(th), n = D.v.length; if (n <= R.CH) return null; const last = (ME.SIGS[th.id] || []).slice(-1)[0];
@@ -214,7 +230,8 @@ Ce qu'exige une idée de desk :
 - Une chaîne de causalité claire jusqu'au titre, et la preuve que le marché ne l'a pas encore payée : sers-toi des performances du tableau et vérifie le cours récent.
 - Une asymétrie : dis ce qui se passe si tu as tort. Si le scénario adverse est aussi probable, pas d'idée.
 - Un effet qui dure des mois, pas des jours.
-- Quatre profils sont acceptés : vendre un excès dont le momentum casse (voir le style du trader) ; le titre qui n'a pas encore réagi ; le tout début d'une tendance longue (le titre vient de démarrer et le mouvement a de quoi durer des mois) ; ou un chart qui CONSOLIDE après un gros mouvement et s'apprête à repartir dans le sens de la tendance : drapeau baissier après une chute, drapeau haussier dans une tendance haussière (le tableau marque ces cas « CONSOLIDATION »). Dans ce dernier cas, l'entrée est la cassure du range de consolidation, le stop de l'autre côté du range, et il faut une raison de fond pour que le mouvement reprenne. Jamais d'achat sur un titre déjà étiré, jamais de vente d'un plancher sans cassure.
+- Cinq profils sont acceptés (le cinquième est décrit plus bas) : vendre un excès dont le momentum casse (voir le style du trader) ; le titre qui n'a pas encore réagi ; le tout début d'une tendance longue (le titre vient de démarrer et le mouvement a de quoi durer des mois) ; ou un chart qui CONSOLIDE après un gros mouvement et s'apprête à repartir dans le sens de la tendance : drapeau baissier après une chute, drapeau haussier dans une tendance haussière (le tableau marque ces cas « CONSOLIDATION »). Dans ce dernier cas, l'entrée est la cassure du range de consolidation, le stop de l'autre côté du range, et il faut une raison de fond pour que le mouvement reprenne. Jamais d'achat sur un titre déjà étiré, jamais de vente d'un plancher sans cassure.
+- Cinquième profil, le positionnement AVANT un événement daté à venir (rubrique AGENDA : grève générale, grosses manifestations, vote de censure ou du budget, revue d'une agence de notation, élection, réunion de banque centrale, échéance tarifaire). Exemple type : grosses manifestations annoncées en France la semaine prochaine, budget bloqué -> pression sur l'OAT (écart OAT-Bund), les banques françaises (BNP, Société Générale, Crédit Agricole) et l'euro. Il faut un impact de marché crédible et pas encore dans le prix, un sens clair, l'instrument le plus direct, la date de l'événement, et ce qui se passe si l'événement fait pschitt. Un événement seul sans fragilité de fond ne suffit pas.
 - Ça peut être une idée sur une seule action : résultats ou prévisions qui changent la trajectoire, carnet de commandes, décision d'un régulateur, changement de prix ou de demande dans son secteur. Même exigence : un fait daté, pas encore dans le prix.
 - Un instrument très liquide et négociable chez Interactive Brokers, partout dans le monde : action, ETF pays ou secteur, future de taux ou d'indice, devise (FX:EURUSD), crypto (BINANCE:BTCUSDT ou l'ETF IBIT), ETF obligataire ou de matière première, quand c'est l'expression la plus propre. Sers-toi du tableau multi-actifs ; sinon donne le symbole TradingView exact (PLACE:TICKER).
 - Le style du trader (vu dans son portefeuille IBKR) : il aime VENDRE les excès des thèmes à la mode quand leur momentum casse (semi-conducteurs, IA, Corée, souvent via des ETF à levier comme SOXL, NVDL, KORU) et être ACHETEUR des chocs d'offre durables (pétrole, gaz européen TTF). Ces deux familles sont prioritaires quand le fond et le chart s'alignent : un thème étiré dont le momentum casse (cassure de la moyenne 20 ou 50 jours, sommet plus bas, catalyseur qui retourne le récit) est une idée valable, même si le titre a beaucoup monté.
@@ -227,8 +244,8 @@ Raisonne comme un desk de hedge fund, dans cet ordre, sans copier personne :
 5. L'expression la plus propre : l'instrument qui porte la thèse avec le moins de risques parasites.
 6. L'asymétrie : gain si tu as raison, perte si tu as tort, et le fait précis qui te fait couper.
 Donne toujours tes 2 meilleures idées du moment, même imparfaites, avec une note honnête : c'est la note qui décide de l'envoi, pas toi.
-Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Les idées à 4 ou 5 sont envoyées comme idées du desk ; celles à 3 partent marquées « à surveiller ».
-Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "court": "la thèse en UNE phrase de 120 caractères max, en français", "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
+Note ta conviction de 1 à 5 sans complaisance : 4 veut dire que tu engagerais le capital du fonds sur cette thèse aujourd'hui, 5 est rare, 3 veut dire intéressante mais il manque une étape. Seules les idées à 4 ou 5 sont envoyées ; à 3 ou moins, rien ne part. Le trader ne veut pas le bruit de la presse : mieux vaut aucune idée qu'une idée moyenne, ne gonfle jamais la note pour faire partir une idée.
+Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le marché a déjà intégré. Raisonne brièvement, puis termine par <json>[ ... ]</json> : un tableau JSON avec tes 2 idées. Chaque idée : {"titre": "8 mots max", "sens": "achat" ou "vente", "tv": "PLACE:TICKER", "nom": "nom du titre", "fait": "le fait d'actualité daté, une phrase courte en français", "pourquoi": "le mécanisme vers ce titre et pourquoi ce n'est pas dans le prix, une phrase courte en français", "risque": "ce qui te donnerait tort, 12 mots max", "mois": nombre de mois, "invalidation": "le signal concret pour couper, 10 mots max", "entree": prix d'entrée (nombre, dans l'unité du cours TradingView), "stop": prix du stop (nombre), "objectif": prix objectif (nombre), "evenement": "si l'idée dépend d'un événement à venir : sa date et sa nature en 40 caractères max (ex. 23/10 grève générale), sinon chaîne vide", "court": "la thèse en UNE phrase de 120 caractères max, en français", "detail": "la thèse d'investissement complète comme un mémo de desk de hedge fund, 6 lignes courtes séparées par \\n : Contexte (faits datés et chiffrés), Consensus (ce que le marché croit et a déjà payé), Notre écart, Expression (instrument chez IBKR et pourquoi), Catalyseurs (avec dates), Risque et taille", "confiance": 1 à 5, "refs": [numéros des titres de presse utilisés]}.`;
   const MULTI = ['AMEX:SPY', 'NASDAQ:QQQ', 'AMEX:IWM', 'AMEX:XLF', 'AMEX:XLE', 'AMEX:XLK', 'AMEX:XLV', 'AMEX:XLY', 'AMEX:XLP', 'AMEX:XLI', 'AMEX:XLU', 'AMEX:XHB', 'AMEX:KRE', 'NASDAQ:SMH', 'AMEX:ITA', 'AMEX:JETS', 'AMEX:XRT',
     'AMEX:EWJ', 'AMEX:EWG', 'AMEX:EWQ', 'AMEX:EWU', 'AMEX:EWI', 'AMEX:EWP', 'AMEX:EWZ', 'AMEX:EWW', 'AMEX:FXI', 'AMEX:KWEB', 'AMEX:EWY', 'AMEX:EWT', 'AMEX:EWA', 'AMEX:EWC', 'AMEX:EZA', 'AMEX:EPOL', 'AMEX:KSA', 'AMEX:EIS', 'AMEX:EIDO', 'AMEX:ARGT',
     'CBOT:ZN1!', 'CBOT:ZB1!', 'EUREX:FGBL1!', 'EUREX:FOAT1!', 'EUREX:FBTP1!', 'NASDAQ:TLT', 'AMEX:HYG', 'AMEX:LQD', 'NASDAQ:EMB',
@@ -251,30 +268,29 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     });
   } catch (e) {}
   console.log('Tableau multi-actifs : ' + multi.length + ' lignes.');
-  const user = `TABLEAU MULTI-ACTIFS (actions, secteurs, pays, taux, crédit, devises, crypto, matières premières)\n${multi.join('\n')}\n\nTITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTHÈMES SUIVIS PAR LA RÈGLE (surtout matières premières)\n${[...uni.values()].slice(0, 60).join('\n')}`;
+  const user = `TABLEAU MULTI-ACTIFS (actions, secteurs, pays, taux, crédit, devises, crypto, matières premières)\n${multi.join('\n')}\n\nTITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nAGENDA (événements à venir annoncés ces 7 derniers jours, presse anglaise et locale)\n${A.map((h, i) => `[A${i + 1}] ${h.title} — ${h.src}`).join('\n') || 'rien'}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTHÈMES SUIVIS PAR LA RÈGLE (surtout matières premières)\n${[...uni.values()].slice(0, 60).join('\n')}`;
   let ideas = jsonOf(await claude(system, user, true));
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
   console.log(`IA (${MODEL}) : ${H.length} titres lus, ${ideas.length} idée(s) proposée(s).`);
   state.ai = state.ai || {}; let n = 0;
   for (const it of ideas.slice(0, 2)) {
     const buy = /achat/i.test(it.sens || ''), key = String(it.tv || '').toUpperCase() + (buy ? '|achat' : '|vente');
-    // 4-5/5 : envoyées ; 3/5 : envoyées en « à surveiller », 2 par jour au plus (choix de Jack, 15 oct.)
-    const watch = +it.confiance === 3;
+    const watch = false;   // plus d'idées 3/5 « à surveiller » (choix de Jack, 20 oct.)
     state.ai3 = state.ai3 && state.ai3.day === today ? state.ai3 : {day: today, n: 0};
     if (watch && state.ai3.n >= 2) { console.log('  écartée : ' + (it.nom || it.tv) + ' (3/5, déjà 2 « à surveiller » aujourd\'hui)'); continue; }
     const numv = v => (typeof v === 'number' && isFinite(v) ? v : (isFinite(parseFloat(v)) ? parseFloat(v) : null));
     const jrow = {id: key + '|' + today, ts: new Date().toISOString(), tv: String(it.tv || '').toUpperCase(), name: it.nom || it.tv, dir: buy ? 1 : -1, entry: numv(it.entree), stop: numv(it.stop), target: numv(it.objectif), sent: false,
-      f: {note: +it.confiance || null, cls: classOf(String(it.tv || '').toUpperCase()), mois: numv(it.mois), titre: it.titre || null}};
-    if (it.tv && !recent.includes(key) && !(it.confiance >= 3)) journalIdea({...jrow, why: 'note'});
-    if (!it.tv || !(it.confiance >= 3) || recent.includes(key)) { console.log('  écartée : ' + (it.nom || it.tv) + ' (confiance ' + it.confiance + ')'); continue; }
+      f: {note: +it.confiance || null, cls: classOf(String(it.tv || '').toUpperCase()), mois: numv(it.mois), titre: it.titre || null, event: it.evenement ? 1 : 0}};
+    if (it.tv && !recent.includes(key) && !(it.confiance >= MIN_CONV)) journalIdea({...jrow, why: 'note'});
+    if (!it.tv || !(it.confiance >= MIN_CONV) || recent.includes(key)) { console.log('  écartée : ' + (it.nom || it.tv) + ' (confiance ' + it.confiance + ')'); continue; }
     const ok = await checkSym(String(it.tv).toUpperCase());
     if (!ok || !ok.liquid) { console.log('  écartée : ' + it.tv + (ok ? ' trop peu liquide' : ' introuvable')); continue; }
     jrow.tv = ok.tv; jrow.f.cls = classOf(ok.tv);
     // réglages appris par le bilan mensuel (l'idée reste suivie pour pouvoir rouvrir le filtre)
-    if (+it.confiance < (MP.minNote || 3) || (MP.blocked || []).includes(jrow.f.cls)) { console.log('  écartée par le bilan mensuel : ' + (it.nom || it.tv) + ' (' + (+it.confiance < (MP.minNote || 3) ? 'conviction ' + it.confiance + ' < ' + MP.minNote : 'classe ' + jrow.f.cls + ' coupée') + ')'); journalIdea({...jrow, why: 'ml'}); continue; }
+    if (+it.confiance < MIN_CONV || (MP.blocked || []).includes(jrow.f.cls)) { console.log('  écartée par le bilan mensuel : ' + (it.nom || it.tv) + ' (' + (+it.confiance < MIN_CONV ? 'conviction ' + it.confiance + ' < ' + MIN_CONV : 'classe ' + jrow.f.cls + ' coupée') + ')'); journalIdea({...jrow, why: 'ml'}); continue; }
     console.log(`  ${buy ? 'ACHAT' : 'VENTE'} ${it.nom} (${ok.tv}) · ${it.titre}`);
     if (!TOKEN || !CHAT) continue;
-    const e = ME.esc, cap = `${watch ? '🟡' : '🧠'} <b>${buy ? 'ACHAT' : 'VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))} · ${e(cut(it.titre, 50))} (${e(it.confiance)}/5)\n${e(cut(it.court || it.pourquoi || it.fait, 160))}\n${[it.entree != null ? 'Entrée ' + e(it.entree) : '', it.stop != null ? 'stop ' + e(it.stop) : '', it.objectif != null ? 'objectif ' + e(it.objectif) : ''].filter(Boolean).join(' · ') || 'Coupe si : ' + e(cut(it.invalidation, 60))} · <a href="${ME.tvUrl(ok.tv)}">chart</a>`;
+    const e = ME.esc, cap = `${watch ? '🟡' : '🧠'} <b>${buy ? 'ACHAT' : 'VENTE'} ${e(it.nom)}</b> · ${e(ME.short(ok.tv))} · ${e(cut(it.titre, 50))} (${e(it.confiance)}/5)\n${it.evenement ? '📅 ' + e(cut(it.evenement, 40)) + ' · ' : ''}${e(cut(it.court || it.pourquoi || it.fait, it.evenement ? 120 : 160))}\n${[it.entree != null ? 'Entrée ' + e(it.entree) : '', it.stop != null ? 'stop ' + e(it.stop) : '', it.objectif != null ? 'objectif ' + e(it.objectif) : ''].filter(Boolean).join(' · ') || 'Coupe si : ' + e(cut(it.invalidation, 60))} · <a href="${ME.tvUrl(ok.tv)}">chart</a>`;
     let res = {ok: false};
     let L = ME.FULL[ok.tv] && ME.FULL[ok.tv].c.length > 130 ? ME.FULL[ok.tv] : null;
     if (!L) { const Y = await history(ok.tv); if (Y) L = Y; }
