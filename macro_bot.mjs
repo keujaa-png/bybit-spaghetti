@@ -209,12 +209,13 @@ async function aiIdeas() {
     const age = (Date.now() - Date.parse(g('pubDate'))) / 864e5, k = title.toLowerCase().slice(0, 60);
     if (!title || !(age < 8) || seenA.has(k) || seen.has(k)) continue;
     seenA.add(k); A.push({title: (lang ? '[' + lang + '] ' : '') + title, src, age}); if (++n >= max) break; } };
+  // requêtes groupées (OR) : peu d'appels, pour ne pas se faire limiter par Google News
   const AGENDA = {
-    en: ['general strike planned', 'nationwide strike next week', 'mass protests planned', 'no-confidence vote scheduled', 'budget vote parliament deadline', 'credit rating review scheduled', 'snap election called', 'election next month polls', 'referendum vote date', 'central bank meeting next week', 'OPEC meeting next week', 'tariff deadline', 'debt ceiling deadline', 'summit next week leaders'],
-    fr: ['grève générale', 'journée de mobilisation intersyndicale', 'manifestations nationales prévues', 'motion de censure vote', 'budget 2027 vote Assemblée', 'agence de notation France révision', 'blocage du pays appel', 'dissolution élections anticipées'],
-    de: ['Generalstreik geplant', 'Misstrauensvotum'], it: ['sciopero generale', 'voto di fiducia governo'], es: ['huelga general convocada', 'moción de censura votación']};
+    en: ['"general strike" OR "nationwide strike" OR "mass protests" planned', '"no-confidence vote" OR "budget vote" OR "snap election" OR referendum', '"rating review" OR "credit rating" France OR Italy OR UK OR US scheduled', '"central bank" OR OPEC OR tariff deadline "next week"'],
+    fr: ['grève générale OR "journée de mobilisation" OR "manifestations nationales"', '"motion de censure" OR "vote du budget" OR dissolution OR "agence de notation"'],
+    de: ['Generalstreik OR Misstrauensvotum'], it: ['"sciopero generale" OR "voto di fiducia"'], es: ['"huelga general" OR "moción de censura"']};
   const ED = {en: 'hl=en-US&gl=US&ceid=US:en', fr: 'hl=fr&gl=FR&ceid=FR:fr', de: 'hl=de&gl=DE&ceid=DE:de', it: 'hl=it&gl=IT&ceid=IT:it', es: 'hl=es&gl=ES&ceid=ES:es'};
-  for (const [lang, L] of Object.entries(AGENDA)) for (const q of L) { try { pushA(await (await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:7d') + '&' + ED[lang], {headers: {'User-Agent': 'Mozilla/5.0'}})).text(), 3, lang === 'en' ? '' : lang.toUpperCase()); } catch (e) {} }
+  for (const [lang, L] of Object.entries(AGENDA)) for (const q of L) { try { pushA(await (await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:7d') + '&' + ED[lang], {headers: {'User-Agent': 'Mozilla/5.0'}})).text(), 8, lang === 'en' ? '' : lang.toUpperCase()); } catch (e) {} await new Promise(r => setTimeout(r, 400)); }
   console.log('Agenda : ' + A.length + ' titres sur des événements à venir.');
   if (H.length < 10) { console.log('IA : trop peu de titres de presse (' + H.length + '), passage annulé.'); return 0; }
   // tableau de marché
