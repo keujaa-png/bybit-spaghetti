@@ -72,41 +72,12 @@ async function findChat() {
   } catch (e) {}
   return false;
 }
-// chart du coin : bougies 4h sur 30 jours (Hyperliquid), prix d'entrée de la whale et liquidation
-async function coinChart(ch) {
-  try {
-    const now = Date.now(), raw = await api({type: 'candleSnapshot', req: {coin: ch.coin, interval: '4h', startTime: now - 30 * 864e5, endTime: now}});
-    const bars = (raw || []).map(x => ({o: +x.o, h: +x.h, l: +x.l, c: +x.c})).filter(b => b.c > 0);
-    if (bars.length < 20) return null;
-    const {createCanvas} = await import('@napi-rs/canvas');
-    const W = 900, H = 420, cv = createCanvas(W, H), ctx = cv.getContext('2d');
-    ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, W, H);
-    const lv = [{v: ch.entry, lab: 'entrée', col: '#58a6ff'}, {v: ch.liq, lab: 'liquidation', col: '#f85149'}].filter(l => l.v > 0);
-    let lo = Math.min(...bars.map(b => b.l)), hi = Math.max(...bars.map(b => b.h));
-    for (const l of lv) if (l.v > lo * 0.5 && l.v < hi * 2) { lo = Math.min(lo, l.v); hi = Math.max(hi, l.v); }
-    const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
-    const X = i => 12 + (W - 150) * i / (bars.length - 1), Y = v => 40 + (H - 70) * (1 - (v - lo) / (hi - lo)), bw = Math.max(2, (W - 150) / bars.length * 0.6);
-    ctx.font = '600 20px "DejaVu Sans", sans-serif'; ctx.fillStyle = '#d7dde5'; ctx.fillText(`${nm(ch.coin)} · la whale ouvre un ${ch.side}`, 12, 26);
-    bars.forEach((b, i) => { const up = b.c >= b.o; ctx.strokeStyle = ctx.fillStyle = up ? '#3fb950' : '#f85149'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(i), Y(b.h)); ctx.lineTo(X(i), Y(b.l)); ctx.stroke(); ctx.fillRect(X(i) - bw / 2, Math.min(Y(b.o), Y(b.c)), bw, Math.max(1, Math.abs(Y(b.o) - Y(b.c)))); });
-    ctx.font = '15px "DejaVu Sans", sans-serif';
-    for (const l of lv) { if (l.v < lo || l.v > hi) continue; ctx.strokeStyle = ctx.fillStyle = l.col; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(12, Y(l.v)); ctx.lineTo(W - 135, Y(l.v)); ctx.stroke(); ctx.setLineDash([]); ctx.fillText(l.lab + ' ' + px(l.v), W - 130, Y(l.v) + 5); }
-    ctx.fillStyle = '#8b949e'; ctx.font = '13px "DejaVu Sans", sans-serif'; ctx.fillText('Hyperliquid · bougies 4h · 30 jours', 12, H - 8);
-    return cv.toBuffer('image/png');
-  } catch (e) { console.log('chart impossible : ' + e.message); return null; }
-}
-async function tg(text, ch) {
+async function tg(text) {
   if (!TOKEN || !CHAT) { console.log('[à vide] ' + text.replace(/<[^>]+>/g, '').replace(/\n/g, ' ¦ ')); return true; }
   try {
-    const png = ch ? await coinChart(ch) : null;
-    if (png) {
-      const fd = new FormData(); fd.append('chat_id', CHAT); fd.append('caption', text.slice(0, 1024)); fd.append('parse_mode', 'HTML'); fd.append('photo', new Blob([png], {type: 'image/png'}), 'whale.png');
-      const jp = await (await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {method: 'POST', body: fd})).json();
-      if (jp.ok) return true;
-      console.log('Telegram a refusé le chart : ' + (jp.description || 'erreur') + ' ; envoi du texte seul.');
-    }
     const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {method: 'POST', body: new URLSearchParams({chat_id: CHAT, text, parse_mode: 'HTML', disable_web_page_preview: 'true'})});
     const j = await r.json();
-    if (!j.ok && /chat not found|chat_id is empty|PEER_ID_INVALID/i.test(j.description || '') && !chatTried && await findChat()) return tg(text, ch);
+    if (!j.ok && /chat not found|chat_id is empty|PEER_ID_INVALID/i.test(j.description || '') && !chatTried && await findChat()) return tg(text);
     if (!j.ok) console.log('Telegram a refusé : ' + (j.description || 'erreur'));
     return j.ok;
   } catch (e) { console.log('Telegram injoignable.'); return false; }
@@ -181,7 +152,7 @@ for (const addr of WALLETS) {
         if (Math.abs(dSz) / Math.abs(a.szi) >= MIN_PCT && dUsd >= MIN_USD)
           msg = `${dSz > 0 ? icon(b.szi) + ' <b>renforce' : '🟡 <b>allège'} son ${side(b.szi)} ${esc(nm(c))}</b> de ${usd(dUsd)}${at}\nTaille ${usd(a.value)} → ${usd(b.value)} ×${b.lev} · entrée ${px(b.entry)}${b.liq ? ' · liquidation ' + px(b.liq) : ''}${dSz < 0 ? ' · gain réalisé ' + usd(realized) : ''}`;
       }
-      if (msg && await tg(`${head} ${msg}\nCapital ${usd(now.equity)} · ${link}`, b ? {coin: c, entry: b.entry, liq: b.liq, side: side(b.szi)} : null)) sent++;
+      if (msg && await tg(`${head} ${msg}\nCapital ${usd(now.equity)} · ${link}`)) sent++;
       if (!msg && a && b) now.pos[c] = {...b, base: (a.base || a.szi)};
     }
   }
