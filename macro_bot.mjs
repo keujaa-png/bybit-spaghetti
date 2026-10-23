@@ -360,13 +360,19 @@ function yahooOf(tv) {
   return suf ? t.replace(/\.$/, '') + suf : null;
 }
 async function history(tv) {
-  const y = yahooOf(tv); if (!y) return null;
-  try {
+  const y = yahooOf(tv);
+  if (y) try {
     const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(y)}?range=1y&interval=1d`, {headers: {'User-Agent': 'Mozilla/5.0'}});
     const res = (await r.json()).chart.result[0], c = res.indicators.quote[0].close, t = [], v = [];
     res.timestamp.forEach((s, i) => { if (c[i] != null) { t.push(Math.floor(s / 86400)); v.push(c[i]); } });
-    return v.length > 60 ? {t, c: v} : null;
-  } catch (e) { return null; }
+    if (v.length > 60) return {t, c: v};
+  } catch (e) {}
+  // repli : TradingView (Yahoo bloque souvent les serveurs de GitHub) -> le chart part quand même
+  for (const p of ['./mlcore.mjs', './cs/mlcore.mjs']) {
+    if (!fs.existsSync(p)) continue;
+    try { const {dailyBars} = await import(p); const b = ((await dailyBars([tv], 300))[tv] || []); if (b.length > 60) return {t: b.map(x => Math.floor(x.t / 86400)), c: b.map(x => x.c)}; } catch (e) {}
+  }
+  return null;
 }
 function hit(w, q, q2) {
   if (!q || q.close == null) return null;
@@ -410,14 +416,19 @@ async function sendThesisCard(w, q, v, op) {
   const e = ME.esc, buy = w.sens === 'achat';
   const px = w.tv2 ? 'ratio ' + v.toFixed(4) : (+q.close).toPrecision(5) + ' ' + (q.currency || '');
   const cap = `🎯 <b>${buy ? 'ACHAT' : 'VENTE'} ${e(w.nom)}</b> · ${e(ME.short(w.tv))}${w.tv2 ? ' / ' + e(ME.short(w.tv2)) : ''} · ${e(px)} (Opus ${e(op.note)}/5)\n${e(first(op.analyse))}\nCoupe ${e(cut(op.invalidation || w.invalidation, 50))} · objectif ${e(cut(op.objectif || '?', 30))} · <a href="${ME.tvUrl(w.tv)}">chart</a>`;
-  const H = w.tv2 ? null : await history(w.tv);
+  let H = await history(w.tv);
+  if (H && w.tv2) {   // thèse de paire : chart du ratio
+    const H2 = await history(w.tv2), m = new Map(H2 ? H2.t.map((d, i) => [d, H2.c[i]]) : []), t = [], c = [];
+    H.t.forEach((d, i) => { if (m.has(d)) { t.push(d); c.push(H.c[i] / m.get(d)); } });
+    H = c.length > 60 ? {t, c} : null;
+  }
   if (H && TOKEN && CHAT) {
     try {
       const {createCanvas} = await import('@napi-rs/canvas'); const cv = createCanvas(900, 340), ctx = cv.getContext('2d'); ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, 900, 340);
       const ma = H.c.map((_, i) => ME.sma(H.c, 50, i)), lines = [{v: ma, color: '#5b6b80', w: 2, dash: [6, 5]}, {v: H.c, color: '#d7dde5', w: 2.5}];
-      if (w.niveau && !w.tv2) lines.unshift({v: H.c.map(() => w.niveau), color: buy ? '#3fb950' : '#f85149', w: 1.5, dash: [3, 4]});
+      if (w.niveau) lines.unshift({v: H.c.map(() => w.niveau), color: buy ? '#3fb950' : '#f85149', w: 1.5, dash: [3, 4]});
       const n = H.c.length - 1;
-      ME.panel(ctx, 0, 6, 900, 328, H.t, lines, {title: w.nom + '  (' + w.tv + ')', marks: [{i: n, v: H.c[n], color: buy ? '#3fb950' : '#f85149', label: buy ? 'signal achat' : 'signal vente'}]});
+      ME.panel(ctx, 0, 6, 900, 328, H.t, lines, {title: w.nom + '  (' + w.tv + (w.tv2 ? ' / ' + w.tv2 : '') + ')', marks: [{i: n, v: H.c[n], color: buy ? '#3fb950' : '#f85149', label: buy ? 'signal achat' : 'signal vente'}]});
       const fd = new FormData(); fd.append('chat_id', CHAT); fd.append('caption', cap.slice(0, 1020)); fd.append('parse_mode', 'HTML'); fd.append('photo', new Blob([cv.toBuffer('image/png')], {type: 'image/png'}), 'these.png');
       const r = await tg('sendPhoto', fd); if (r.ok) return r;
     } catch (err) { console.log('  chart impossible : ' + err.message); }
