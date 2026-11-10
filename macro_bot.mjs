@@ -76,11 +76,14 @@ async function sendIdea(tr, extra = '') {
 // Modèle Claude (secret ANTHROPIC_API_KEY) : il lit l'actualité, avec recherche web quand l'API l'accepte
 const AKEY = (process.env.ANTHROPIC_API_KEY || '').trim();
 const MODEL = (process.env.MACRO_MODEL || '').trim() || 'claude-opus-5-5';
-async function claude(system, user, search) {
+// modèle « fantôme » : lit les mêmes news que le modèle principal, ses idées sont seulement notées (calls/macro_shadow.jsonl)
+// pour que le bilan mensuel compare les deux ; rien ne part sur Telegram
+const SHADOW = (process.env.MACRO_SHADOW_MODEL || '').trim();
+async function claude(system, user, search, model = MODEL) {
   const call = async tools => {
     let messages = [{role: 'user', content: user}], out = '';
     for (let k = 0; k < 4; k++) {
-      const body = {model: MODEL, max_tokens: 12000, system, messages}; if (tools) body.tools = tools;
+      const body = {model, max_tokens: 12000, system, messages}; if (tools) body.tools = tools;
       const r = await fetch('https://api.anthropic.com/v1/messages', {method: 'POST', headers: {'x-api-key': AKEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}, body: JSON.stringify(body)});
       const j = await r.json();
       if (!r.ok) return {err: r.status + ' ' + ((j.error && j.error.message) || 'erreur')};
@@ -276,6 +279,27 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     // réponse coupée ou JSON abîmé : un second appel, sans recherche, remet les idées au propre
     console.log('IA : réponse illisible (' + raw.length + ' caractères, fin : « ' + raw.slice(-160).replace(/\s+/g, ' ') + ' »), reformatage.');
     ideas = jsonOf(await claude('Tu reformates sans rien inventer. Recopie les idées de trading du texte fourni en un tableau JSON valide (mêmes champs, mêmes valeurs ; une idée coupée en cours de route est complétée seulement si ses champs principaux sont présents, sinon omise), entre <json> et </json>, sans aucun autre texte.', raw.slice(-24000), false));
+  }
+  // une fois par jour (passage du matin) : le modèle fantôme reçoit exactement la même consigne et les mêmes données
+  if (SHADOW && SHADOW !== MODEL && new Date().getUTCHours() < 6) {
+    try {
+      const sraw = await claude(system, user, true, SHADOW);
+      let sid = jsonOf(sraw);
+      if (!Array.isArray(sid) && sraw.length > 200) sid = jsonOf(await claude('Tu reformates sans rien inventer. Recopie les idées de trading du texte fourni en un tableau JSON valide (mêmes champs, mêmes valeurs), entre <json> et </json>, sans aucun autre texte.', sraw.slice(-24000), false, SHADOW));
+      const numv = v => (typeof v === 'number' && isFinite(v) ? v : (isFinite(parseFloat(v)) ? parseFloat(v) : null));
+      let k = 0;
+      for (const it of (Array.isArray(sid) ? sid : []).slice(0, 2)) {
+        if (!it.tv) continue;
+        const buy = /achat/i.test(it.sens || ''); let tv = String(it.tv).toUpperCase();
+        try { const ok = await checkSym(tv); if (ok && ok.tv) tv = ok.tv; } catch (e) {}
+        const f = process.env.MACRO_JOURNAL || 'macro_calls.jsonl', file = path.join(path.dirname(f), 'macro_shadow.jsonl');
+        fs.mkdirSync(path.dirname(file), {recursive: true});
+        fs.appendFileSync(file, JSON.stringify({id: tv + (buy ? '|achat|' : '|vente|') + today + '|' + SHADOW, ts: new Date().toISOString(), tv, name: it.nom || it.tv, dir: buy ? 1 : -1, entry: numv(it.entree), stop: numv(it.stop), target: numv(it.objectif),
+          sent: false, why: 'fantôme', f: {note: +it.confiance || null, cls: classOf(tv), mois: numv(it.mois), titre: it.titre || null, event: it.evenement ? 1 : 0, model: SHADOW}}) + '\n');
+        k++; console.log(`  fantôme ${SHADOW} : ${buy ? 'ACHAT' : 'VENTE'} ${it.nom || tv} (${tv}) · ${it.titre} · ${it.confiance}/5`);
+      }
+      console.log(`Modèle fantôme (${SHADOW}) : ${k} idée(s) notée(s), rien d'envoyé.`);
+    } catch (e) { console.log('Modèle fantôme : ' + e.message); }
   }
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
   console.log(`IA (${MODEL}) : ${H.length} titres lus, ${ideas.length} idée(s) proposée(s).`);
