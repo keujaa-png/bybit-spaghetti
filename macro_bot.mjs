@@ -175,7 +175,9 @@ async function checkSym(tv) {
     const r = await fetch('https://scanner.tradingview.com/global/scan', {method: 'POST', body: JSON.stringify({symbols: {tickers: [tv]}, columns: ['close', 'average_volume_30d_calc', 'currency', 'description']})});
     const d = (await r.json()).data[0]; if (!d) return null;
     const [c, v, cur, name] = d.d, usd = c * v * (FX[cur] || 0) / 1e6;
-    return {tv: d.s, name, usd, liquid: FX[cur] ? usd >= 20 : true};
+    // futures et devises : le scanner donne un volume en contrats (ou pas de volume), pas en dollars : on ne les écarte pas sur ce critère
+    const noVol = /\d!$/.test(d.s) || /^(FX|FX_IDC|OANDA):/.test(d.s);
+    return {tv: d.s, name, usd, liquid: noVol ? true : (FX[cur] ? usd >= 20 : true)};
   } catch (e) { return null; }
 }
 async function aiIdeas() {
