@@ -45,6 +45,11 @@ h1{font-size:21px;line-height:1.25;margin:0;font-weight:650;letter-spacing:-.01e
 .controls label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink2)}
 select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--base);border-radius:8px;padding:6px 28px 6px 10px;min-height:34px}
 
+.notif{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.btn{font:inherit;font-weight:550;color:var(--ink);background:var(--surface);border:1px solid var(--base);border-radius:8px;padding:6px 12px;min-height:34px;cursor:pointer}
+.btn[aria-pressed="true"]{border-color:var(--new-edge);background:var(--new-bg)}
+.btn[aria-pressed="true"]::before{content:"\2713\00a0"}
+.note{font-size:12px;color:var(--ink2);max-width:46ch}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 22px}
 .kpi{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:12px 14px;min-width:0}
 .kpi .k{font-size:12px;color:var(--ink2)}
@@ -150,6 +155,11 @@ footer p{margin:0 0 6px}
         <option value="pnl">PnL latent</option>
       </select>
     </label>
+    <div class="notif">
+      <button type="button" class="btn" id="notif-btn" aria-pressed="false">Activer les notifications</button>
+      <button type="button" class="btn" id="sound-btn" aria-pressed="false">Activer le son</button>
+      <span class="note" id="notif-note"></span>
+    </div>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -170,7 +180,7 @@ footer p{margin:0 0 6px}
   </section>
 
   <footer>
-    <p>Source : API publique de Hyperliquid, interrogée directement par cette page. Positions rafraîchies toutes les 30 secondes ; marchés secondaires revérifiés toutes les 15 minutes.</p>
+    <p>Source : API publique de Hyperliquid, interrogée directement par cette page. Positions rafraîchies automatiquement toutes les 30 secondes, sans recharger ; marchés secondaires revérifiés toutes les 3 minutes.</p>
     <p>La date d'ouverture vient des exécutions des 3 derniers jours : une position plus ancienne n'a pas de date. Le PnL latent ne compte pas le funding. Les pourcentages sont la variation du prix depuis l'entrée, dans le sens du trade, sans levier.</p>
     <p>Lecture seule : cette page ne passe aucun ordre et ne demande aucun wallet. Elle décrit des positions, pas ce qu'il faut copier.</p>
   </footer>
@@ -185,7 +195,7 @@ const SNAPSHOT = {"time":1795518626537,"pos":[{"t":"1","a":"0x45d26f28196d226497
 "use strict";
 const API = "https://api.hyperliquid.xyz/info";
 const CORE = ["", "xyz"];
-const REFRESH_MS = 30000, SWEEP_MS = 15*60000, LOOKBACK_H = 72;
+const REFRESH_MS = 30000, SWEEP_MS = 3*60000, LOOKBACK_H = 72;
 
 const state = {
   mode: "loading",            // loading | live | unstable | snapshot
@@ -205,14 +215,15 @@ const ADDRS = [...BY_ADDR.keys()];
 
 /* ---------- settings ---------- */
 const $ = id => document.getElementById(id);
-const settings = {window: 24, min: 100000, sort: "rank"};
+const settings = {window: 24, min: 100000, sort: "rank", notify: false, sound: false};
+const save = () => { try { localStorage.setItem("hl-dash-settings", JSON.stringify(settings)); } catch (e) {} };
 try { Object.assign(settings, JSON.parse(localStorage.getItem("hl-dash-settings") || "{}")); } catch (e) {}
 const SEL = {window: $("f-window"), min: $("f-min"), sort: $("f-sort")};
 for (const k in SEL) {
   if ([...SEL[k].options].some(o => o.value === String(settings[k]))) SEL[k].value = String(settings[k]);
   SEL[k].addEventListener("change", () => {
     settings[k] = k === "sort" ? SEL[k].value : Number(SEL[k].value);
-    try { localStorage.setItem("hl-dash-settings", JSON.stringify(settings)); } catch (e) {}
+    save();
     render();
   });
 }
@@ -300,13 +311,13 @@ function applyGroup(addr, dex, list) {
     const old = state.pos.get(p.key);
     if (prev) {
       if (!old) { state.opened.set(p.key, now); state.live.add(p.key); logEvent("open", p); }
-      else if (old.long !== p.long) { state.opened.set(p.key, now); state.live.add(p.key); logEvent("flip", p); }
+      else if (old.long !== p.long) { state.opened.set(p.key, now); state.live.add(p.key); notified.delete(p.key); logEvent("flip", p); }
     }
     state.pos.set(p.key, p);
   }
   if (prev) for (const k of prev) if (!next.has(k)) {
     const old = state.pos.get(k); if (old) logEvent("close", old);
-    state.pos.delete(k); state.opened.delete(k); state.live.delete(k);
+    state.pos.delete(k); state.opened.delete(k); state.live.delete(k); notified.delete(k);
   }
   state.groups.set(g, next);
   if (list.length && !CORE.includes(dex)) { if (!state.extra.has(addr)) state.extra.set(addr, new Set()); state.extra.get(addr).add(dex); }
@@ -335,13 +346,13 @@ async function refreshCoreInner() {
   const ok = await fetchGroups(pairs);
   if (ok >= pairs.length * 0.8) { state.lastOk = Date.now(); state.fails = 0; state.mode = "live"; }
   else { state.fails++; if (state.fails >= 2) state.mode = "unstable"; }
-  render();
+  checkNotify(); render();
 }
 async function sweepOtherDexs() {
   const others = state.dexs.filter(d => !CORE.includes(d));
   const pairs = [];
   for (const a of ADDRS) for (const d of others) if (!(state.extra.get(a) || new Set()).has(d)) pairs.push([a, d]);
-  await fetchGroups(pairs); render();
+  await fetchGroups(pairs); checkNotify(); render();
 }
 
 /* ---------- opening times from recent fills ---------- */
@@ -371,6 +382,78 @@ async function loadFills() {
     state.fillsDone++; render();
   }));
 }
+
+/* ---------- desktop notifications (only while this page is open) ---------- */
+const notified = new Set(), baseTitle = document.title; let unseen = 0;
+const canNotify = "Notification" in window;
+function notifState() {
+  if (!canNotify) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  return Notification.permission === "granted" && settings.notify ? "on" : "off";
+}
+/* small two-note chime; browsers only allow sound after a click on the page */
+let actx = null, beeps = 0;
+function audio() { if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (C) { try { actx = new C(); } catch (e) {} } } return actx; }
+function beep() {
+  const a = audio(); if (!a || a.state !== "running") return false;
+  const t = a.currentTime;
+  [[880, 0], [1175, 0.16]].forEach(([f, d]) => {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.18, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.32);
+    o.connect(g); g.connect(a.destination); o.start(t + d); o.stop(t + d + 0.35);
+  });
+  beeps++; return true;
+}
+const soundReady = () => !!(actx && actx.state === "running");
+function drawNotif() {
+  const b = $("notif-btn"), sb = $("sound-btn"), n = $("notif-note"), s = notifState();
+  b.hidden = s === "unsupported";
+  b.textContent = s === "on" ? "Notifications activées" : "Activer les notifications";
+  b.setAttribute("aria-pressed", s === "on" ? "true" : "false");
+  sb.textContent = settings.sound ? "Son activé" : "Activer le son";
+  sb.setAttribute("aria-pressed", settings.sound ? "true" : "false");
+  const notes = [];
+  if (s === "denied") notes.push("Notifications bloquées pour ce site dans les réglages du navigateur.");
+  if (s === "on" || settings.sound) notes.push("Signal à chaque nouvelle position au-dessus de la taille minimale, tant que cette page reste ouverte.");
+  if (settings.sound && !soundReady()) notes.push("Cliquez une fois n'importe où sur la page pour réactiver le son.");
+  n.textContent = notes.join(" ");
+}
+$("sound-btn").addEventListener("click", async () => {
+  settings.sound = !settings.sound; save();
+  if (settings.sound) { const a = audio(); if (a) { try { await a.resume(); } catch (e) {} beep(); } }
+  drawNotif();
+});
+document.addEventListener("pointerdown", async () => {
+  if (!settings.sound || soundReady()) return;
+  const a = audio(); if (a) { try { await a.resume(); } catch (e) {} drawNotif(); }
+});
+function pushNote(title, body, tag, tid) {
+  try {
+    const n = new Notification(title, {body, tag});
+    n.onclick = () => { window.focus(); if (tid) location.hash = "t-" + tid; n.close(); };
+  } catch (e) {}
+}
+$("notif-btn").addEventListener("click", async () => {
+  if (notifState() === "on") { settings.notify = false; save(); drawNotif(); return; }
+  let perm = Notification.permission;
+  if (perm !== "granted") { try { perm = await Notification.requestPermission(); } catch (e) {} }
+  settings.notify = perm === "granted"; save(); drawNotif();
+  if (settings.notify) pushNote("Notifications activées", "Vous serez prévenu à chaque nouvelle position des traders suivis.", "hl-dash-on");
+});
+function checkNotify() {
+  let fresh = 0;
+  for (const k of state.live) {
+    if (notified.has(k)) continue;
+    const p = state.pos.get(k);
+    if (!p || p.ntl < settings.min) continue;       // waits until the position reaches the minimum size
+    notified.add(k); fresh++;
+    if (document.hidden) { unseen++; document.title = "(" + unseen + ") " + baseTitle; }
+    if (notifState() === "on") pushNote(p.t.label + " : nouveau " + (p.long ? "long " : "short ") + p.name, usd(p.ntl) + " à " + px(p.entry) + (p.sub ? " (sous-compte)" : ""), k, p.t.id);
+  }
+  if (fresh && settings.sound) beep();
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { unseen = 0; document.title = baseTitle; } });
 
 /* ---------- rendering ---------- */
 let pending = false;
@@ -522,7 +605,7 @@ function useSnapshot(reason) {
   render();
 }
 async function start() {
-  render();
+  drawNotif(); render();
   let dexs;
   try { dexs = await raw({type: "perpDexs"}, 10000); } catch (e) { return useSnapshot(e); }
   state.dexs = (Array.isArray(dexs) ? dexs : []).map(d => d && d.name ? d.name : "");
@@ -535,7 +618,7 @@ async function start() {
   setInterval(() => { sweepOtherDexs(); }, SWEEP_MS);
   setInterval(render, 15000);
 }
-window.hlDash = {state, refreshCore, render};
+window.hlDash = {state, refreshCore, render, beepCount: () => beeps, soundReady};
 start();
 })();
 </script>
