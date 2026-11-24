@@ -40,7 +40,7 @@ a:hover{text-decoration-color:currentColor}
 .top{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 20px;margin-bottom:14px}
 h1{font-size:21px;line-height:1.25;margin:0;font-weight:650;letter-spacing:-.01em}
 .sub{color:var(--ink2);margin:4px 0 0;max-width:70ch}
-.status{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);white-space:nowrap;font-weight:550}
+.status{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);font-weight:550}
 .status small{font-weight:400;color:var(--ink2);font-size:13px}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--off);flex:none}
 .status[data-mode="live"] .dot{background:var(--ok);animation:pulse 2s ease-out infinite}
@@ -249,7 +249,7 @@ const state = {
   live: new Set(),            // keys opened while the page was open
   log: [],
   dexs: [],
-  lastOk: 0, fails: 0, fillsDone: 0, fillsTotal: 0, startedAt: Date.now(),
+  lastOk: 0, fails: 0, fillsDone: 0, fillsTotal: 0, startedAt: Date.now(), nextAt: 0, refreshing: false, refreshes: 0,
   expanded: new Set(), cardOpen: new Map(), snapshotTime: 0,
 };
 const NARROW = window.matchMedia("(max-width: 640px)");
@@ -319,7 +319,7 @@ function h(tag, attrs, ...kids) {
 /* ---------- API with a weight budget (Hyperliquid allows 1200 weight per minute per IP) ---------- */
 const Q = {queue: [], active: 0, tokens: 60, max: 60, rate: 13, pausedUntil: 0};
 setInterval(() => { Q.tokens = Math.min(Q.max, Q.tokens + Q.rate / 4); pump(); }, 250);
-function call(body, weight) { return new Promise((res, rej) => { Q.queue.push({body, weight, res, rej}); pump(); }); }
+function call(body, weight, first) { return new Promise((res, rej) => { Q.queue[first ? "unshift" : "push"]({body, weight, res, rej}); pump(); }); }
 function pump() {
   while (Q.active < 5 && Q.queue.length && Q.tokens >= Q.queue[0].weight && Date.now() >= Q.pausedUntil) {
     const j = Q.queue.shift(); Q.tokens -= j.weight; Q.active++;
@@ -370,10 +370,10 @@ function logEvent(kind, p) {
   state.log.unshift({time: Date.now(), kind, p});
   if (state.log.length > 60) state.log.length = 60;
 }
-async function fetchGroups(pairs) {
+async function fetchGroups(pairs, first) {
   let ok = 0;
   await Promise.all(pairs.map(([addr, dex]) =>
-    call(Object.assign({type: "clearinghouseState", user: addr}, dex ? {dex} : {}), 2).then(st => {
+    call(Object.assign({type: "clearinghouseState", user: addr}, dex ? {dex} : {}), 2, first).then(st => {
       const list = ((st && st.assetPositions) || []).map(x => toPos(addr, x.position)).filter(Boolean);
       applyGroup(addr, dex, list); ok++;
     }, () => {})));
@@ -387,7 +387,9 @@ async function refreshCore() {
 async function refreshCoreInner() {
   const pairs = [];
   for (const a of ADDRS) for (const d of new Set([...CORE, ...(state.extra.get(a) || [])])) pairs.push([a, d]);
-  const ok = await fetchGroups(pairs);
+  state.refreshing = true; drawStatus();
+  const ok = await fetchGroups(pairs, true);
+  state.refreshing = false; state.refreshes++;
   if (ok >= pairs.length * 0.8) { state.lastOk = Date.now(); state.fails = 0; state.mode = "live"; }
   else { state.fails++; if (state.fails >= 2) state.mode = "unstable"; }
   checkNotify(); render();
@@ -544,17 +546,22 @@ function liqText(p) {
 const join = (...parts) => parts.filter(Boolean).join(" · ");
 function traderLink(t) { return h("a", {href: "https://hypurrscan.io/address/" + t.main, target: "_blank", rel: "noopener"}, t.label); }
 
+const hms = ms => new Date(ms).toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+function drawStatus() {
+  const st = $("status"), txt = $("status-text");
+  st.dataset.mode = state.mode;
+  const left = Math.max(0, Math.ceil((state.nextAt - Date.now()) / 1000));
+  const next = state.refreshing ? "mise à jour en cours…" : (state.nextAt ? "prochaine dans " + left + " s" : "");
+  txt.replaceChildren();
+  if (state.mode === "live") txt.append("En direct ", h("small", {text: "· mis à jour à " + hms(state.lastOk) + (next ? " · " + next : "")}));
+  else if (state.mode === "unstable") txt.append("Connexion instable ", h("small", {text: (state.lastOk ? "· dernières données à " + hms(state.lastOk) : "") + (next ? " · " + next : "")}));
+  else if (state.mode === "snapshot") txt.append("Aperçu figé ", h("small", {text: "· " + clock(state.snapshotTime)}));
+  else txt.append("Connexion…");
+}
 function draw() {
   const all = [...state.pos.values()];
   const now = Date.now();
-  /* status */
-  const st = $("status"), txt = $("status-text");
-  st.dataset.mode = state.mode;
-  txt.replaceChildren();
-  if (state.mode === "live") txt.append("En direct ", h("small", {text: "· mis à jour " + ago(state.lastOk)}));
-  else if (state.mode === "unstable") txt.append("Connexion instable ", h("small", {text: state.lastOk ? "· dernières données " + ago(state.lastOk) : ""}));
-  else if (state.mode === "snapshot") txt.append("Aperçu figé ", h("small", {text: "· " + clock(state.snapshotTime)}));
-  else txt.append("Connexion…");
+  drawStatus();
 
   /* KPIs */
   const tot = all.reduce((s, p) => s + p.ntl, 0), lg = all.filter(p => p.long).reduce((s, p) => s + p.ntl, 0);
@@ -704,13 +711,16 @@ async function start() {
   if (!state.dexs.includes("")) state.dexs.unshift("");
   await refreshCore();
   if (state.mode !== "live" && !state.pos.size) return useSnapshot();
+  const loop = async () => { const t0 = Date.now(); state.nextAt = 0; await refreshCore(); const wait = Math.max(5000, REFRESH_MS - (Date.now() - t0)); state.nextAt = Date.now() + wait; setTimeout(loop, wait); };
+  state.nextAt = Date.now() + REFRESH_MS; setTimeout(loop, REFRESH_MS);
+  setInterval(drawStatus, 1000);
+  setInterval(render, 15000);
   await loadFills();
   await sweepOtherDexs();
-  setInterval(() => { refreshCore(); }, REFRESH_MS);
   setInterval(() => { sweepOtherDexs(); }, SWEEP_MS);
-  setInterval(render, 15000);
 }
 window.hlDash = {state, refreshCore, render, beepCount: () => beeps, soundReady};
+window.addEventListener("online", () => { if (state.mode !== "snapshot") refreshCore(); });
 start();
 })();
 </script>
