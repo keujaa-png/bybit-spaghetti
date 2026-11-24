@@ -2,8 +2,17 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Positions HL">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="positions.webmanifest">
+<link rel="apple-touch-icon" href="positions-icon-180.png">
+<link rel="icon" type="image/png" href="positions-icon-192.png">
 <title>Positions en direct des traders Hyperliquid suivis</title>
 <style>
 :root{
@@ -25,7 +34,7 @@ body{margin:0;background:var(--plane);color:var(--ink);font:14px/1.45 system-ui,
 a{color:inherit;text-decoration:underline;text-decoration-color:var(--base);text-underline-offset:2px}
 a:hover{text-decoration-color:currentColor}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
-.wrap{max-width:1500px;margin:0 auto;padding:20px 16px 48px}
+.wrap{max-width:1500px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 .top{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 20px;margin-bottom:14px}
@@ -108,11 +117,40 @@ tr.flash td{animation:flash 2.4s ease-out 1}
 .flat{padding:12px 14px;color:var(--ink2)}
 footer{color:var(--ink2);font-size:12.5px;max-width:95ch}
 footer p{margin:0 0 6px}
-@media (max-width:520px){
-  .wrap{padding:14px 10px 36px}
+.m-only{display:none}
+details.settings{margin:0 0 12px}
+details.settings>summary{cursor:pointer;font-weight:550;padding:6px 0;color:var(--ink2)}
+details.settings[open]>summary{margin-bottom:6px}
+details.settings .controls{margin:0}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 14px}
+.card header{cursor:pointer;position:relative;padding-right:44px}
+.card header .chev{position:absolute;right:16px;top:15px;width:9px;height:9px;border-right:2px solid var(--ink2);border-bottom:2px solid var(--ink2);transform:rotate(45deg)}
+.card.open header .chev{transform:rotate(-135deg);top:20px}
+.card:not(.open) header{border-bottom:0}
+.chip{display:inline-block;background:var(--new-badge);color:var(--new-ink);font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px}
+.cnt{font-size:12.5px;color:var(--ink2)}
+@media (max-width:640px){
+  .wrap{padding:calc(12px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(36px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left))}
   h1{font-size:18px}
+  .sub{display:none}
+  .top{margin-bottom:10px}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+  .kpi{padding:10px 12px}
   .kpi .v{font-size:20px}
-  td,th{padding:6px 8px}
+  .kpi.first{grid-column:1 / -1;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .kpi.first .v{order:-1;margin:0}
+  td,th{padding:8px 8px}
+  .d-only{display:none}
+  .m-only{display:block}
+  td small.m-only{white-space:normal}
+  .btn,select{min-height:42px}
+  .card td:first-child{min-width:0}
+  #new-body td:first-child,#log-body td:first-child{white-space:normal}
+  #new-body td small,#log-body td small{white-space:normal}
+  .card:not(.open) .barlegend{display:none}
+  .card td small{white-space:normal}
+  .grid{gap:10px}
+  footer{font-size:12px}
 }
 @media (prefers-reduced-motion: reduce){.status .dot,tr.flash td{animation:none!important}}
 </style>
@@ -129,6 +167,14 @@ footer p{margin:0 0 6px}
 
   <div class="banner" id="banner" hidden></div>
 
+  <div class="actions">
+    <button type="button" class="btn" id="notif-btn" aria-pressed="false">Activer les notifications</button>
+    <button type="button" class="btn" id="sound-btn" aria-pressed="false">Activer le son</button>
+    <button type="button" class="btn" id="wake-btn" aria-pressed="false" hidden>Garder l'écran allumé</button>
+    <span class="note" id="notif-note"></span>
+  </div>
+
+  <details class="settings" id="settings"><summary>Réglages d'affichage</summary>
   <div class="controls">
     <label>Position « nouvelle » si ouverte depuis
       <select id="f-window">
@@ -155,12 +201,8 @@ footer p{margin:0 0 6px}
         <option value="pnl">PnL latent</option>
       </select>
     </label>
-    <div class="notif">
-      <button type="button" class="btn" id="notif-btn" aria-pressed="false">Activer les notifications</button>
-      <button type="button" class="btn" id="sound-btn" aria-pressed="false">Activer le son</button>
-      <span class="note" id="notif-note"></span>
-    </div>
   </div>
+  </details>
 
   <div class="kpis" id="kpis"></div>
 
@@ -182,6 +224,7 @@ footer p{margin:0 0 6px}
   <footer>
     <p>Source : API publique de Hyperliquid, interrogée directement par cette page. Positions rafraîchies automatiquement toutes les 30 secondes, sans recharger ; marchés secondaires revérifiés toutes les 3 minutes.</p>
     <p>La date d'ouverture vient des exécutions des 3 derniers jours : une position plus ancienne n'a pas de date. Le PnL latent ne compte pas le funding. Les pourcentages sont la variation du prix depuis l'entrée, dans le sens du trade, sans levier.</p>
+    <p>Sur téléphone : ajoutez la page à l'écran d'accueil pour l'ouvrir comme une application. Le son et les notifications ne partent que tant que la page est ouverte à l'écran ; un téléphone verrouillé met la page en pause.</p>
     <p>Lecture seule : cette page ne passe aucun ordre et ne demande aucun wallet. Elle décrit des positions, pas ce qu'il faut copier.</p>
   </footer>
 </div>
@@ -207,15 +250,16 @@ const state = {
   log: [],
   dexs: [],
   lastOk: 0, fails: 0, fillsDone: 0, fillsTotal: 0, startedAt: Date.now(),
-  expanded: new Set(), snapshotTime: 0,
+  expanded: new Set(), cardOpen: new Map(), snapshotTime: 0,
 };
+const NARROW = window.matchMedia("(max-width: 640px)");
 const BY_ADDR = new Map();
 TRADERS.forEach((t, i) => { t.rank = i; [t.main, ...t.subs].forEach(a => BY_ADDR.set(a, {t, sub: a !== t.main})); });
 const ADDRS = [...BY_ADDR.keys()];
 
 /* ---------- settings ---------- */
 const $ = id => document.getElementById(id);
-const settings = {window: 24, min: 100000, sort: "rank", notify: false, sound: false};
+const settings = {window: 24, min: 100000, sort: "rank", notify: false, sound: false, wake: false};
 const save = () => { try { localStorage.setItem("hl-dash-settings", JSON.stringify(settings)); } catch (e) {} };
 try { Object.assign(settings, JSON.parse(localStorage.getItem("hl-dash-settings") || "{}")); } catch (e) {}
 const SEL = {window: $("f-window"), min: $("f-min"), sort: $("f-sort")};
@@ -413,10 +457,16 @@ function drawNotif() {
   b.setAttribute("aria-pressed", s === "on" ? "true" : "false");
   sb.textContent = settings.sound ? "Son activé" : "Activer le son";
   sb.setAttribute("aria-pressed", settings.sound ? "true" : "false");
+  const wb = $("wake-btn");
+  wb.hidden = !("wakeLock" in navigator);
+  wb.textContent = settings.wake && wake ? "Écran maintenu allumé" : "Garder l'écran allumé";
+  wb.setAttribute("aria-pressed", settings.wake && wake ? "true" : "false");
   const notes = [];
+  if (s === "unsupported" && IOS && !STANDALONE) notes.push("Sur iPhone, les notifications demandent d'installer la page : bouton Partager, puis « Sur l'écran d'accueil ».");
   if (s === "denied") notes.push("Notifications bloquées pour ce site dans les réglages du navigateur.");
   if (s === "on" || settings.sound) notes.push("Signal à chaque nouvelle position au-dessus de la taille minimale, tant que cette page reste ouverte.");
-  if (settings.sound && !soundReady()) notes.push("Cliquez une fois n'importe où sur la page pour réactiver le son.");
+  if (settings.sound && !soundReady()) notes.push("Touchez une fois la page pour réactiver le son.");
+  if (settings.sound && IOS) notes.push("Sur iPhone, le son ne joue pas en mode silencieux.");
   n.textContent = notes.join(" ");
 }
 $("sound-btn").addEventListener("click", async () => {
@@ -424,15 +474,34 @@ $("sound-btn").addEventListener("click", async () => {
   if (settings.sound) { const a = audio(); if (a) { try { await a.resume(); } catch (e) {} beep(); } }
   drawNotif();
 });
+$("wake-btn").addEventListener("click", () => { settings.wake = !(settings.wake && wake); save(); setWake(settings.wake); });
 document.addEventListener("pointerdown", async () => {
+  if (settings.wake && !wake && "wakeLock" in navigator) setWake(true);
   if (!settings.sound || soundReady()) return;
   const a = audio(); if (a) { try { await a.resume(); } catch (e) {} drawNotif(); }
 });
+let swReg = null;
+const HOSTED = location.protocol === "https:" || location.hostname === "localhost";
+if (HOSTED && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("positions-sw.js", {scope: "./positions.html"}).catch(() => {});
+  navigator.serviceWorker.ready.then(r => { swReg = r; }).catch(() => {});
+}
 function pushNote(title, body, tag, tid) {
+  const plain = () => { try { const n = new Notification(title, {body, tag}); n.onclick = () => { window.focus(); if (tid) location.hash = "t-" + tid; n.close(); }; } catch (e) {} };
+  // phones (iPhone web app, Android) only accept notifications shown through the service worker
+  if (swReg && swReg.showNotification) swReg.showNotification(title, {body, tag, data: {tid: tid || ""}, icon: "positions-icon-192.png"}).catch(plain);
+  else plain();
+}
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const STANDALONE = navigator.standalone === true || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+/* keep the screen on (phone left open on the page) */
+let wake = null;
+async function setWake(on) {
   try {
-    const n = new Notification(title, {body, tag});
-    n.onclick = () => { window.focus(); if (tid) location.hash = "t-" + tid; n.close(); };
-  } catch (e) {}
+    if (on && navigator.wakeLock) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; drawNotif(); }); }
+    else if (!on && wake) { await wake.release(); wake = null; }
+  } catch (e) { wake = null; }
+  drawNotif();
 }
 $("notif-btn").addEventListener("click", async () => {
   if (notifState() === "on") { settings.notify = false; save(); drawNotif(); return; }
@@ -453,7 +522,12 @@ function checkNotify() {
   }
   if (fresh && settings.sound) beep();
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { unseen = 0; document.title = baseTitle; } });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  unseen = 0; document.title = baseTitle;
+  if (settings.wake && !wake) setWake(true);      // the lock is dropped whenever the page is hidden
+  if (state.mode === "live" || state.mode === "unstable") refreshCore();   // catch up at once when the phone comes back to the page
+});
 
 /* ---------- rendering ---------- */
 let pending = false;
@@ -489,11 +563,11 @@ function draw() {
   const winLabel = settings.window >= 48 ? (settings.window / 24) + " j" : settings.window + " h";
   const kp = (k, v, n, cls, vcls) => h("div", {class: "kpi" + (cls ? " " + cls : "")}, h("div", {class: "k", text: k}), h("div", {class: "v" + (vcls ? " " + vcls : ""), text: v}), h("div", {class: "n", text: n}));
   $("kpis").replaceChildren(
+    kp("Nouvelles positions", String(fresh.length), "ouvertes depuis " + winLabel, "first" + (fresh.length ? " hot" : "")),
     kp("Exposition totale", usd(tot), all.length + " positions"),
-    kp("En long", usd(lg), tot ? nf0.format(lg / tot * 100) + " % de l'exposition" : "—"),
-    kp("En short", usd(tot - lg), tot ? nf0.format((tot - lg) / tot * 100) + " % de l'exposition" : "—"),
     kp("PnL latent", usdS(pnl), "hors funding", "", pnl >= 0 ? "up" : "down"),
-    kp("Nouvelles positions", String(fresh.length), "ouvertes depuis " + winLabel, fresh.length ? "hot" : "")
+    kp("En long", usd(lg), tot ? nf0.format(lg / tot * 100) + " % de l'exposition" : "—"),
+    kp("En short", usd(tot - lg), tot ? nf0.format((tot - lg) / tot * 100) + " % de l'exposition" : "—")
   );
 
   /* new positions */
@@ -505,16 +579,19 @@ function draw() {
     for (const p of fresh) {
       const o = state.opened.get(p.key);
       tb.append(h("tr", {class: "new" + (state.live.has(p.key) && now - o < 6000 ? " flash" : "")},
-        h("td", null, ago(o), h("small", {text: clock(o)})),
-        h("td", null, traderLink(p.t), p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null),
-        h("td", null, sideEl(p), h("small", {text: join(p.lev ? "levier affiché " + p.lev + "x" : null, liqText(p))})),
+        h("td", {class: "d-only"}, ago(o), h("small", {text: clock(o)})),
+        h("td", {class: "d-only"}, traderLink(p.t), p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null),
+        h("td", null, sideEl(p),
+          h("small", {class: "m-only", text: join(p.t.label + (p.sub ? " (sous-compte)" : ""), ago(o))}),
+          h("small", {class: "m-only", text: join("entrée " + px(p.entry), "prix " + px(p.mark))}),
+          h("small", {text: join(p.lev ? "levier affiché " + p.lev + "x" : null, liqText(p))})),
         h("td", {class: "r", text: usd(p.ntl)}),
-        h("td", {class: "r", text: px(p.entry)}),
-        h("td", {class: "r", text: px(p.mark)}),
+        h("td", {class: "r d-only", text: px(p.entry)}),
+        h("td", {class: "r d-only", text: px(p.mark)}),
         pnlEl(p)));
     }
     $("new-body").replaceChildren(h("table", null,
-      h("thead", null, h("tr", null, h("th", {text: "Ouverte"}), h("th", {text: "Trader"}), h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Entrée"}), h("th", {class: "r", text: "Prix actuel"}), h("th", {class: "r", text: "PnL latent"}))), tb));
+      h("thead", null, h("tr", null, h("th", {class: "d-only", text: "Ouverte"}), h("th", {class: "d-only", text: "Trader"}), h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r d-only", text: "Entrée"}), h("th", {class: "r d-only", text: "Prix actuel"}), h("th", {class: "r", text: "PnL latent"}))), tb));
   }
 
   /* session log */
@@ -524,15 +601,15 @@ function draw() {
     for (const ev of state.log.slice(0, 25)) {
       const p = ev.p;
       tb.append(h("tr", null,
-        h("td", null, ago(ev.time), h("small", {text: clock(ev.time)})),
-        h("td", {text: lab[ev.kind]}),
-        h("td", null, traderLink(p.t), p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null),
-        h("td", null, sideEl(p)),
+        h("td", {class: "d-only"}, ago(ev.time), h("small", {text: clock(ev.time)})),
+        h("td", {class: "d-only", text: lab[ev.kind]}),
+        h("td", {class: "d-only"}, traderLink(p.t), p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null),
+        h("td", null, sideEl(p), h("small", {class: "m-only", text: join(lab[ev.kind], p.t.label + (p.sub ? " (sous-compte)" : ""), ago(ev.time))})),
         h("td", {class: "r", text: usd(p.ntl)}),
         ev.kind === "close" ? h("td", {class: "r"}, h("span", {class: p.upnl >= 0 ? "up" : "down", text: usdS(p.upnl)}), h("small", {text: "PnL latent juste avant"})) : h("td", {class: "r", text: "à " + px(p.entry)})));
     }
     $("log-body").replaceChildren(h("table", null,
-      h("thead", null, h("tr", null, h("th", {text: "Quand"}), h("th", {text: "Mouvement"}), h("th", {text: "Trader"}), h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Détail"}))), tb));
+      h("thead", null, h("tr", null, h("th", {class: "d-only", text: "Quand"}), h("th", {class: "d-only", text: "Mouvement"}), h("th", {class: "d-only", text: "Trader"}), h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Détail"}))), tb));
   }
 
   /* trader cards */
@@ -559,7 +636,17 @@ function draw() {
         d.lng > 0 ? h("i", {class: "l", style: "flex:" + Math.max(d.lng, d.ntl * 0.01)}) : null,
         d.sht > 0 ? h("i", {class: "s", style: "flex:" + Math.max(d.sht, d.ntl * 0.01)}) : null) : null,
       d.ntl > 0 ? h("div", {class: "barlegend"}, h("span", {class: "l", text: "Long " + usd(d.lng)}), h("span", {class: "s", text: "Short " + usd(d.sht)})) : null);
-    const card = h("article", {class: "card" + (d.recent ? " hasnew" : ""), id: "t-" + t.id}, head);
+    const nNew = d.ps.filter(p => isNew(p) && p.ntl >= settings.min).length;
+    const open = state.cardOpen.has(t.id) ? state.cardOpen.get(t.id) : !NARROW.matches;
+    head.append(h("span", {class: "chev", "aria-hidden": "true"}));
+    head.querySelector(".who").append(...[
+      nNew ? h("span", {class: "chip", text: nNew + (nNew > 1 ? " nouvelles" : " nouvelle")}) : null,
+      h("span", {class: "cnt", text: d.ps.length ? d.ps.length + (d.ps.length > 1 ? " positions" : " position") : "aucune position"})].filter(Boolean));
+    head.setAttribute("role", "button"); head.setAttribute("tabindex", "0"); head.setAttribute("aria-expanded", open ? "true" : "false");
+    const toggle = ev => { if (ev.target.closest("a")) return; if (ev.type === "keydown" && ev.key !== "Enter" && ev.key !== " ") return; ev.preventDefault(); state.cardOpen.set(t.id, !open); draw(); };
+    head.addEventListener("click", toggle); head.addEventListener("keydown", toggle);
+    const card = h("article", {class: "card" + (d.recent ? " hasnew" : "") + (open ? " open" : ""), id: "t-" + t.id}, head);
+    if (!open) return card;
     if (!d.ps.length) card.append(h("div", {class: "flat", text: state.mode === "loading" ? "Chargement…" : "Aucune position ouverte."}));
     else {
       if (list.length) {
@@ -568,13 +655,14 @@ function draw() {
           const o = state.opened.get(p.key), nw = isNew(p);
           tb.append(h("tr", {class: nw ? "new" + (state.live.has(p.key) && now - o < 6000 ? " flash" : "") : null},
             h("td", null, sideEl(p), nw ? h("span", {class: "badge", text: "NOUVEAU"}) : null, p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null,
+              h("small", {class: "m-only", text: join("entrée " + px(p.entry), "prix " + px(p.mark))}),
               h("small", {text: join(o != null ? "ouverte " + ago(o) : null, p.lev ? p.lev + "x" : null, liqText(p))})),
             h("td", {class: "r", text: usd(p.ntl)}),
-            h("td", {class: "r"}, px(p.mark), h("small", {text: "entrée " + px(p.entry)})),
+            h("td", {class: "r d-only"}, px(p.mark), h("small", {text: "entrée " + px(p.entry)})),
             pnlEl(p)));
         }
         card.append(h("div", {class: "scroll"}, h("table", null,
-          h("thead", null, h("tr", null, h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Prix actuel"}), h("th", {class: "r", text: "PnL latent"}))), tb)));
+          h("thead", null, h("tr", null, h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r d-only", text: "Prix actuel"}), h("th", {class: "r", text: "PnL latent"}))), tb)));
       } else card.append(h("div", {class: "flat", text: "Aucune position au-dessus de la taille minimale."}));
       if (hidden.length) {
         const exp = state.expanded.has(t.id);
@@ -605,6 +693,10 @@ function useSnapshot(reason) {
   render();
 }
 async function start() {
+  if (!NARROW.matches) $("settings").open = true;
+  if (location.hash.startsWith("#t-")) state.cardOpen.set(location.hash.slice(3), true);
+  window.addEventListener("hashchange", () => { if (location.hash.startsWith("#t-")) { state.cardOpen.set(location.hash.slice(3), true); draw(); const el = document.getElementById(location.hash.slice(1)); if (el) el.scrollIntoView({block: "start"}); } });
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", ev => { if (ev.data && ev.data.tid) location.hash = "t-" + ev.data.tid; });
   drawNotif(); render();
   let dexs;
   try { dexs = await raw({type: "perpDexs"}, 10000); } catch (e) { return useSnapshot(e); }
