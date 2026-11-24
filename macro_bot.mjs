@@ -16,6 +16,10 @@ const today = ME.today();
 const pb = readJ('macro_playbook.json'), base = readJ('macro_hist.json');
 const add = readJ('macro_add.json', {}), state = readJ('macro_state.json', {sent: {}});
 state.sent = state.sent || {};
+// Deux passages complets par jour (règles, lecture des news, thèses). Entre les deux, des passages « choc » : on ne regarde que
+// les gros titres, et le modèle n'est appelé que si une nouvelle majeure tombe sur un leader mondial (détecté par mots-clés).
+const DISPATCH = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
+const FULL = DISPATCH || Date.now() - (state.aiLast || 0) > 10 * 3600e3;
 // journal des idées (bilan mensuel du dépôt crypto-scanner) et réglages appris par ce bilan
 const MP = readJ(process.env.MACRO_PARAMS || 'macro_params.json', {});
 const MIN_CONV = Math.max(4, +MP.minNote || 0);   // seules les idées à 4/5 ou 5/5 partent
@@ -127,9 +131,11 @@ async function headlines(q) {
   } catch (e) { return []; }
 }
 const newsText = (th, H) => '📰 ' + H.map(h => `<a href="${ME.esc(h.link)}">${ME.esc(h.title)}</a>`).join('\n📰 ');
-if (cur[0]) { const th = ME.theme(cur[0].th), H = th.news ? await headlines(th.news) : []; console.log('Titres de presse (' + th.name + ') : ' + H.length + (H[0] ? ' · ex. « ' + H[0].title + ' »' : '')); }
+if (FULL && cur[0]) { const th = ME.theme(cur[0].th), H = th.news ? await headlines(th.news) : []; console.log('Titres de presse (' + th.name + ') : ' + H.length + (H[0] ? ' · ex. « ' + H[0].title + ' »' : '')); }
 
-if (!TOKEN) {
+if (!FULL) {
+  console.log('Passage « choc » : seuls les gros titres sont regardés.');
+} else if (!TOKEN) {
   console.log('Pas de jeton Telegram (secret TELEGRAM_TOKEN absent) : rien n’est envoyé.');
 } else {
   let welcome = false;
@@ -180,7 +186,55 @@ async function checkSym(tv) {
     return {tv: d.s, name, usd, liquid: noVol ? true : (FX[cur] ? usd >= 20 : true)};
   } catch (e) { return null; }
 }
-async function aiIdeas() {
+// Carte des dépendances : donnée au modèle à chaque lecture, pour qu'il cherche l'effet de second tour (ex. Nvidia -> Taïwan)
+const DEPS = `
+Carte des dépendances (effets de second tour). Quand une nouvelle touche un leader ou un thème, ne t'arrête pas à l'expression directe : cherche l'actif exposé qui n'a PAS encore réagi (fournisseur, client, ETF pays, devise), et préfère-le si le titre direct a déjà bougé.
+- Nvidia, IA, semi-conducteurs -> TSMC (NYSE:TSM), Taïwan (AMEX:EWT, dont TSMC est de loin le premier poids), Corée (AMEX:EWY, KRX:000660 SK Hynix, KRX:005930 Samsung), Micron, ASML, AMD, Broadcom, SMH/SOXL, équipementiers japonais (Tokyo Electron, Advantest), électricité des data centers, cuivre, yen (débouclage de carry).
+- Apple -> assembleurs et fournisseurs de Taïwan et de Chine (Hon Hai), Corée (écrans, mémoire).
+- Tesla, véhicules électriques -> BYD, batteries coréennes, lithium, cuivre.
+- Pétrole, Ormuz, OPEP -> compagnies aériennes (AMEX:JETS), pays importateurs (Inde, Japon, Corée), pétrolières (AMEX:XLE), couronne norvégienne et dollar canadien, inflation puis taux.
+- Gaz européen (TTF) -> chimie allemande (BASF, Evonik), engrais, services publics, euro.
+- Chine (relance, immobilier, consommation) -> minerai de fer et cuivre, BHP et Rio Tinto, dollar australien, luxe (LVMH), automobile allemande, AMEX:FXI et AMEX:KWEB.
+- Taux américains, Fed -> banques régionales (AMEX:KRE), constructeurs de maisons (AMEX:XHB), petites capitalisations (AMEX:IWM), dette émergente, or, dollar.
+- Dette souveraine (France, Italie, Royaume-Uni) -> banques du pays, futures OAT/BTP/Gilt, indice ou ETF du pays (AMEX:EWQ, AMEX:EWI, AMEX:EWU), euro ou livre.
+- Yen, Banque du Japon -> exportateurs japonais, Nikkei, positions de carry (valeurs de croissance américaines, devises émergentes).
+- Dollar fort -> émergents (AMEX:EWZ, AMEX:EWW, AMEX:EIDO), matières premières, or.
+Un ETF pays très concentré est souvent l'expression la plus propre et la plus liquide d'un choc sur son premier poids.`;
+
+// Passage « choc » : détection sans modèle. Un leader mondial + un mot de rupture, dans au moins 2 titres de moins de 6 heures.
+const LEADERS = {Nvidia: /\bnvidia\b|jensen huang/i, TSMC: /\btsmc\b|taiwan semiconductor/i, Apple: /\bapple\b(?! tv)/i, Microsoft: /\bmicrosoft\b/i, Alphabet: /\balphabet\b|\bgoogle\b/i, Amazon: /\bamazon\b/i,
+  Meta: /\bmeta\b(?! analysis)/i, Tesla: /\btesla\b|\bmusk\b/i, OpenAI: /\bopenai\b/i, Samsung: /\bsamsung\b/i, ASML: /\basml\b/i, Broadcom: /\bbroadcom\b/i, AMD: /\bamd\b/i, Micron: /\bmicron\b/i,
+  JPMorgan: /\bjpmorgan\b|\bjp morgan\b/i, 'Goldman Sachs': /\bgoldman\b/i, Berkshire: /\bberkshire\b|\bbuffett\b/i, 'Saudi Aramco': /\baramco\b/i, Exxon: /\bexxon\b/i, 'Novo Nordisk': /\bnovo nordisk\b/i, 'Eli Lilly': /\beli lilly\b/i,
+  LVMH: /\blvmh\b/i, Toyota: /\btoyota\b/i, Alibaba: /\balibaba\b/i, Tencent: /\btencent\b/i, BYD: /\bbyd\b/i, Boeing: /\bboeing\b/i, Airbus: /\bairbus\b/i, Volkswagen: /\bvolkswagen\b/i, SoftBank: /\bsoftbank\b/i,
+  'la Fed': /\bfed\b|federal reserve|\bpowell\b/i, 'la BCE': /\becb\b|\blagarde\b/i, 'la Banque du Japon': /\bboj\b|bank of japan/i, 'la Banque de Chine': /\bpboc\b/i, "l'OPEP": /\bopec\b/i,
+  'le détroit d\'Ormuz': /\bhormuz\b/i, 'Taïwan (détroit)': /taiwan strait|blockade of taiwan/i};
+const SHOCK = /\b(resign(s|ed|ation)?|steps? down|stepping down|oust(s|ed|er)?|fired|sacked|dies|dead|death|probe|investigat\w+|fraud|indict\w+|arrest\w+|raid(s|ed)?|profit warning|(cuts?|slash(es|ed)|lowers?|withdraws?) (its |full-year |annual )?(guidance|forecast|outlook)|halts?|suspend(s|ed)|bans?|banned|export (ban|curbs?|controls?)|sanction(s|ed)?|defaults?|defaulted|downgrad\w+|bankrupt\w*|emergency|surprise|shock\w*|plunge[sd]?|crash(es|ed)?|collapse[sd]?|attack(s|ed)?|invad\w+|invasion|coup|blockade|seiz(es|ed|ure)|nationali[sz]\w+|hack(ed)?|explosion)\b/i;
+async function detectChoc() {
+  const C = state.choc = state.choc && state.choc.day === today ? state.choc : {day: today, n: 0, last: (state.choc || {}).last || {}};
+  if (C.n >= 2) { console.log('Passage « choc » : déjà 2 lectures de choc aujourd\'hui.'); return null; }
+  const G = 'hl=en-US&gl=US&ceid=US:en', urls = ['https://news.google.com/rss/headlines/section/topic/BUSINESS?' + G, 'https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?' + G,
+    ...['CEO resigns OR "steps down" OR ousted', '"profit warning" OR "cuts guidance" OR "cuts forecast" OR "withdraws guidance"', '"export ban" OR "export controls" OR sanctions OR "emergency meeting" markets', 'shares plunge OR stock crash'].map(q => 'https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:1d') + '&' + G)];
+  const hits = {}; let nT = 0;
+  for (const u of urls) {
+    let x = ''; try { x = await (await fetch(u, {headers: {'User-Agent': 'Mozilla/5.0'}})).text(); } catch (e) {}
+    for (const m of x.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+      const g = t => unent(((m[1].match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
+      const src = g('source'); let title = g('title'); if (src && title.endsWith(' - ' + src)) title = title.slice(0, -src.length - 3);
+      const age = (Date.now() - Date.parse(g('pubDate'))) / 3600e3; if (!title || !(age < 6)) continue; nT++;
+      if (!SHOCK.test(title)) continue;
+      for (const [name, re] of Object.entries(LEADERS)) if (re.test(title)) { const H = hits[name] = hits[name] || new Map(); H.set(title.toLowerCase().slice(0, 50), `${title} — ${src} (il y a ${Math.max(1, Math.round(age))} h)`); }
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  // au moins 2 titres de sources différentes, leader pas déjà traité depuis 48 h ; le plus couvert d'abord
+  const best = Object.entries(hits).filter(([name, H]) => H.size >= 2 && !(C.last[name] > Date.now() - 48 * 3600e3)).sort((a, b) => b[1].size - a[1].size)[0];
+  console.log(`Passage « choc » : ${nT} titres de moins de 6 h, ${Object.entries(hits).map(([k, H]) => k + ' ' + H.size).join(', ') || 'aucun leader touché'}.`);
+  if (!best) return null;
+  C.n++; C.last[best[0]] = Date.now();
+  for (const k of Object.keys(C.last)) if (C.last[k] < Date.now() - 7 * 864e5) delete C.last[k];
+  return {leader: best[0], titles: [...best[1].values()].slice(0, 8)};
+}
+async function aiIdeas(choc = null) {
   // titres de presse : à la une (économie, monde) + une recherche par thème
   const feeds = ['https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en', 'https://www.nhc.noaa.gov/index-at.xml'];
   const qs = ['central bank rate decision', 'bond market selloff', 'election markets reaction', 'tariffs trade war', 'China economy stimulus property', 'profit warning sector demand', 'commodity supply shock', 'currency crisis emerging markets', 'sovereign debt downgrade',
@@ -275,7 +329,10 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
   } catch (e) {}
   console.log('Tableau multi-actifs : ' + multi.length + ' lignes.');
   const user = `TABLEAU MULTI-ACTIFS (actions, secteurs, pays, taux, crédit, devises, crypto, matières premières)\n${multi.join('\n')}\n\nTITRES DE PRESSE (moins de 4 jours)\n${H.map((h, i) => `[${i + 1}] ${h.title} — ${h.src}`).join('\n')}\n\nAGENDA (événements à venir annoncés ces 7 derniers jours, presse anglaise et locale)\n${A.map((h, i) => `[A${i + 1}] ${h.title} — ${h.src}`).join('\n') || 'rien'}\n\nINDICATEURS MACRO\n${themes.join('\n')}\n\nTHÈMES SUIVIS PAR LA RÈGLE (surtout matières premières)\n${[...uni.values()].slice(0, 60).join('\n')}`;
-  const raw = await claude(system, user, true);
+  const chocSys = choc ? `
+PASSAGE « CHOC » : une grosse nouvelle vient de tomber sur ${choc.leader} (titres en tête du message). Tes idées doivent porter sur ce choc : l'expression directe, et surtout les effets de second tour de la carte des dépendances (fournisseurs, clients, ETF pays, devises) qui n'ont pas encore réagi. Vérifie par une recherche web ce que la nouvelle dit exactement et ce que chaque actif a déjà fait aujourd'hui. Donne jusqu'à 3 idées au lieu de 2, avec la même exigence de note. Si le choc est déjà dans les prix, sans portée durable, ou si c'est une fausse alerte, note 3 ou moins : rien ne partira.` : '';
+  const chocUser = choc ? `CHOC EN COURS SUR ${choc.leader.toUpperCase()} (titres de moins de 6 heures)\n${choc.titles.join('\n')}\n\n` : '';
+  const raw = await claude(system + DEPS + chocSys, chocUser + user, true);
   let ideas = jsonOf(raw);
   if (!Array.isArray(ideas) && raw.length > 200) {
     // réponse coupée ou JSON abîmé : un second appel, sans recherche, remet les idées au propre
@@ -283,7 +340,7 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
     ideas = jsonOf(await claude('Tu reformates sans rien inventer. Recopie les idées de trading du texte fourni en un tableau JSON valide (mêmes champs, mêmes valeurs ; une idée coupée en cours de route est complétée seulement si ses champs principaux sont présents, sinon omise), entre <json> et </json>, sans aucun autre texte.', raw.slice(-24000), false));
   }
   // une fois par jour (passage du matin) : le modèle fantôme reçoit exactement la même consigne et les mêmes données
-  if (SHADOW && SHADOW !== MODEL && new Date().getUTCHours() < 6) {
+  if (!choc && SHADOW && SHADOW !== MODEL && new Date().getUTCHours() < 6) {
     try {
       const sraw = await claude(system, user, true, SHADOW);
       let sid = jsonOf(sraw);
@@ -306,14 +363,14 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
   if (!Array.isArray(ideas)) { console.log('IA : pas de liste d’idées lisible.'); return 0; }
   console.log(`IA (${MODEL}) : ${H.length} titres lus, ${ideas.length} idée(s) proposée(s).`);
   state.ai = state.ai || {}; let n = 0;
-  for (const it of ideas.slice(0, 2)) {
+  for (const it of ideas.slice(0, choc ? 3 : 2)) {
     const buy = /achat/i.test(it.sens || ''), key = String(it.tv || '').toUpperCase() + (buy ? '|achat' : '|vente');
     const watch = false;   // plus d'idées 3/5 « à surveiller » (choix de Jack, 20 oct.)
     state.ai3 = state.ai3 && state.ai3.day === today ? state.ai3 : {day: today, n: 0};
     if (watch && state.ai3.n >= 2) { console.log('  écartée : ' + (it.nom || it.tv) + ' (3/5, déjà 2 « à surveiller » aujourd\'hui)'); continue; }
     const numv = v => (typeof v === 'number' && isFinite(v) ? v : (isFinite(parseFloat(v)) ? parseFloat(v) : null));
     const jrow = {id: key + '|' + today, ts: new Date().toISOString(), tv: String(it.tv || '').toUpperCase(), name: it.nom || it.tv, dir: buy ? 1 : -1, entry: numv(it.entree), stop: numv(it.stop), target: numv(it.objectif), sent: false,
-      f: {note: +it.confiance || null, cls: classOf(String(it.tv || '').toUpperCase()), mois: numv(it.mois), titre: it.titre || null, event: it.evenement ? 1 : 0}};
+      f: {note: +it.confiance || null, cls: classOf(String(it.tv || '').toUpperCase()), mois: numv(it.mois), titre: it.titre || null, event: it.evenement ? 1 : 0, choc: choc ? choc.leader : null}};
     if (it.tv && !recent.includes(key) && !(it.confiance >= MIN_CONV)) journalIdea({...jrow, why: 'note'});
     if (!it.tv || !(it.confiance >= MIN_CONV) || recent.includes(key)) { console.log('  écartée : ' + (it.nom || it.tv) + ' (confiance ' + it.confiance + ')'); continue; }
     const ok = await checkSym(String(it.tv).toUpperCase());
@@ -354,8 +411,14 @@ Tu peux chercher sur le web pour vérifier un fait, sa date, et ce que le march�
   return n;
 }
 // deux lectures des news par jour au plus (une à chaque passage du matin et du soir)
-if (AKEY && (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' || Date.now() - (state.aiLast || 0) > 10 * 3600e3)) {
+if (AKEY && FULL) {
   try { const n = await aiIdeas(); state.aiLast = Date.now(); state.aiDay = today; console.log('Idées IA envoyées : ' + n); } catch (e) { console.log('IA : erreur, passage ignoré (' + e.message + ').'); }
+} else if (AKEY) {
+  try {
+    const c = process.env.MACRO_CHOC_TEST ? {leader: process.env.MACRO_CHOC_TEST, titles: ['(test)']} : await detectChoc();
+    if (c) { console.log(`CHOC détecté sur ${c.leader} :\n  ` + c.titles.join('\n  ')); console.log('Idées « choc » envoyées : ' + await aiIdeas(c)); }
+    else console.log('Passage « choc » : rien de majeur, le modèle n\'est pas appelé.');
+  } catch (e) { console.log('Passage « choc » : erreur, ignoré (' + e.message + ').'); }
 } else if (!AKEY) console.log('Pas de clé ANTHROPIC_API_KEY : pas d’idées tirées des news.');
 
 // 5. Thèses sous surveillance (macro_watch.json + thèses ajoutées par le desk IA).
@@ -524,7 +587,7 @@ Termine par <json>[{"id": "mot-cle-court", "titre": "8 mots max", "sens": "achat
   return n;
 }
 
-try {
+if (FULL) try {
   if (AKEY && today - (state.watchGen || 0) >= 7) { const k = await newTheses(); state.watchGen = today; console.log('Thèses ajoutées par le desk IA : ' + k); }
   console.log('Thèses sous surveillance :');
   console.log('Idées de thèses envoyées : ' + await watchTheses());
