@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Positions en direct des traders Hyperliquid suivis</title>
+<style>
+:root{
+  --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#6f6d68;
+  --hair:#e1e0d9; --base:#c3c2b7; --up:#006300; --down:#c03030;
+  --long:#2a78d6; --short:#eb6834; --new-bg:#fff3cf; --new-edge:#e09a00; --new-ink:#0b0b0b; --new-badge:#fab219;
+  --ok:#0ca30c; --warn:#fab219; --off:#898781; --focus:#2a78d6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --plane:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#9a988f;
+    --hair:#2c2c2a; --base:#383835; --up:#2fbf2f; --down:#ee7a7a;
+    --long:#3987e5; --short:#e0703f; --new-bg:#33290c; --new-edge:#fab219; --new-ink:#0b0b0b; --new-badge:#fab219;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--plane);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums}
+a{color:inherit;text-decoration:underline;text-decoration-color:var(--base);text-underline-offset:2px}
+a:hover{text-decoration-color:currentColor}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1500px;margin:0 auto;padding:20px 16px 48px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 20px;margin-bottom:14px}
+h1{font-size:21px;line-height:1.25;margin:0;font-weight:650;letter-spacing:-.01em}
+.sub{color:var(--ink2);margin:4px 0 0;max-width:70ch}
+.status{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);white-space:nowrap;font-weight:550}
+.status small{font-weight:400;color:var(--ink2);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--off);flex:none}
+.status[data-mode="live"] .dot{background:var(--ok);animation:pulse 2s ease-out infinite}
+.status[data-mode="unstable"] .dot{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(12,163,12,.45)}100%{box-shadow:0 0 0 9px rgba(12,163,12,0)}}
+
+.banner{border:1px solid var(--new-edge);background:var(--new-bg);border-radius:10px;padding:10px 14px;margin:0 0 14px}
+.banner strong{font-weight:650}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end;margin:0 0 16px}
+.controls label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink2)}
+select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--base);border-radius:8px;padding:6px 28px 6px 10px;min-height:34px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 22px}
+.kpi{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:12px 14px;min-width:0}
+.kpi .k{font-size:12px;color:var(--ink2)}
+.kpi .v{font-size:24px;line-height:1.2;font-weight:650;letter-spacing:-.01em;margin-top:2px;white-space:nowrap}
+.kpi .n{font-size:12px;color:var(--ink2);margin-top:2px}
+.kpi.hot{border-color:var(--new-edge);background:var(--new-bg)}
+
+h2{font-size:15px;margin:0 0 8px;font-weight:650}
+h2 .count{font-weight:400;color:var(--ink2)}
+section{margin:0 0 24px}
+.panel{background:var(--surface);border:1px solid var(--hair);border-radius:12px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th{font-size:11.5px;font-weight:550;color:var(--ink2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--hair);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--hair);vertical-align:top;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right}
+td small{display:block;color:var(--ink2);font-size:12px}
+.empty{padding:14px;color:var(--ink2)}
+
+.side{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.side i{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;flex:none}
+.side.long i{border-bottom:8px solid var(--long)}
+.side.short i{border-top:8px solid var(--short)}
+.up{color:var(--up)} .down{color:var(--down)}
+.badge{display:inline-block;background:var(--new-badge);color:var(--new-ink);font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:999px;margin-left:6px;vertical-align:1px}
+.tag{display:inline-block;border:1px solid var(--base);color:var(--ink2);font-size:10.5px;padding:0 5px;border-radius:999px;margin-left:6px;vertical-align:1px}
+tr.new td{background:var(--new-bg)}
+tr.new td:first-child{box-shadow:inset 3px 0 0 var(--new-edge)}
+tr.flash td{animation:flash 2.4s ease-out 1}
+@keyframes flash{0%{background:var(--new-badge)}100%{background:var(--new-bg)}}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:12px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;overflow:hidden;min-width:0}
+.card.hasnew{border-color:var(--new-edge)}
+.card header{padding:12px 14px 10px;border-bottom:1px solid var(--hair)}
+.who{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.rank{font-size:16px;font-weight:650}
+.addr{font-size:12.5px;color:var(--ink2)}
+.tot{display:flex;flex-wrap:wrap;gap:2px 16px;margin-top:6px;font-size:13px}
+.tot span b{font-weight:600}
+.tot .lab{color:var(--ink2)}
+.bar{display:flex;gap:2px;height:6px;margin-top:9px}
+.bar i{display:block;height:100%;border-radius:3px;min-width:3px}
+.bar .l{background:var(--long)} .bar .s{background:var(--short)}
+.barlegend{display:flex;gap:14px;font-size:11.5px;color:var(--ink2);margin-top:5px}
+.barlegend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-0.5px}
+.barlegend .l::before{background:var(--long)} .barlegend .s::before{background:var(--short)}
+.card td:first-child{white-space:normal;min-width:150px}
+.card td,.card th{padding-left:8px;padding-right:8px}
+.card td:first-child,.card th:first-child{padding-left:14px}
+.card td:last-child,.card th:last-child{padding-right:14px}
+#new-body td small,#log-body td small{white-space:nowrap}
+.more{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;color:var(--ink2);background:none;border:0;border-top:1px solid var(--hair);padding:9px 14px;cursor:pointer}
+.more:hover{color:var(--ink)}
+.flat{padding:12px 14px;color:var(--ink2)}
+footer{color:var(--ink2);font-size:12.5px;max-width:95ch}
+footer p{margin:0 0 6px}
+@media (max-width:520px){
+  .wrap{padding:14px 10px 36px}
+  h1{font-size:18px}
+  .kpi .v{font-size:20px}
+  td,th{padding:6px 8px}
+}
+@media (prefers-reduced-motion: reduce){.status .dot,tr.flash td{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Positions en direct des traders Hyperliquid suivis</h1>
+      <p class="sub">Les 20 traders du classement et 0x15a4, sous-comptes inclus, sur tous les marchés de perps. Les positions ouvertes récemment sont surlignées.</p>
+    </div>
+    <div class="status" id="status" data-mode="loading" role="status" aria-live="polite"><span class="dot"></span><span id="status-text">Connexion…</span></div>
+  </div>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="controls">
+    <label>Position « nouvelle » si ouverte depuis
+      <select id="f-window">
+        <option value="1">1 heure</option>
+        <option value="6">6 heures</option>
+        <option value="24" selected>24 heures</option>
+        <option value="72">3 jours</option>
+      </select>
+    </label>
+    <label>Taille minimale affichée
+      <select id="f-min">
+        <option value="0">Toutes</option>
+        <option value="50000">50 k$</option>
+        <option value="100000" selected>100 k$</option>
+        <option value="250000">250 k$</option>
+        <option value="1000000">1 M$</option>
+      </select>
+    </label>
+    <label>Trier les traders par
+      <select id="f-sort">
+        <option value="rank" selected>Rang</option>
+        <option value="recent">Position la plus récente</option>
+        <option value="ntl">Exposition</option>
+        <option value="pnl">PnL latent</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section id="sec-new">
+    <h2>Nouvelles positions <span class="count" id="new-count"></span></h2>
+    <div class="panel"><div class="scroll" id="new-body"></div></div>
+  </section>
+
+  <section id="sec-log" hidden>
+    <h2>Mouvements depuis l'ouverture de cette page</h2>
+    <div class="panel"><div class="scroll" id="log-body"></div></div>
+  </section>
+
+  <section>
+    <h2>Positions par trader</h2>
+    <div class="grid" id="traders"></div>
+  </section>
+
+  <footer>
+    <p>Source : API publique de Hyperliquid, interrogée directement par cette page. Positions rafraîchies toutes les 30 secondes ; marchés secondaires revérifiés toutes les 15 minutes.</p>
+    <p>La date d'ouverture vient des exécutions des 3 derniers jours : une position plus ancienne n'a pas de date. Le PnL latent ne compte pas le funding. Les pourcentages sont la variation du prix depuis l'entrée, dans le sens du trade, sans levier.</p>
+    <p>Lecture seule : cette page ne passe aucun ordre et ne demande aucun wallet. Elle décrit des positions, pas ce qu'il faut copier.</p>
+  </footer>
+</div>
+
+<script>
+const TRADERS = [{"id":"1","label":"n° 1","main":"0x45d26f28196d226497130c4bac709d808fed4029","subs":[],"seuil":3000000},{"id":"2","label":"n° 2","main":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","subs":["0xb5a31a6f48bfd9e12e6176df363e06aa74d45971","0xa2454b4036314e8460bd7bc99cfbcf3285cce654","0x3f97f6a4692c96e213f818268e0f192cee23ce25"],"seuil":3000000},{"id":"3","label":"n° 3","main":"0x5d2f4460ac3514ada79f5d9838916e508ab39bb7","subs":[],"seuil":2000000},{"id":"4","label":"n° 4","main":"0x8e096995c3e4a3f0bc5b3ea1cba94de2aa4d70c9","subs":["0xa095a64f205c8ccb253b398259b98b68f076c5d6"],"seuil":1000000},{"id":"5","label":"n° 5","main":"0x418aa6bf98a2b2bc93779f810330d88cde488888","subs":[],"seuil":2000000},{"id":"6","label":"n° 6","main":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","subs":["0xfc722d0de76547188bf2b562c2c3f9fd9035f30e"],"seuil":1000000},{"id":"7","label":"n° 7","main":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","subs":["0x3bffac0b209413d1d04f171cde1e7ceabe2f3cbe"],"seuil":1000000},{"id":"8","label":"n° 8","main":"0xbfc79c444c41a74516bf31237ebf586a231480b4","subs":["0x674de12cb4f38d9a74e87824d675291a3a11131d"],"seuil":1000000},{"id":"9","label":"n° 9","main":"0x015354106478dda69c4aae3c0cf801290b738052","subs":[],"seuil":2000000},{"id":"10","label":"n° 10","main":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","subs":[],"seuil":1000000},{"id":"11","label":"n° 11","main":"0x8bae3527e5a33fa0cf184f37bc112d071463ab6d","subs":[],"seuil":1000000},{"id":"12","label":"n° 12","main":"0xfce053a5e461683454bf37ad66d20344c0e3f4c0","subs":[],"seuil":1000000},{"id":"13","label":"n° 13","main":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","subs":[],"seuil":1000000},{"id":"14","label":"n° 14","main":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","subs":["0xdabc59d832f59256d58c343183eb70073712ba65"],"seuil":1000000},{"id":"15","label":"n° 15","main":"0x2d99fe0f36c1aebd28a1a2c0e82e8ca13c2ea351","subs":[],"seuil":2000000},{"id":"16","label":"n° 16","main":"0x888e000c78b8f1aada5b3c99f880794907b76d77","subs":[],"seuil":1000000},{"id":"17","label":"n° 17","main":"0x2fcb6898d5a0623de19c3691904927685014c4d8","subs":[],"seuil":1000000},{"id":"18","label":"n° 18","main":"0xf220c9b7b4c0e5e785ebe4b40b17576ce24473e0","subs":[],"seuil":2000000},{"id":"19","label":"n° 19","main":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","subs":[],"seuil":1000000},{"id":"20","label":"n° 20","main":"0xb632c6580173a16154f17cdafc6eb27e95cf73b7","subs":[],"seuil":3000000},{"id":"x","label":"0x15a4","main":"0x15a4f009bb324a3fb9e36137136b201e3fe0dfdb","subs":["0xf1b1a8c5f8ef0023875891c2f931acc8df28196e"],"seuil":0}];
+const SNAPSHOT = {"time":1795518626537,"pos":[{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"BTC","s":-436.0,"n":26048384.0,"e":77001.5,"u":7524312.182921,"l":144457.2514895118,"x":20},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ETH","s":-13950.0,"n":23497380.0,"e":2443.6,"u":10590902.464533,"l":4312.6004968757,"x":20},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ATOM","s":-24600.0,"n":31564.26,"e":10.1735,"u":218704.30346,"l":1484.3949330377,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"SOL","s":-29220.0,"n":2052734.22,"e":93.2845,"u":673041.75949,"l":1318.8667115923,"x":20},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"AVAX","s":-9870.0,"n":66083.598,"e":49.454,"u":422027.79419,"l":3703.2051358386,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"BNB","s":-128.0,"n":69923.84,"e":697.335,"u":19335.07437,"l":267188.1029974786,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"OP","s":-76500.0,"n":5322.87,"e":2.26298,"u":167795.41416,"l":476.9918165062,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ARB","s":-499000.0,"n":56611.55,"e":0.96678,"u":425811.856214,"l":68.5117635226,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"DOGE","s":-39554000.0,"n":2197224.7,"e":0.095443,"u":1577958.634528,"l":0.9355162518,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"kPEPE","s":-128400000.0,"n":447088.8,"e":0.0038,"u":40955.341893,"l":0.2751777691,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"CRV","s":-267400.0,"n":47126.576,"e":0.80767,"u":168844.605812,"l":133.369475994,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"LINK","s":-195500.0,"n":1746460.15,"e":11.54211,"u":510023.2797,"l":187.0748571381,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"STX","s":-100800.0,"n":26020.512,"e":2.02824,"u":178426.54747,"l":362.2080516342,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"XRP","s":-2403000.0,"n":2230969.23,"e":1.483196,"u":1333151.381126,"l":16.1113276416,"x":20},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"AAVE","s":-15721.0,"n":1489391.819,"e":118.4015,"u":371999.3624,"l":2310.7786504441,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"TRX","s":-184000.0,"n":56598.4,"e":0.316884,"u":1708.371706,"l":193.8721179609,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"kSHIB","s":-19075000.0,"n":68460.175,"e":0.014903,"u":215829.22009,"l":1.7928534757,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"UNI","s":-131000.0,"n":622354.8,"e":8.05042,"u":432251.08507,"l":270.9933199864,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"SEI","s":-140000.0,"n":4659.9,"e":0.589749,"u":77905.094726,"l":243.8412841886,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ZRO","s":-571400.0,"n":600484.26,"e":1.30729,"u":146501.547898,"l":60.5485689949,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"NEAR","s":-909400.0,"n":2648354.68,"e":3.26165,"u":317795.21578,"l":41.1634417139,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"FIL","s":-19600.0,"n":10705.716,"e":7.90791,"u":144289.3975,"l":1817.6825010615,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"kBONK","s":-2380000.0,"n":5145.56,"e":0.024837,"u":53967.777873,"l":14.6684750604,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ONDO","s":-1805000.0,"n":507006.45,"e":0.44836,"u":302283.928597,"l":19.1785553475,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"TAO","s":-1890.0,"n":346512.6,"e":321.714,"u":261528.59139,"l":18171.1537903054,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"kFLOKI","s":-515000.0,"n":8423.855,"e":0.230632,"u":110351.693934,"l":66.0298872207,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ETHFI","s":-117000.0,"n":55346.85,"e":0.60365,"u":15281.157172,"l":291.0454266126,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ENA","s":-7000000.0,"n":688058.0,"e":0.520929,"u":2958445.141432,"l":5.0804059442,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"POL","s":-176000.0,"n":13387.088,"e":0.719196,"u":113191.49358,"l":202.4389681409,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"MOODENG","s":-1796000.0,"n":44971.84,"e":0.471415,"u":801691.093658,"l":17.872636979,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"GRASS","s":-20000.0,"n":7455.4,"e":0.45442,"u":1633.172014,"l":1603.0869787162,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"HYPE","s":-433080.0,"n":27073996.2,"e":28.7925,"u":-14604521.511727,"l":141.015434247,"x":10},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"VIRTUAL","s":-94500.0,"n":33954.795,"e":2.33415,"u":186622.877807,"l":360.1155858061,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"PENGU","s":-6993000.0,"n":30230.739,"e":0.028834,"u":171406.876257,"l":4.8658942947,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"FARTCOIN","s":-7341700.0,"n":588804.34,"e":0.63634,"u":4083078.768195,"l":4.8310472342,"x":7},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"SPX","s":-139500.0,"n":38725.2,"e":1.67172,"u":194480.12817,"l":243.9834642558,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"VVV","s":-15800.0,"n":403168.6,"e":14.7728,"u":-169757.672571,"l":2054.2691629319,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"INIT","s":-100000.0,"n":8165.1,"e":0.810288,"u":72863.704265,"l":320.6244927432,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"SYRUP","s":-30000.0,"n":2355.99,"e":0.549201,"u":14120.060848,"l":1068.5546721441,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"PUMP","s":-1277810000.0,"n":3105078.3,"e":0.004715,"u":2920533.173034,"l":0.0296366419,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"XPL","s":-2100000.0,"n":95037.6,"e":0.104139,"u":123654.689306,"l":16.2971663853,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ASTER","s":-100000.0,"n":49609.0,"e":0.6912,"u":19511.06843,"l":340.4657706368,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"APEX","s":-264770.0,"n":34274.4765,"e":2.45974,"u":616991.037723,"l":121.1940878907,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"2Z","s":-1526000.0,"n":24545.71,"e":0.623842,"u":927437.475278,"l":21.0215136857,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"ZEC","s":-5227.0,"n":3852978.51,"e":833.4375,"u":503399.4631,"l":7381.6533567917,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"MON","s":-28000000.0,"n":354704.0,"e":0.030434,"u":497469.019249,"l":1.2268454308,"x":5},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"LIT","s":-150000.0,"n":353640.0,"e":1.888811,"u":-70318.292488,"l":229.0040537578,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"CHIP","s":-397500.0,"n":10985.31,"e":0.078822,"u":20346.600111,"l":80.6673446147,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"CASHCAT","s":-5600517.0,"n":211391.514165,"e":0.116438,"u":440726.315381,"l":0.3224188073,"x":3},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"xyz:XYZ100","s":170.0,"n":4469640.0,"e":24524.0,"u":300558.7034,"l":17562.274902658,"x":4},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"xyz:SKHX","s":-2531.5,"n":2090386.125,"e":1189.096,"u":919811.5464,"l":14894.8281373908,"x":2},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"xyz:SP500","s":1000.0,"n":7180300.0,"e":6864.421,"u":315878.8106,"l":4741.707009,"x":4},{"t":"1","a":"0x45d26f28196d226497130c4bac709d808fed4029","c":"xyz:ANT","s":30000.0,"n":2481270.0,"e":92.3017,"u":-287782.35289,"l":null,"x":3},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"BTC","s":203.80547,"n":12171262.6684,"e":64776.6,"u":-1030579.404121,"l":null,"x":40},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"ETH","s":37.4459,"n":63055.15101,"e":1844.48,"u":-6013.128089,"l":null,"x":25},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"AVAX","s":-12091.83,"n":80936.664105,"e":42.1163,"u":428327.646745,"l":1386.5205160748,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"SUI","s":-63739.9,"n":41807.637809,"e":2.31644,"u":105842.515943,"l":256.1847157287,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"kPEPE","s":-96500000.0,"n":335820.0,"e":0.007044,"u":343990.749137,"l":0.1722611453,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"CRV","s":-441827.7,"n":77827.949355,"e":0.32045,"u":63758.182421,"l":37.0397973545,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"LINK","s":-69261.2,"n":618585.62944,"e":14.08033,"u":356635.123357,"l":244.0899977723,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"XRP","s":-696000.0,"n":645915.84,"e":1.493915,"u":393849.1756,"l":24.9002148675,"x":20},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"AAVE","s":-9133.75,"n":865011.79375,"e":131.4882,"u":335968.95285,"l":1877.913487671,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"kSHIB","s":-12000000.0,"n":43068.0,"e":0.015504,"u":142988.179476,"l":1.3103765872,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"UNI","s":-61310.7,"n":291170.64537,"e":9.1886,"u":272188.85265,"l":270.4022490305,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"ADA","s":-1086001.0,"n":158469.26592,"e":0.709813,"u":612389.099358,"l":15.1434941498,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"PENDLE","s":-155378.0,"n":198029.261,"e":5.502951,"u":657008.2609,"l":106.0987384653,"x":5},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"NEAR","s":-48872.7,"n":142253.76789,"e":3.29351,"u":18709.395892,"l":336.1720202108,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"FIL","s":-143000.0,"n":78095.16,"e":3.18908,"u":377943.862378,"l":109.2667147265,"x":5},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"STRK","s":-4500000.0,"n":136395.0,"e":0.13637,"u":477299.884498,"l":3.4852088991,"x":5},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"GRASS","s":-238431.2,"n":88879.998424,"e":2.86895,"u":595168.915986,"l":65.578351509,"x":3},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"HYPE","s":-42228.12,"n":2638750.76256,"e":85.368,"u":966180.412601,"l":448.1878730767,"x":3},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"ZEC","s":2468.14,"n":1818599.5962,"e":797.3115,"u":-149277.0522,"l":null,"x":5},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"xyz:XYZ100","s":184.4448,"n":4849422.6816,"e":27947.49,"u":-305347.504857,"l":null,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"xyz:NVDA","s":-1091.0,"n":170217.82,"e":180.034,"u":26199.41084,"l":15448.9931510398,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"xyz:JPY","s":4611.29,"n":734025.1422,"e":161.5134,"u":-10760.2787,"l":133.14269271,"x":10},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"xyz:CL","s":-694.927,"n":55645.584598,"e":93.83,"u":9560.076345,"l":140.5530244142,"x":5},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"xyz:SP500","s":5399.099,"n":38767150.5497,"e":7171.774,"u":46031.424709,"l":3980.7856929956,"x":20},{"t":"2","a":"0x8af700ba841f30e0a3fcb0ee4c4a9d223e1efa05","c":"xyz:SPCX","s":-6371.25,"n":837819.375,"e":219.6337,"u":561522.407239,"l":325.4086389688,"x":2},{"t":"3","a":"0x5d2f4460ac3514ada79f5d9838916e508ab39bb7","c":"xyz:XYZ100","s":39.0284,"n":1025978.5792,"e":28185.7,"u":-74064.314686,"l":23941.6749482732,"x":20},{"t":"3","a":"0x5d2f4460ac3514ada79f5d9838916e508ab39bb7","c":"xyz:SP500","s":1050.068,"n":7539278.2264,"e":6970.515,"u":219762.932277,"l":6473.8131643711,"x":20},{"t":"4","a":"0x8e096995c3e4a3f0bc5b3ea1cba94de2aa4d70c9","c":"BTC","s":-294.36048,"n":17579207.8656,"e":64360.6,"u":1366014.504343,"l":82945.3159259006,"x":20},{"t":"4","a":"0x8e096995c3e4a3f0bc5b3ea1cba94de2aa4d70c9","c":"ETH","s":-20.9182,"n":35224.15698,"e":2002.03,"u":6654.81707,"l":326106.9342523942,"x":20},{"t":"4","a":"0x8e096995c3e4a3f0bc5b3ea1cba94de2aa4d70c9","c":"xyz:SKHX","s":-2210.0,"n":1824819.1,"e":834.163,"u":18682.39757,"l":3808.7191934501,"x":10},{"t":"4","a":"0x8e096995c3e4a3f0bc5b3ea1cba94de2aa4d70c9","c":"xyz:ANT","s":-448.18,"n":37048.35152,"e":109.1,"u":11848.08648,"l":14792.0448682332,"x":10},{"t":"5","a":"0x418aa6bf98a2b2bc93779f810330d88cde488888","c":"ETH","s":-3000.0,"n":5049300.0,"e":1797.01,"u":341758.83652,"l":2264.7042847232,"x":25},{"t":"5","a":"0x418aa6bf98a2b2bc93779f810330d88cde488888","c":"ENA","s":357134.0,"n":35074.844408,"e":0.120798,"u":-8066.380353,"l":null,"x":10},{"t":"5","a":"0x418aa6bf98a2b2bc93779f810330d88cde488888","c":"io:ANTH","s":1.0,"n":1462.4,"e":1688.799,"u":-226.399999,"l":616.7477482759,"x":15},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"BTC","s":-229.27621,"n":13688019.01321,"e":70810.5,"u":2547146.905858,"l":80857.2650260671,"x":35},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"ETH","s":-1041.8819,"n":1753591.42589,"e":2124.69,"u":460088.569124,"l":6304.5085095876,"x":25},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"SOL","s":-6250.51,"n":438642.04027,"e":83.1492,"u":81083.010667,"l":836.7503291724,"x":20},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"SUI","s":-306.3,"n":200.825595,"e":3.54119,"u":883.843292,"l":15271.2777174354,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"WLD","s":-3415.0,"n":799.3832,"e":0.48949,"u":872.247408,"l":1369.8948528422,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"JUP","s":-1503305.0,"n":343279.69675,"e":0.290117,"u":92855.171318,"l":3.2786577198,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"ENA","s":-30863.0,"n":3031.116956,"e":0.104222,"u":185.50756,"l":151.6515781425,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"PURR","s":-8814264.0,"n":630651.774936,"e":0.084903,"u":117707.260484,"l":0.5491444504,"x":3},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"HYPE","s":-9563.53,"n":597232.88497,"e":69.2334,"u":64883.070807,"l":551.5353038288,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"FARTCOIN","s":-2348298.2,"n":188239.583712,"e":0.18534,"u":247014.535072,"l":2.0719817964,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"SPX","s":-49.5,"n":13.7313,"e":0.49972,"u":11.004849,"l":90197.9103884114,"x":5},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"VVV","s":-262.65,"n":6691.53405,"e":16.9786,"u":-2232.09383,"l":16053.0893561034,"x":3},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"PUMP","s":-19026578.0,"n":46196.531384,"e":0.005121,"u":51256.363101,"l":0.2482626183,"x":9},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"XPL","s":-19378.0,"n":876.447562,"e":0.045553,"u":6.293483,"l":237.4849354075,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"ZEC","s":-170.75,"n":125762.4975,"e":772.3319,"u":6113.1836,"l":28129.7454568445,"x":10},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"MON","s":-33104.0,"n":418.831808,"e":0.015413,"u":91.400928,"l":134.8840522213,"x":5},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"LIT","s":-511933.0,"n":1206267.7279,"e":4.09503,"u":890113.712827,"l":11.0777202502,"x":5},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"CASHCAT","s":-1267869.0,"n":47830.358025,"e":0.20693,"u":214530.396867,"l":0.0479545622,"x":3},{"t":"6","a":"0x6859da14835424957a1e6b397d8026b1d9ff7e1e","c":"PONS","s":-759501.0,"n":68074.834131,"e":0.432273,"u":260237.488496,"l":5.6322864874,"x":3},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"JTO","s":-694.0,"n":165.443354,"e":0.6417,"u":279.896889,"l":0.2957317998,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"XPL","s":-1505.0,"n":68.048575,"e":0.098777,"u":80.611566,"l":0.0564702844,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"CASHCAT","s":-624.0,"n":23.5404,"e":0.18261,"u":90.40824,"l":0.0479390728,"x":3},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"xyz:COPPER","s":22262.14,"n":122644.355474,"e":6.6774,"u":-26009.844508,"l":4.3724790033,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"xyz:PLATINUM","s":13.7057,"n":17780.40461,"e":1679.5,"u":-5238.401588,"l":965.7619218506,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"xyz:PALLADIUM","s":127.2861,"n":112361.804775,"e":1469.07,"u":-74630.996145,"l":665.4913302657,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"xyz:HYUNDAI","s":1.477,"n":292.93341,"e":260.093,"u":-91.224454,"l":141.4030395895,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"xyz:ZHIPU","s":-0.003,"n":0.11667,"e":165.83,"u":0.38082,"l":50.5479365079,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"xyz:CXMT","s":0.1,"n":0.52892,"e":7.66841,"u":-0.237921,"l":3.8969368421,"x":4},{"t":"6","a":"0xfc722d0de76547188bf2b562c2c3f9fd9035f30e","c":"io:NBIS","s":-1000.0,"n":92787.0,"e":126.4,"u":33613.0,"l":281.6213642255,"x":15},{"t":"7","a":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","c":"ZRO","s":-126732.2,"n":133030.79034,"e":1.73913,"u":87373.557558,"l":2.6171568469,"x":5},{"t":"7","a":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","c":"PAXG","s":-636.604,"n":2302405.6868,"e":4089.277,"u":300844.8274,"l":3943.6012568133,"x":10},{"t":"7","a":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","c":"ZEC","s":154.42,"n":113734.9626,"e":1099.5364,"u":-56055.4494,"l":null,"x":10},{"t":"7","a":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","c":"XMR","s":255.999,"n":127469.58207,"e":553.979,"u":-14348.60737,"l":null,"x":5},{"t":"7","a":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","c":"xyz:GOLD","s":-3500.0,"n":12688900.0,"e":4202.13,"u":2018579.607229,"l":3957.2925462045,"x":25},{"t":"7","a":"0x7a6d5fc57f6906f337c48fe2763c3a501304f79c","c":"xyz:SKHX","s":50.0,"n":41284.0,"e":946.52,"u":-6042.006826,"l":null,"x":10},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"BTC","s":-89.98816,"n":5372383.14016,"e":75642.5,"u":1434546.854759,"l":84778.8092272595,"x":40},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"SOL","s":-20000.0,"n":1403540.0,"e":85.9767,"u":315994.495397,"l":181.6362552711,"x":20},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"XRP","s":-800000.0,"n":742016.0,"e":1.479318,"u":441438.650153,"l":3.7140013818,"x":20},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"NEAR","s":-531000.0,"n":1545210.0,"e":2.00602,"u":-480010.607874,"l":7.0081342177,"x":10},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"STRK","s":-4000000.0,"n":121160.0,"e":0.11886,"u":354280.486756,"l":0.549588803,"x":5},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"GRASS","s":-300000.0,"n":111786.0,"e":0.34164,"u":-9292.016426,"l":6.9009478087,"x":3},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"VVV","s":-6100.0,"n":155306.0,"e":17.1554,"u":-50657.803907,"l":346.5253020689,"x":3},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"PUMP","s":-126000000.0,"n":305928.0,"e":0.00318,"u":94770.527829,"l":0.0196987085,"x":10},{"t":"8","a":"0xbfc79c444c41a74516bf31237ebf586a231480b4","c":"ZEC","s":-1075.0,"n":791769.75,"e":558.0869,"u":-191826.252994,"l":2760.8176926308,"x":10},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"WLD","s":-7788841.9,"n":1821965.897248,"e":0.38968,"u":1213232.226639,"l":1.762378231,"x":3},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"HYPE","s":-66991.36,"n":4172690.84032,"e":58.4252,"u":-258700.552554,"l":239.9952822656,"x":3},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"FARTCOIN","s":-0.1,"n":0.00801,"e":0.16342,"u":0.008332,"l":119049195.20243807,"x":10},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"WLFI","s":-12643319.0,"n":511523.400102,"e":0.226638,"u":2353934.376503,"l":0.9392557609,"x":3},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"MEGA","s":-7493776.0,"n":327350.617008,"e":0.133232,"u":671064.338071,"l":1.4734598656,"x":3},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"LIT","s":-781762.0,"n":1841049.51,"e":4.94628,"u":2025764.525683,"l":16.8911207211,"x":3},{"t":"10","a":"0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1","c":"CHIP","s":-1877604.0,"n":51804.971964,"e":0.063346,"u":67134.462541,"l":5.7340272672,"x":3},{"t":"11","a":"0x8bae3527e5a33fa0cf184f37bc112d071463ab6d","c":"APEX","s":46734.0,"n":6049.7163,"e":0.18022,"u":-2372.68518,"l":null,"x":3},{"t":"12","a":"0xfce053a5e461683454bf37ad66d20344c0e3f4c0","c":"ETH","s":-4000.0,"n":6730000.0,"e":2244.79,"u":2249171.969057,"l":2284.3283463586,"x":20},{"t":"12","a":"0xfce053a5e461683454bf37ad66d20344c0e3f4c0","c":"HYPE","s":-5000.0,"n":311435.0,"e":76.7226,"u":72178.19338,"l":529.9936005987,"x":3},{"t":"12","a":"0xfce053a5e461683454bf37ad66d20344c0e3f4c0","c":"io:PRL","s":-3000.0,"n":6287.1,"e":2.00228,"u":-280.24233,"l":3.7245498069,"x":3},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"BTC","s":-0.33828,"n":20189.56524,"e":62944.2,"u":1103.223701,"l":10814747.786641791,"x":20},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"LDO","s":-68199.1,"n":15955.861436,"e":0.38116,"u":10039.229454,"l":49.3375286485,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"CFX","s":-676798.0,"n":22256.50223,"e":0.053488,"u":13944.625201,"l":4.9809185176,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"ZRO","s":-1807.3,"n":1897.12281,"e":1.6357,"u":1059.0927,"l":1853.9901020442,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"FET","s":165369.0,"n":17484.46437,"e":0.111153,"u":-896.92389,"l":null,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"STRK","s":-6176190.6,"n":187076.813274,"e":0.04775,"u":107870.705756,"l":0.5725043527,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"TAO","s":-541.461,"n":99160.460235,"e":289.679,"u":57689.790859,"l":6367.9187399445,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"ENA","s":-312804.0,"n":30713.599152,"e":0.212433,"u":35736.375347,"l":11.3137951183,"x":10},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"HBAR","s":-5169121.0,"n":264441.892118,"e":0.077307,"u":135170.856723,"l":0.6990088026,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"RENDER","s":-141.1,"n":181.10185,"e":1.83373,"u":77.637806,"l":23734.9418176084,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"GRASS","s":-644055.0,"n":239962.0119,"e":0.40026,"u":17833.360588,"l":5.2750465473,"x":3},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"VVV","s":-12668.3,"n":322413.30232,"e":20.348,"u":-64638.472576,"l":274.6912683187,"x":3},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"BERA","s":1197.9,"n":94.693995,"e":0.10561,"u":-31.822561,"l":null,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"PUMP","s":-10316827.0,"n":25038.939129,"e":0.004197,"u":18270.148853,"l":0.342481822,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"XPL","s":-1015700.0,"n":45913.7028,"e":0.105291,"u":61031.282005,"l":3.4744605113,"x":10},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"WLFI","s":867081.0,"n":35080.363098,"e":0.042853,"u":-2077.39578,"l":null,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"ZEC","s":-2456.58,"n":1808092.0116,"e":1087.7721,"u":864107.255376,"l":2164.1382656477,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"MON","s":-532769.0,"n":6742.724464,"e":0.025873,"u":7042.045446,"l":6.2983430212,"x":3},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"AERO","s":-1.0,"n":0.40951,"e":0.791467,"u":0.381957,"l":3157458.5016317144,"x":3},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"XMR","s":-78.611,"n":39129.41136,"e":601.503,"u":8155.343696,"l":43097.6402790264,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"USELESS","s":-730894.0,"n":54290.80632,"e":0.266035,"u":140153.186679,"l":4.3942745438,"x":3},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"xyz:COST","s":45.11,"n":48587.981,"e":1109.18,"u":-1447.29518,"l":612.7386105076,"x":20},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"xyz:STRC","s":0.3,"n":29.0658,"e":98.993,"u":-0.632102,"l":47.0571017544,"x":2},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"xyz:OURA","s":551.5,"n":26625.317,"e":48.83599,"u":-307.73229,"l":11.7076460602,"x":5},{"t":"13","a":"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c","c":"xyz:GLW","s":-13.78,"n":1431.742,"e":145.2867,"u":570.3092,"l":214.5114129518,"x":10},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"BTC","s":-38.76347,"n":2313636.47042,"e":69663.2,"u":386753.608608,"l":96431.8040043728,"x":20},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"ETH","s":-236.7213,"n":398283.58725,"e":2474.49,"u":187482.801151,"l":7655.4368647857,"x":20},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"SOL","s":-671.71,"n":47131.20386,"e":73.8491,"u":2473.98624,"l":2164.8559733349,"x":20},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"OP","s":-269202.5,"n":18709.57375,"e":1.23665,"u":314201.474113,"l":5.1716949118,"x":5},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"HBAR","s":-400000.0,"n":20462.8,"e":0.198088,"u":58772.42214,"l":3.3288838342,"x":5},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"MOODENG","s":-383014.0,"n":9562.327524,"e":0.200002,"u":67041.369011,"l":3.4480542779,"x":3},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"HYPE","s":-10000.1,"n":623206.232,"e":81.7834,"u":194636.39231,"l":199.6709890653,"x":10},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"MELANIA","s":-909769.4,"n":45197.343792,"e":0.32197,"u":247729.152155,"l":1.4908042384,"x":3},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"APEX","s":-30000.0,"n":3883.5,"e":0.992061,"u":25878.34279,"l":41.3351587725,"x":3},{"t":"14","a":"0xaea8e3bd369217cc6e3e6abddf0da318fba8e59b","c":"xyz:ANT","s":-16547.08,"n":1366292.3956,"e":110.2088,"u":457341.779065,"l":165.5770094392,"x":10},{"t":"14","a":"0xdabc59d832f59256d58c343183eb70073712ba65","c":"io:ANTH","s":-1.187,"n":1734.6818,"e":1930.6,"u":556.9404,"l":2953.9559752154,"x":2},{"t":"15","a":"0x2d99fe0f36c1aebd28a1a2c0e82e8ca13c2ea351","c":"HYPE","s":53473.45,"n":3332465.404,"e":75.5009,"u":-704831.742846,"l":35.1850653459,"x":2},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"DYDX","s":-27000.0,"n":1896.48,"e":0.23111,"u":4343.705165,"l":80.2467738928,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"APE","s":-24999.0,"n":1752.67989,"e":0.1978,"u":3192.193833,"l":86.664230369,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"SNX","s":-1787.9,"n":260.890368,"e":2.18863,"u":3652.174918,"l":1141.7452695718,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"WLD","s":-49000.0,"n":11460.61,"e":0.53737,"u":14870.5679,"l":46.5165538798,"x":10},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"DOT","s":-2000.0,"n":1334.56,"e":1.5592,"u":1783.840664,"l":1134.5925450552,"x":10},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"FIL","s":-10777.0,"n":5879.60789,"e":0.98416,"u":4726.70094,"l":201.4146815436,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"ZETA","s":-99344.7,"n":2645.549361,"e":0.06482,"u":3794.639099,"l":20.5719180435,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"kFLOKI","s":-29000.0,"n":473.657,"e":0.096963,"u":2338.284104,"l":74.6634507623,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"ZK","s":-50000.0,"n":324.3,"e":0.063241,"u":2837.771152,"l":43.3018143021,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"RENDER","s":-2500.0,"n":3208.75,"e":2.42616,"u":2856.664723,"l":867.1900660422,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"POL","s":-26000.0,"n":1975.142,"e":0.172498,"u":2509.814365,"l":83.3362137348,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"MOVE","s":-200000.0,"n":895.6,"e":0.056919,"u":10488.342834,"l":10.2098053855,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"GRIFFAIN","s":-200000.0,"n":1931.0,"e":0.0245,"u":2969.0,"l":10.2149823855,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"TRUMP","s":-47000.0,"n":39738.5,"e":2.41114,"u":73585.178345,"l":49.0976389385,"x":10},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"MELANIA","s":-449000.0,"n":22306.32,"e":0.13688,"u":39157.27797,"l":4.5954828443,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"ANIME","s":-1099998.0,"n":2333.095758,"e":0.006088,"u":4364.303685,"l":1.8576384438,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"BERA","s":-9000.0,"n":711.36,"e":0.81642,"u":6636.429637,"l":240.6086416784,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"KAITO","s":-8700.0,"n":1380.168,"e":1.220705,"u":9239.973641,"l":248.9823658742,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"WCT","s":-23003.0,"n":648.477573,"e":0.093109,"u":1493.320615,"l":88.7585947343,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"XPL","s":-50000.0,"n":2260.1,"e":0.1225,"u":3864.9,"l":45.4022126022,"x":10},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"WLFI","s":-50000.0,"n":2022.9,"e":0.141504,"u":5052.323989,"l":43.3357863021,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"AVNT","s":-10000.0,"n":578.71,"e":0.408544,"u":3506.734924,"l":216.5345125105,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"STBL","s":-77000.0,"n":1405.019,"e":0.082156,"u":4921.061759,"l":26.5255908584,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"ZEC","s":-10.0,"n":7359.6,"e":1470.1468,"u":7341.868421,"l":227521.0130110476,"x":10},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"MON","s":-29999.0,"n":379.517349,"e":0.037422,"u":743.113586,"l":72.1739368797,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"MEGA","s":-50000.0,"n":2183.95,"e":0.158235,"u":5727.833805,"l":40.864988542,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"ICP","s":-350.0,"n":720.125,"e":6.48916,"u":1551.081631,"l":6187.1044003013,"x":5},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"STABLE","s":-100000.0,"n":2334.0,"e":0.0399,"u":1656.0,"l":20.433994771,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"FOGO","s":-200000.0,"n":292.4,"e":0.035613,"u":6830.325523,"l":10.2067893855,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"USELESS","s":-39250.0,"n":2913.92,"e":0.259949,"u":7289.089726,"l":52.0759082063,"x":3},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"xyz:NVDA","s":-10000.0,"n":1557500.0,"e":165.18,"u":94301.92046,"l":230.2045558483,"x":10},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"xyz:PALLADIUM","s":450.0,"n":397237.5,"e":895.88,"u":-5909.081405,"l":455.3765590313,"x":20},{"t":"16","a":"0x888e000c78b8f1aada5b3c99f880794907b76d77","c":"xyz:SOXL","s":-5000.0,"n":188815.0,"e":41.9051,"u":20710.57169,"l":101.0470617126,"x":10},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"BCH","s":-20.0,"n":3945.0,"e":630.0,"u":8655.0,"l":139342.7502832857,"x":10},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"WLD","s":-49500.0,"n":11577.555,"e":0.55057,"u":15676.126247,"l":56.4542941549,"x":10},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"UNI","s":-1000.0,"n":4745.6,"e":8.2836,"u":3538.0,"l":2787.6556056657,"x":10},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"ZRO","s":-3500.0,"n":3677.8,"e":2.40911,"u":4754.091129,"l":760.0262560906,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"ORDI","s":-1100.0,"n":2835.8,"e":7.6907,"u":5624.040557,"l":2279.5043682717,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"ZEN","s":-1000.0,"n":3640.4,"e":24.3079,"u":20667.576211,"l":2660.0544963173,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"FIL","s":-7000.0,"n":3818.99,"e":3.24032,"u":18863.267507,"l":380.0332980453,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"STRK","s":-4500.0,"n":136.26,"e":0.15308,"u":552.608168,"l":590.3445236261,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"TNSR","s":-90777.7,"n":1699.358544,"e":0.15671,"u":12526.603452,"l":27.6094058744,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"VIRTUAL","s":-3000.0,"n":1076.52,"e":1.443,"u":3252.48,"l":885.8302054391,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"TRUMP","s":-57000.0,"n":48191.22,"e":2.99262,"u":122388.254007,"l":49.6684425555,"x":10},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"MELANIA","s":-100000.0,"n":4967.0,"e":0.19318,"u":14351.846145,"l":25.095860051,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"ANIME","s":-502714.0,"n":1066.256394,"e":0.009141,"u":3529.152113,"l":4.9843156576,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"VVV","s":-4.99,"n":126.93562,"e":9.8186,"u":-77.940783,"l":501953.094332379,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"BERA","s":-17000.0,"n":1343.68,"e":0.96741,"u":15102.403966,"l":156.3386927245,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"AVNT","s":-20000.0,"n":1157.3,"e":0.41,"u":7042.7,"l":132.8785698159,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"STBL","s":-160000.0,"n":2919.52,"e":0.091833,"u":11773.88,"l":15.6721157819,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"0G","s":-10000.0,"n":1011.5,"e":1.141549,"u":10403.999992,"l":250.5630505099,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"MET","s":-750.0,"n":161.25,"e":0.43888,"u":167.91,"l":3339.7070067989,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"ICP","s":-1000.0,"n":2057.5,"e":7.07,"u":5012.5,"l":2658.4715963173,"x":5},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"FOGO","s":-200000.0,"n":292.4,"e":0.038816,"u":7470.9,"l":12.5245570255,"x":3},{"t":"17","a":"0x2fcb6898d5a0623de19c3691904927685014c4d8","c":"CHIP","s":-70000.0,"n":1931.37,"e":0.120063,"u":6473.052723,"l":35.8078625014,"x":3},{"t":"18","a":"0xf220c9b7b4c0e5e785ebe4b40b17576ce24473e0","c":"BTC","s":55.0,"n":3282785.0,"e":61062.0,"u":-75628.487116,"l":30618.9257980023,"x":40},{"t":"18","a":"0xf220c9b7b4c0e5e785ebe4b40b17576ce24473e0","c":"ETH","s":300.0,"n":504750.0,"e":1698.25,"u":-4727.408835,"l":null,"x":20},{"t":"18","a":"0xf220c9b7b4c0e5e785ebe4b40b17576ce24473e0","c":"xyz:XYZ100","s":475.0,"n":12485375.0,"e":26001.31,"u":134748.3458,"l":22904.9612201342,"x":30},{"t":"18","a":"0xf220c9b7b4c0e5e785ebe4b40b17576ce24473e0","c":"xyz:GOLD","s":525.0,"n":1903125.0,"e":3805.14,"u":-94574.00461,"l":556.4678715335,"x":20},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"BTC","s":16.5,"n":984835.5,"e":62242.8,"u":-42171.5,"l":null,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"DOGE","s":-765060.0,"n":42452.41434,"e":0.262119,"u":158084.53913,"l":4.460949428,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"TIA","s":350000.0,"n":115909.5,"e":0.38439,"u":-18627.51288,"l":null,"x":5},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"kBONK","s":25000000.0,"n":54000.0,"e":0.009629,"u":-186729.466766,"l":null,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"ENA","s":150000.0,"n":14725.2,"e":0.306486,"u":-31247.81994,"l":null,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"HYPE","s":-23750.0,"n":1480456.25,"e":37.5605,"u":-588392.499941,"l":204.2483286324,"x":4},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"XPL","s":1600000.0,"n":72312.0,"e":0.518252,"u":-756892.5222,"l":null,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"ZEC","s":-150.0,"n":110377.5,"e":524.5808,"u":-31690.367719,"l":23205.4603667936,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:XYZ100","s":-76.6752,"n":2015714.3328,"e":27224.29,"u":71714.219053,"l":27798.6702400366,"x":30},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:AAPL","s":-1179.58,"n":412392.9638,"e":354.074,"u":5266.343686,"l":3276.6242310016,"x":20},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:SKHX","s":2200.0,"n":1816144.0,"e":966.797,"u":-310811.260702,"l":null,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:SPCX","s":-625.0,"n":82156.25,"e":139.0796,"u":4768.5608,"l":219.9196350236,"x":5},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:SKHY","s":-15500.0,"n":1810090.0,"e":141.2402,"u":379134.15017,"l":334.2278422593,"x":10},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:CXMT","s":-19663.4,"n":104001.68894,"e":7.28202,"u":39187.729216,"l":12.9800530602,"x":5},{"t":"19","a":"0x1e771e1b95c86491299d6e2a5c3b3842d03b552e","c":"xyz:ANT","s":-3500.0,"n":289177.0,"e":90.2693,"u":26765.615367,"l":1045.605301434,"x":10},{"t":"20","a":"0xb632c6580173a16154f17cdafc6eb27e95cf73b7","c":"BTC","s":100.0,"n":5968700.0,"e":57732.5,"u":195446.06828,"l":30961.1102050532,"x":5},{"t":"x","a":"0x15a4f009bb324a3fb9e36137136b201e3fe0dfdb","c":"ETH","s":-30000.0,"n":50475000.0,"e":2283.23,"u":18021933.42649,"l":2716.4229645857,"x":20},{"t":"x","a":"0xf1b1a8c5f8ef0023875891c2f931acc8df28196e","c":"xyz:NVDA","s":-200000.0,"n":31156000.0,"e":166.95,"u":2234058.75553,"l":187.5817387004,"x":10}],"opened":{"0x418aa6bf98a2b2bc93779f810330d88cde488888|ETH":1795443143077,"0x6859da14835424957a1e6b397d8026b1d9ff7e1e|ENA":1795453601800,"0x6859da14835424957a1e6b397d8026b1d9ff7e1e|ZEC":1795472259541,"0xfce053a5e461683454bf37ad66d20344c0e3f4c0|io:PRL":1795322995326,"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c|FET":1795448954279,"0x5bc43f38c2ddcd85857f218674cd384f172c3b0c|WLFI":1795448962450,"0x888e000c78b8f1aada5b3c99f880794907b76d77|xyz:NVDA":1795444469924,"0x888e000c78b8f1aada5b3c99f880794907b76d77|xyz:SOXL":1795464624775,"0xf220c9b7b4c0e5e785ebe4b40b17576ce24473e0|ETH":1795339230921,"0xf1b1a8c5f8ef0023875891c2f931acc8df28196e|xyz:NVDA":1795445323823}};
+</script>
+<script>
+(function(){
+"use strict";
+const API = "https://api.hyperliquid.xyz/info";
+const CORE = ["", "xyz"];
+const REFRESH_MS = 30000, SWEEP_MS = 15*60000, LOOKBACK_H = 72;
+
+const state = {
+  mode: "loading",            // loading | live | unstable | snapshot
+  pos: new Map(),             // key addr|coin -> position
+  groups: new Map(),          // addr|dex -> Set(keys) for groups fetched OK at least once
+  extra: new Map(),           // addr -> Set(dex) where positions were found outside CORE
+  opened: new Map(),          // key -> ms (opening time, when known)
+  live: new Set(),            // keys opened while the page was open
+  log: [],
+  dexs: [],
+  lastOk: 0, fails: 0, fillsDone: 0, fillsTotal: 0, startedAt: Date.now(),
+  expanded: new Set(), snapshotTime: 0,
+};
+const BY_ADDR = new Map();
+TRADERS.forEach((t, i) => { t.rank = i; [t.main, ...t.subs].forEach(a => BY_ADDR.set(a, {t, sub: a !== t.main})); });
+const ADDRS = [...BY_ADDR.keys()];
+
+/* ---------- settings ---------- */
+const $ = id => document.getElementById(id);
+const settings = {window: 24, min: 100000, sort: "rank"};
+try { Object.assign(settings, JSON.parse(localStorage.getItem("hl-dash-settings") || "{}")); } catch (e) {}
+const SEL = {window: $("f-window"), min: $("f-min"), sort: $("f-sort")};
+for (const k in SEL) {
+  if ([...SEL[k].options].some(o => o.value === String(settings[k]))) SEL[k].value = String(settings[k]);
+  SEL[k].addEventListener("change", () => {
+    settings[k] = k === "sort" ? SEL[k].value : Number(SEL[k].value);
+    try { localStorage.setItem("hl-dash-settings", JSON.stringify(settings)); } catch (e) {}
+    render();
+  });
+}
+
+/* ---------- formatting ---------- */
+const NF = (min, max) => new Intl.NumberFormat("fr-FR", {minimumFractionDigits: min, maximumFractionDigits: max});
+const nf0 = NF(0, 0), nf1 = NF(1, 1), nf2 = NF(2, 2), nf3 = NF(3, 3);
+function usd(v) {
+  const a = Math.abs(v);
+  if (a >= 1e9) return nf2.format(a / 1e9) + " Md$";
+  if (a >= 1e7) return nf1.format(a / 1e6) + " M$";
+  if (a >= 1e6) return nf2.format(a / 1e6) + " M$";
+  if (a >= 1e3) return nf0.format(a / 1e3) + " k$";
+  return nf0.format(a) + " $";
+}
+const sign = v => (v < 0 ? "−" : "+");
+const usdS = v => sign(v) + usd(v);
+const pctS = v => sign(v) + nf1.format(Math.abs(v) * 100) + " %";
+function px(v) {
+  if (v == null || !isFinite(v)) return "—";
+  const a = Math.abs(v);
+  if (a >= 1000) return nf0.format(v);
+  if (a >= 100) return nf2.format(v);
+  if (a >= 1) return nf3.format(v);
+  return new Intl.NumberFormat("fr-FR", {maximumSignificantDigits: 4}).format(v);
+}
+function ago(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 90) return "à l'instant";
+  if (s < 3600) return "il y a " + Math.round(s / 60) + " min";
+  if (s < 48 * 3600) return "il y a " + Math.round(s / 3600) + " h";
+  return "il y a " + Math.round(s / 86400) + " j";
+}
+const clock = ms => new Date(ms).toLocaleString("fr-FR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"});
+const short = a => a.slice(0, 6) + "…" + a.slice(-4);
+
+/* ---------- DOM helper (data always goes through textContent) ---------- */
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+}
+
+/* ---------- API with a weight budget (Hyperliquid allows 1200 weight per minute per IP) ---------- */
+const Q = {queue: [], active: 0, tokens: 60, max: 60, rate: 13, pausedUntil: 0};
+setInterval(() => { Q.tokens = Math.min(Q.max, Q.tokens + Q.rate / 4); pump(); }, 250);
+function call(body, weight) { return new Promise((res, rej) => { Q.queue.push({body, weight, res, rej}); pump(); }); }
+function pump() {
+  while (Q.active < 5 && Q.queue.length && Q.tokens >= Q.queue[0].weight && Date.now() >= Q.pausedUntil) {
+    const j = Q.queue.shift(); Q.tokens -= j.weight; Q.active++;
+    raw(j.body).then(j.res, j.rej).finally(() => { Q.active--; pump(); });
+  }
+}
+async function raw(body, timeoutMs) {
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), timeoutMs || 20000);
+  try {
+    const r = await fetch(API, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: ctl.signal});
+    if (r.status === 429) { Q.pausedUntil = Date.now() + 15000; throw new Error("429"); }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(to); }
+}
+
+/* ---------- positions ---------- */
+function toPos(addr, p) {
+  const szi = Number(p.szi); if (!szi) return null;
+  const ntl = Number(p.positionValue), entry = Number(p.entryPx), mark = ntl / Math.abs(szi);
+  const who = BY_ADDR.get(addr), coin = String(p.coin), i = coin.indexOf(":");
+  return {
+    key: addr + "|" + coin, t: who.t, sub: who.sub, addr, coin, name: i >= 0 ? coin.slice(i + 1) : coin,
+    long: szi > 0, ntl, entry, mark, upnl: Number(p.unrealizedPnl),
+    pct: entry ? (mark - entry) / entry * (szi > 0 ? 1 : -1) : 0,
+    liq: p.liquidationPx != null ? Number(p.liquidationPx) : null, lev: p.leverage ? p.leverage.value : null,
+  };
+}
+function applyGroup(addr, dex, list) {
+  const g = addr + "|" + dex, prev = state.groups.get(g), next = new Set(), now = Date.now();
+  for (const p of list) {
+    next.add(p.key);
+    const old = state.pos.get(p.key);
+    if (prev) {
+      if (!old) { state.opened.set(p.key, now); state.live.add(p.key); logEvent("open", p); }
+      else if (old.long !== p.long) { state.opened.set(p.key, now); state.live.add(p.key); logEvent("flip", p); }
+    }
+    state.pos.set(p.key, p);
+  }
+  if (prev) for (const k of prev) if (!next.has(k)) {
+    const old = state.pos.get(k); if (old) logEvent("close", old);
+    state.pos.delete(k); state.opened.delete(k); state.live.delete(k);
+  }
+  state.groups.set(g, next);
+  if (list.length && !CORE.includes(dex)) { if (!state.extra.has(addr)) state.extra.set(addr, new Set()); state.extra.get(addr).add(dex); }
+}
+function logEvent(kind, p) {
+  state.log.unshift({time: Date.now(), kind, p});
+  if (state.log.length > 60) state.log.length = 60;
+}
+async function fetchGroups(pairs) {
+  let ok = 0;
+  await Promise.all(pairs.map(([addr, dex]) =>
+    call(Object.assign({type: "clearinghouseState", user: addr}, dex ? {dex} : {}), 2).then(st => {
+      const list = ((st && st.assetPositions) || []).map(x => toPos(addr, x.position)).filter(Boolean);
+      applyGroup(addr, dex, list); ok++;
+    }, () => {})));
+  return ok;
+}
+let busy = false;
+async function refreshCore() {
+  if (busy) return; busy = true;
+  try { await refreshCoreInner(); } finally { busy = false; }
+}
+async function refreshCoreInner() {
+  const pairs = [];
+  for (const a of ADDRS) for (const d of new Set([...CORE, ...(state.extra.get(a) || [])])) pairs.push([a, d]);
+  const ok = await fetchGroups(pairs);
+  if (ok >= pairs.length * 0.8) { state.lastOk = Date.now(); state.fails = 0; state.mode = "live"; }
+  else { state.fails++; if (state.fails >= 2) state.mode = "unstable"; }
+  render();
+}
+async function sweepOtherDexs() {
+  const others = state.dexs.filter(d => !CORE.includes(d));
+  const pairs = [];
+  for (const a of ADDRS) for (const d of others) if (!(state.extra.get(a) || new Set()).has(d)) pairs.push([a, d]);
+  await fetchGroups(pairs); render();
+}
+
+/* ---------- opening times from recent fills ---------- */
+async function loadFills() {
+  state.fillsTotal = ADDRS.length; state.fillsDone = 0;
+  const since = Date.now() - LOOKBACK_H * 3600000;
+  await Promise.all(ADDRS.map(async addr => {
+    try {
+      let fills = [], st = since;
+      for (let page = 0; page < 6; page++) {
+        const b = await call({type: "userFillsByTime", user: addr, startTime: st, aggregateByTime: true}, 20);
+        if (!Array.isArray(b)) break;
+        fills = fills.concat(b);
+        if (b.length < 2000) break;
+        st = Math.max(...b.map(f => f.time)) + 1;
+      }
+      fills.sort((a, b) => a.time - b.time);
+      const open = new Map();
+      for (const f of fills) {
+        const c = String(f.coin); if (c[0] === "@" || c.includes("/")) continue;
+        const sp = Number(f.startPosition || 0), after = sp + (f.side === "B" ? 1 : -1) * Number(f.sz);
+        if (Math.abs(sp) < 1e-12 || sp * after < 0) open.set(c, f.time);
+        if (Math.abs(after) < 1e-12) open.delete(c);
+      }
+      for (const [c, t] of open) { const k = addr + "|" + c; if (!state.live.has(k)) state.opened.set(k, t); }
+    } catch (e) {}
+    state.fillsDone++; render();
+  }));
+}
+
+/* ---------- rendering ---------- */
+let pending = false;
+function render() { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; draw(); }); }
+const isNew = p => { const o = state.opened.get(p.key); return o != null && Date.now() - o <= settings.window * 3600000; };
+function sideEl(p) { return h("span", {class: "side " + (p.long ? "long" : "short")}, h("i"), (p.long ? "Long " : "Short ") + p.name); }
+function pnlEl(p) { return h("td", {class: "r"}, h("span", {class: p.upnl >= 0 ? "up" : "down", text: usdS(p.upnl)}), h("small", {text: pctS(p.pct)})); }
+function liqText(p) {
+  if (p.liq == null) return null;
+  const d = (p.liq - p.mark) / p.mark;
+  if (Math.abs(d) >= 1) return null;            // more than 100 % away: not worth a line
+  return "liq. " + px(p.liq) + " (à " + pctS(d) + ")";
+}
+const join = (...parts) => parts.filter(Boolean).join(" · ");
+function traderLink(t) { return h("a", {href: "https://hypurrscan.io/address/" + t.main, target: "_blank", rel: "noopener"}, t.label); }
+
+function draw() {
+  const all = [...state.pos.values()];
+  const now = Date.now();
+  /* status */
+  const st = $("status"), txt = $("status-text");
+  st.dataset.mode = state.mode;
+  txt.replaceChildren();
+  if (state.mode === "live") txt.append("En direct ", h("small", {text: "· mis à jour " + ago(state.lastOk)}));
+  else if (state.mode === "unstable") txt.append("Connexion instable ", h("small", {text: state.lastOk ? "· dernières données " + ago(state.lastOk) : ""}));
+  else if (state.mode === "snapshot") txt.append("Aperçu figé ", h("small", {text: "· " + clock(state.snapshotTime)}));
+  else txt.append("Connexion…");
+
+  /* KPIs */
+  const tot = all.reduce((s, p) => s + p.ntl, 0), lg = all.filter(p => p.long).reduce((s, p) => s + p.ntl, 0);
+  const pnl = all.reduce((s, p) => s + p.upnl, 0);
+  const fresh = all.filter(p => isNew(p) && p.ntl >= settings.min).sort((a, b) => state.opened.get(b.key) - state.opened.get(a.key));
+  const winLabel = settings.window >= 48 ? (settings.window / 24) + " j" : settings.window + " h";
+  const kp = (k, v, n, cls, vcls) => h("div", {class: "kpi" + (cls ? " " + cls : "")}, h("div", {class: "k", text: k}), h("div", {class: "v" + (vcls ? " " + vcls : ""), text: v}), h("div", {class: "n", text: n}));
+  $("kpis").replaceChildren(
+    kp("Exposition totale", usd(tot), all.length + " positions"),
+    kp("En long", usd(lg), tot ? nf0.format(lg / tot * 100) + " % de l'exposition" : "—"),
+    kp("En short", usd(tot - lg), tot ? nf0.format((tot - lg) / tot * 100) + " % de l'exposition" : "—"),
+    kp("PnL latent", usdS(pnl), "hors funding", "", pnl >= 0 ? "up" : "down"),
+    kp("Nouvelles positions", String(fresh.length), "ouvertes depuis " + winLabel, fresh.length ? "hot" : "")
+  );
+
+  /* new positions */
+  const loadingDates = state.mode !== "snapshot" && state.fillsDone < state.fillsTotal;
+  $("new-count").textContent = "· " + fresh.length + " sur les dernières " + (settings.window >= 48 ? (settings.window / 24) + " jours" : settings.window + " heures") + (loadingDates ? " (dates d'ouverture en cours de chargement : " + state.fillsDone + "/" + state.fillsTotal + ")" : "");
+  if (!fresh.length) $("new-body").replaceChildren(h("div", {class: "empty", text: loadingDates || state.mode === "loading" ? "Chargement…" : "Aucune nouvelle position au-dessus de la taille minimale sur cette période."}));
+  else {
+    const tb = h("tbody");
+    for (const p of fresh) {
+      const o = state.opened.get(p.key);
+      tb.append(h("tr", {class: "new" + (state.live.has(p.key) && now - o < 6000 ? " flash" : "")},
+        h("td", null, ago(o), h("small", {text: clock(o)})),
+        h("td", null, traderLink(p.t), p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null),
+        h("td", null, sideEl(p), h("small", {text: join(p.lev ? "levier affiché " + p.lev + "x" : null, liqText(p))})),
+        h("td", {class: "r", text: usd(p.ntl)}),
+        h("td", {class: "r", text: px(p.entry)}),
+        h("td", {class: "r", text: px(p.mark)}),
+        pnlEl(p)));
+    }
+    $("new-body").replaceChildren(h("table", null,
+      h("thead", null, h("tr", null, h("th", {text: "Ouverte"}), h("th", {text: "Trader"}), h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Entrée"}), h("th", {class: "r", text: "Prix actuel"}), h("th", {class: "r", text: "PnL latent"}))), tb));
+  }
+
+  /* session log */
+  $("sec-log").hidden = state.mode === "snapshot" || !state.log.length;
+  if (state.log.length) {
+    const tb = h("tbody"), lab = {open: "Ouverture", close: "Clôture", flip: "Retournement"};
+    for (const ev of state.log.slice(0, 25)) {
+      const p = ev.p;
+      tb.append(h("tr", null,
+        h("td", null, ago(ev.time), h("small", {text: clock(ev.time)})),
+        h("td", {text: lab[ev.kind]}),
+        h("td", null, traderLink(p.t), p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null),
+        h("td", null, sideEl(p)),
+        h("td", {class: "r", text: usd(p.ntl)}),
+        ev.kind === "close" ? h("td", {class: "r"}, h("span", {class: p.upnl >= 0 ? "up" : "down", text: usdS(p.upnl)}), h("small", {text: "PnL latent juste avant"})) : h("td", {class: "r", text: "à " + px(p.entry)})));
+    }
+    $("log-body").replaceChildren(h("table", null,
+      h("thead", null, h("tr", null, h("th", {text: "Quand"}), h("th", {text: "Mouvement"}), h("th", {text: "Trader"}), h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Détail"}))), tb));
+  }
+
+  /* trader cards */
+  const per = TRADERS.map(t => {
+    const ps = all.filter(p => p.t === t).sort((a, b) => b.ntl - a.ntl);
+    const ntl = ps.reduce((s, p) => s + p.ntl, 0), lng = ps.filter(p => p.long).reduce((s, p) => s + p.ntl, 0);
+    const recent = Math.max(0, ...ps.filter(p => isNew(p) && p.ntl >= settings.min).map(p => state.opened.get(p.key)));
+    return {t, ps, ntl, lng, sht: ntl - lng, pnl: ps.reduce((s, p) => s + p.upnl, 0), recent};
+  });
+  const sorters = {rank: (a, b) => a.t.rank - b.t.rank, ntl: (a, b) => b.ntl - a.ntl || a.t.rank - b.t.rank, pnl: (a, b) => b.pnl - a.pnl || a.t.rank - b.t.rank, recent: (a, b) => b.recent - a.recent || a.t.rank - b.t.rank};
+  per.sort(sorters[settings.sort] || sorters.rank);
+  const cards = per.map(d => {
+    const t = d.t, hidden = d.ps.filter(p => p.ntl < settings.min);
+    const list = state.expanded.has(t.id) ? d.ps : d.ps.filter(p => p.ntl >= settings.min);
+    const net = d.lng - d.sht;
+    const head = h("header", null,
+      h("div", {class: "who"}, h("span", {class: "rank", text: t.label}), h("a", {class: "addr", href: "https://hypurrscan.io/address/" + t.main, target: "_blank", rel: "noopener", title: t.main}, short(t.main)),
+        t.subs.length ? h("span", {class: "addr", text: "+ " + t.subs.length + (t.subs.length > 1 ? " sous-comptes" : " sous-compte")}) : null),
+      d.ps.length ? h("div", {class: "tot"},
+        h("span", null, h("span", {class: "lab", text: "Exposition "}), h("b", {text: usd(d.ntl)})),
+        h("span", null, h("span", {class: "lab", text: "Net "}), h("b", {text: (Math.abs(net) < 1000 ? "neutre" : (net > 0 ? "long " : "short ") + usd(net))})),
+        h("span", null, h("span", {class: "lab", text: "PnL latent "}), h("b", {class: d.pnl >= 0 ? "up" : "down", text: usdS(d.pnl)}))) : null,
+      d.ntl > 0 ? h("div", {class: "bar", role: "img", "aria-label": "Long " + usd(d.lng) + ", short " + usd(d.sht), title: "Long " + usd(d.lng) + " · Short " + usd(d.sht)},
+        d.lng > 0 ? h("i", {class: "l", style: "flex:" + Math.max(d.lng, d.ntl * 0.01)}) : null,
+        d.sht > 0 ? h("i", {class: "s", style: "flex:" + Math.max(d.sht, d.ntl * 0.01)}) : null) : null,
+      d.ntl > 0 ? h("div", {class: "barlegend"}, h("span", {class: "l", text: "Long " + usd(d.lng)}), h("span", {class: "s", text: "Short " + usd(d.sht)})) : null);
+    const card = h("article", {class: "card" + (d.recent ? " hasnew" : ""), id: "t-" + t.id}, head);
+    if (!d.ps.length) card.append(h("div", {class: "flat", text: state.mode === "loading" ? "Chargement…" : "Aucune position ouverte."}));
+    else {
+      if (list.length) {
+        const tb = h("tbody");
+        for (const p of list) {
+          const o = state.opened.get(p.key), nw = isNew(p);
+          tb.append(h("tr", {class: nw ? "new" + (state.live.has(p.key) && now - o < 6000 ? " flash" : "") : null},
+            h("td", null, sideEl(p), nw ? h("span", {class: "badge", text: "NOUVEAU"}) : null, p.sub ? h("span", {class: "tag", text: "sous-compte"}) : null,
+              h("small", {text: join(o != null ? "ouverte " + ago(o) : null, p.lev ? p.lev + "x" : null, liqText(p))})),
+            h("td", {class: "r", text: usd(p.ntl)}),
+            h("td", {class: "r"}, px(p.mark), h("small", {text: "entrée " + px(p.entry)})),
+            pnlEl(p)));
+        }
+        card.append(h("div", {class: "scroll"}, h("table", null,
+          h("thead", null, h("tr", null, h("th", {text: "Position"}), h("th", {class: "r", text: "Taille"}), h("th", {class: "r", text: "Prix actuel"}), h("th", {class: "r", text: "PnL latent"}))), tb)));
+      } else card.append(h("div", {class: "flat", text: "Aucune position au-dessus de la taille minimale."}));
+      if (hidden.length) {
+        const exp = state.expanded.has(t.id);
+        const b = h("button", {class: "more", type: "button", "aria-expanded": exp ? "true" : "false",
+          text: exp ? "Masquer les " + hidden.length + " petites positions" : "+ " + hidden.length + (hidden.length > 1 ? " petites positions" : " petite position") + " (" + usd(hidden.reduce((s, p) => s + p.ntl, 0)) + ", PnL latent " + usdS(hidden.reduce((s, p) => s + p.upnl, 0)) + ")"});
+        b.addEventListener("click", () => { exp ? state.expanded.delete(t.id) : state.expanded.add(t.id); draw(); });
+        card.append(b);
+      }
+    }
+    return card;
+  });
+  $("traders").replaceChildren(...cards);
+}
+
+/* ---------- start ---------- */
+function useSnapshot(reason) {
+  state.mode = "snapshot";
+  if (SNAPSHOT) {
+    state.snapshotTime = SNAPSHOT.time;
+    for (const r of SNAPSHOT.pos) {
+      const p = toPos(r.a, {szi: r.s, positionValue: r.n, entryPx: r.e, unrealizedPnl: r.u, liquidationPx: r.l, coin: r.c, leverage: {value: r.x}});
+      if (p) state.pos.set(p.key, p);
+    }
+    for (const k in SNAPSHOT.opened) state.opened.set(k, SNAPSHOT.opened[k]);
+  }
+  const b = $("banner"); b.hidden = false;
+  b.replaceChildren(h("strong", {text: "Aperçu figé. "}), "L'API de Hyperliquid n'a pas répondu depuis cette fenêtre, donc la page affiche les positions relevées le " + clock(state.snapshotTime) + ". Rechargez la page pour retrouver le direct.");
+  render();
+}
+async function start() {
+  render();
+  let dexs;
+  try { dexs = await raw({type: "perpDexs"}, 10000); } catch (e) { return useSnapshot(e); }
+  state.dexs = (Array.isArray(dexs) ? dexs : []).map(d => d && d.name ? d.name : "");
+  if (!state.dexs.includes("")) state.dexs.unshift("");
+  await refreshCore();
+  if (state.mode !== "live" && !state.pos.size) return useSnapshot();
+  await loadFills();
+  await sweepOtherDexs();
+  setInterval(() => { refreshCore(); }, REFRESH_MS);
+  setInterval(() => { sweepOtherDexs(); }, SWEEP_MS);
+  setInterval(render, 15000);
+}
+window.hlDash = {state, refreshCore, render};
+start();
+})();
+</script>
+</body>
+</html>
