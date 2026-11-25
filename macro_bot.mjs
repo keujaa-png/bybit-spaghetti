@@ -199,6 +199,7 @@ Carte des dépendances (effets de second tour). Quand une nouvelle touche un lea
 - Dette souveraine (France, Italie, Royaume-Uni) -> banques du pays, futures OAT/BTP/Gilt, indice ou ETF du pays (AMEX:EWQ, AMEX:EWI, AMEX:EWU), euro ou livre.
 - Yen, Banque du Japon -> exportateurs japonais, Nikkei, positions de carry (valeurs de croissance américaines, devises émergentes).
 - Dollar fort -> émergents (AMEX:EWZ, AMEX:EWW, AMEX:EIDO), matières premières, or.
+- Or, cuivre, métaux -> argent (AMEX:SLV, COMEX:SI1!) : il amplifie l'or (environ 1,5 à 2 fois ses mouvements) et suit aussi le cuivre par son usage industriel ; quand l'or ou le cuivre cassent, regarde TOUJOURS l'argent. Aussi platine (NYMEX:PL1!) et palladium (NYMEX:PA1!), mineurs (AMEX:GDX, AMEX:GDXJ, AMEX:SILJ, NYSE:PAAS, NYSE:BVN, LSE:FRES), rand sud-africain, dollar australien.
 Un ETF pays très concentré est souvent l'expression la plus propre et la plus liquide d'un choc sur son premier poids.`;
 
 // Passage « choc » : détection sans modèle. Un leader mondial + un mot de rupture, dans au moins 2 titres de moins de 6 heures.
@@ -207,6 +208,7 @@ const LEADERS = {Nvidia: /\bnvidia\b|jensen huang/i, TSMC: /\btsmc\b|taiwan semi
   JPMorgan: /\bjpmorgan\b|\bjp morgan\b/i, 'Goldman Sachs': /\bgoldman\b/i, Berkshire: /\bberkshire\b|\bbuffett\b/i, 'Saudi Aramco': /\baramco\b/i, Exxon: /\bexxon\b/i, 'Novo Nordisk': /\bnovo nordisk\b/i, 'Eli Lilly': /\beli lilly\b/i,
   LVMH: /\blvmh\b/i, Toyota: /\btoyota\b/i, Alibaba: /\balibaba\b/i, Tencent: /\btencent\b/i, BYD: /\bbyd\b/i, Boeing: /\bboeing\b/i, Airbus: /\bairbus\b/i, Volkswagen: /\bvolkswagen\b/i, SoftBank: /\bsoftbank\b/i,
   'la Fed': /\bfed\b|federal reserve|\bpowell\b/i, 'la BCE': /\becb\b|\blagarde\b/i, 'la Banque du Japon': /\bboj\b|bank of japan/i, 'la Banque de Chine': /\bpboc\b/i, "l'OPEP": /\bopec\b/i,
+  'l\'or': /\bgold (price|prices|futures)\b|\bbullion\b/i, 'l\'argent (métal)': /\bsilver (price|prices|futures)\b/i, 'le cuivre': /\bcopper (price|prices|futures)\b/i,
   'le détroit d\'Ormuz': /\bhormuz\b/i, 'Taïwan (détroit)': /taiwan strait|blockade of taiwan/i};
 const SHOCK = /\b(resign(s|ed|ation)?|steps? down|stepping down|oust(s|ed|er)?|fired|sacked|dies|dead|death|probe|investigat\w+|fraud|indict\w+|arrest\w+|raid(s|ed)?|profit warning|(cuts?|slash(es|ed)|lowers?|withdraws?) (its |full-year |annual )?(guidance|forecast|outlook)|halts?|suspend(s|ed)|bans?|banned|export (ban|curbs?|controls?)|sanction(s|ed)?|defaults?|defaulted|downgrad\w+|bankrupt\w*|emergency|surprise|shock\w*|plunge[sd]?|crash(es|ed)?|collapse[sd]?|attack(s|ed)?|invad\w+|invasion|coup|blockade|seiz(es|ed|ure)|nationali[sz]\w+|hack(ed)?|explosion)\b/i;
 async function detectChoc() {
